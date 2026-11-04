@@ -1,0 +1,70 @@
+name: 🔁 Rename A_API_room to API_room
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rename_folder:
+    runs-on: ubuntu-latest
+
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 2. 📦 Install requests
+        run: pip install requests
+
+      - name: 3. 🗂️ Rename Folder via GitHub API
+        run: |
+          python -c "
+import os, requests, base64, json
+
+token = os.getenv('TOKEN_GITHUB')
+repo = 'sawajstudio-system/Backend'
+base_url = f'https://api.github.com/repos/{repo}/contents/'
+headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github+json'}
+
+# 1. Get list of files in A_API_room
+old_folder = 'System_room/A_API_room'
+r = requests.get(base_url + old_folder, headers=headers)
+
+if r.status_code != 200:
+    print(f'❌ Folder {old_folder} not found. Exiting.')
+    exit(1)
+
+files = r.json()
+print(f'Found {len(files)} items in {old_folder}. Moving to API_room...')
+
+# 2. Copy each file to new location
+for item in files:
+    if item['type'] == 'file':
+        path = item['path']
+        new_path = path.replace('A_API_room', 'API_room')
+        
+        # Get file content
+        file_data = requests.get(item['url'], headers=headers).json()
+        
+        # Create file in new location
+        create_url = base_url + new_path
+        payload = {
+            'message': f'Rename: {path} -> {new_path}',
+            'content': file_data['content']
+        }
+        res = requests.put(create_url, headers=headers, json=payload)
+        
+        if res.status_code in (200, 201):
+            print(f'  ✅ Created: {new_path}')
+            
+            # Delete old file
+            del_payload = {'message': f'Delete old: {path}', 'sha': item['sha']}
+            requests.delete(item['url'], headers=headers, json=del_payload)
+        else:
+            print(f'  ❌ Failed to create {new_path}: {res.status_code}')
+
+print('✅ Rename Complete! Ab API_room use karein.')
+"
