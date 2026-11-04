@@ -1,6 +1,6 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # 📁 FILE: Firent/.github/workflows/🔄Smart-Trigger.yml
-# 📝 DESCRIPTION: Automatically syncs and updates Master.yml with Real Workflow Names
+# 📝 DESCRIPTION: Automatically syncs and updates Master.yml with Fixed YAML Block Syntax
 # ══════════════════════════════════════════════════════════════════════════════
 
 name: 🔄 Smart Trigger
@@ -90,8 +90,16 @@ jobs:
               clean_name = wf['base_name'].replace(' ', '_').replace('-', '_')
               clean_name = ''.join(c for c in clean_name if c.isalnum() or c=='_')
               
-              desc = f"{wf['display_name']} ({wf['filename']})"
-              inputs_lines.append(f"      run_{clean_name}: {{ description: '{desc}', type: boolean, default: false }}")
+              # Sanitize quotes to prevent breaking YAML string values
+              safe_desc = str(wf['display_name']).replace("'", "").replace('"', "")
+              desc = f"{safe_desc} ({wf['filename']})"
+              
+              # ✅ Fixed: Multi-line Block Style YAML for GitHub Actions Inputs
+              inputs_lines.append(f"      run_{clean_name}:")
+              inputs_lines.append(f"        description: '{desc}'")
+              inputs_lines.append(f"        type: boolean")
+              inputs_lines.append(f"        default: false")
+
               logic_lines.append(f'            [[ "${{{{ github.event.inputs.run_{clean_name} }}}}" == "true" ]] && {{ echo "🚀 Triggering: {wf["filename"]}"; gh workflow run "{wf["filename"]}" --repo sawajstudio-system/Firent || echo "Failed to trigger {wf["filename"]}"; sleep 2; }}')
 
           inputs_str = "\n".join(inputs_lines)
@@ -156,7 +164,7 @@ jobs:
               if master_file.decoded_content.decode('utf-8') != master_content:
                   repo.update_file(
                       master_path, 
-                      '🔄 Smart Trigger: Master synced with real workflow names & YAML validation', 
+                      '🔄 Smart Trigger: Fixed inputs block syntax in Master.yml', 
                       master_content, 
                       master_file.sha
                   )
