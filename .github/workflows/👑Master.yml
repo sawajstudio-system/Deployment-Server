@@ -2,67 +2,38 @@
 # 📁 SAVE THIS FILE AT:
 #    Firent/.github/workflows/👑Master.yml
 # ══════════════════════════════════════════════════════════════════════════════
-name: 👑 Master Test Runner (Run All)
+name: 👑 Master Runner (All YML)
 
 on:
   workflow_dispatch:
 
 jobs:
-  run_all_apis:
+  run_all:
     runs-on: ubuntu-latest
-    steps:
-      - name: 🚀 Trigger All API Tests
-        run: |
-          echo "Triggering API Tests..."
-          gh workflow run "☁️ Cloudflare API Test"
-          gh workflow run "🅰️ Anges API Test"
-          gh workflow run "🌐 OpenRouter API Test"
-          gh workflow run "🎨 Tanvo API Test"
-          gh workflow run "🎬 Coverr API Test"
-          gh workflow run "🎬 Pexels API Test"
-          gh workflow run "🖼️ Pixabay API Test"
-          gh workflow run "🔑 Gemini API Test"
-          gh workflow run "⚡ Groq API Test"
-          gh workflow run "🟢 NVIDIA API Test"
-          gh workflow run "🧠 Cohere API Test"
-          gh workflow run "🪄 Magic API Test"
-          gh workflow run "📱 Telegram Bot Test"
-          gh workflow run "📸 Cloudinary API Test"
-          gh workflow run "🌐 UMMAH API Test"
-          gh workflow run "🌐 Quran Foundation Test"
-          gh workflow run "🌐 Natural Sound URL Test"
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GITHUB }}
 
-  run_all_urls:
-    runs-on: ubuntu-latest
     steps:
-      - name: 🚀 Trigger All URL Tests
-        run: |
-          echo "Triggering URL Tests..."
-          gh workflow run "🌐 AI Image URL Test"
-          gh workflow run "🌐 Hadees URL Test"
-          gh workflow run "🌐 Hijri Date URL Test"
-          gh workflow run "🌐 Jokes URL Test"
-          gh workflow run "🌐 Quotes URL Test"
-          gh workflow run "🌐 Quran URL Test"
-          gh workflow run "🌐 Quran Audio URL Test"
-          gh workflow run "🌐 Quran Tafsir URL Test"
-          gh workflow run "🌐 Translator URL Test"
+      - name: 🚀 Trigger All Workflows
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GITHUB }}
-
-  run_other_tools:
-    runs-on: ubuntu-latest
-    steps:
-      - name: 🚀 Trigger Other Tools (Git, GDrive, Cleaner)
         run: |
-          echo "Triggering Other Tools..."
-          gh workflow run "🐙 GitHub API Test"
-          gh workflow run "📄 TXT Generator (Air Mode)"
-          gh workflow run "📦ZIP_Generator (Air Mode)"
-          gh workflow run "🧹 History Cleaner (Air Mode)"
-          gh workflow run "🧪 Test All GDrive Folders"
-          gh workflow run "🧪 GDrive Test"
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GITHUB }}
+          echo "🔍 Fetching all workflows..."
+          
+          # GitHub API se saari workflows ki list nikaal rahe hain
+          WORKFLOWS=$(gh api repos/sawajstudio-system/Firent/actions/workflows --paginate --jq '.workflows[].path')
+          
+          echo "📋 Found the following workflows:"
+          echo "$WORKFLOWS"
+          
+          echo "======================================"
+          
+          # Ek-ek karke saari workflows ko trigger karenge (khud ko chhod kar)
+          for wf in $WORKFLOWS; do
+            if [[ "$wf" != *"👑Master.yml"* ]]; then
+              echo "🚀 Triggering: $wf"
+              gh workflow run "$wf" || echo "⚠️ Could not trigger $wf"
+            else
+              echo "⏭️ Skipping Master workflow (khud ko trigger nahi karna)"
+            fi
+          done
+          
+          echo "✅ All workflows triggered!"
