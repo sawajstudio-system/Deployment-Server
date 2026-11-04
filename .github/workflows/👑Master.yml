@@ -2,38 +2,73 @@
 # 📁 SAVE THIS FILE AT:
 #    Firent/.github/workflows/👑Master.yml
 # ══════════════════════════════════════════════════════════════════════════════
-name: 👑 Master Runner (All YML)
+name: 👑 Master Runner (Sequential)
 
 on:
   workflow_dispatch:
 
 jobs:
-  run_all:
+  run_all_sequentially:
     runs-on: ubuntu-latest
+    timeout-minutes: 120 # Agar sab chalne mein time lage toh 2 ghante tak rukega
 
     steps:
-      - name: 🚀 Trigger All Workflows
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🚀 Run All Workflows (One by One)
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GITHUB }}
         run: |
           echo "🔍 Fetching all workflows..."
+          # Saari workflows ki list nikaal rahe hain (JSON format mein)
+          gh api repos/sawajstudio-system/Firent/actions/workflows --paginate > /tmp/workflows.json
           
-          # GitHub API se saari workflows ki list nikaal rahe hain
-          WORKFLOWS=$(gh api repos/sawajstudio-system/Firent/actions/workflows --paginate --jq '.workflows[].path')
-          
-          echo "📋 Found the following workflows:"
-          echo "$WORKFLOWS"
+          # jq ke through IDs aur Names nikaal rahe hain
+          jq -r '.workflows[] | "\(.id)|\(.name)"' /tmp/workflows.json > /tmp/wf_list.txt
           
           echo "======================================"
           
-          # Ek-ek karke saari workflows ko trigger karenge (khud ko chhod kar)
-          for wf in $WORKFLOWS; do
-            if [[ "$wf" != *"👑Master.yml"* ]]; then
-              echo "🚀 Triggering: $wf"
-              gh workflow run "$wf" || echo "⚠️ Could not trigger $wf"
-            else
-              echo "⏭️ Skipping Master workflow (khud ko trigger nahi karna)"
+          # Ek-ek karke loop chalega
+          while IFS='|' read -r id name; do
+            # Master workflow ko skip karna hai
+            if [[ "$name" == *"Master Runner"* ]]; then
+              continue
             fi
-          done
+            
+            echo "▶️ Starting: $name (ID: $id)"
+            
+            # 1. Workflow ko trigger karo
+            gh workflow run $id
+            
+            # 2. Thoda wait karo taaki workflow queue ho jaye (5 seconds)
+            sleep 5
+            
+            # 3. Current time save karo
+            START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            
+            # 4. Workflow ka run ID dhoondho
+            RUN_ID=""
+            while [[ -z "$RUN_ID" ]]; do
+              sleep 2
+              RUN_ID=$(gh api "repos/sawajstudio-system/Firent/actions/workflows/$id/runs?per_page=5" --jq ".workflow_runs[] | select(.created_at >= \"$START_TIME\") | .id" | head -n 1)
+            done
+            
+            echo "   ⏳ Waiting for $name to finish (Run ID: $RUN_ID)..."
+            
+            # 5. Jab tak status 'completed' nahi hota, wait karo
+            STATUS=""
+            while [[ "$STATUS" != "completed" ]]; do
+              sleep 10
+              STATUS=$(gh api "repos/sawajstudio-system/Firent/actions/runs/$RUN_ID" --jq ".status")
+              echo "      Status: $STATUS"
+            done
+            
+            # 6. Result check karo (Success / Fail)
+            CONCLUSION=$(gh api "repos/sawajstudio-system/Firent/actions/runs/$RUN_ID" --jq ".conclusion")
+            echo "✅ Finished: $name -> Result: $CONCLUSION"
+            echo "--------------------------------------"
+            
+          done < /tmp/wf_list.txt
           
-          echo "✅ All workflows triggered!"
+          echo "🎉 All workflows completed one by one!"
