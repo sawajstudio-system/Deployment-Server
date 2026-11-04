@@ -27,15 +27,20 @@ jobs:
         
       - name: 3. 🪶 Fetch & Run UMMAH Test
         run: |
-          echo "📥 Downloading UMMAH.py..."
+          echo "📥 Downloading UMMAH.py from Other folder..."
+          set +e
+          # ✅ Path bilkul sahi hai: Other/UMMAH.py
           curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
             -H "Accept: application/vnd.github.raw" \
-            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/URL_room/Islamic/UMMAH.py" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/URL_room/Other/UMMAH.py" \
             -o /tmp/UMMAH.py
           
           if [ -s /tmp/UMMAH.py ]; then
+            echo "✅ File mil gayi!"
             python /tmp/UMMAH.py
           else
-            echo "❌ Download FAILED"
+            echo "❌ File download fail ho gaya."
+            exit 1
           fi
+          
           rm -f /tmp/UMMAH.py
