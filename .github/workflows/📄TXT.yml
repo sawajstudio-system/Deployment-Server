@@ -1,4 +1,4 @@
-name: 📄 TXT Generator
+name: 📄 TXT Generator (Air Mode)
 
 on:
   workflow_dispatch:
@@ -31,20 +31,18 @@ jobs:
       - name: 2. 📦 Install requests
         run: pip install requests
 
-      - name: 3. 🔒 Clone Private Backend
-        run: |
-          git clone https://${{ secrets.TOKEN_GITHUB }}@github.com/sawajstudio-system/Backend.git ${{ runner.temp }}/private_repo
-
-      - name: 4. 🪶 Fetch & Run TXT Generator
+      - name: 3. 🪶 Fetch & Run TXT Generator
         run: |
           set +e
           curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
             -H "Accept: application/vnd.github.raw" \
             "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/Git_room/txt_generator.py" \
             -o /tmp/txt_generator.py
-          if [ -s /tmp/txt_generator.py ]; then python /tmp/txt_generator.py; else echo "❌ Download FAILED"; fi
+          
+          if [ -s /tmp/txt_generator.py ]; then 
+            python /tmp/txt_generator.py
+          else 
+            echo "❌ Download FAILED"
+            exit 1
+          fi
           rm -f /tmp/txt_generator.py
-
-      - name: 5. 💨 Cleanup
-        if: always()
-        run: rm -rf ${{ runner.temp }}/private_repo
