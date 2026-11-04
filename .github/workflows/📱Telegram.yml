@@ -14,8 +14,8 @@ jobs:
     env:
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      # TELEGRAM_BOT_TOKEN hata diya kyunki hum report token use kar rahe hain
 
     steps:
       - name: 1. 🐍 Setup Python
@@ -28,8 +28,8 @@ jobs:
 
       - name: 3. 🔍 Debug — Env Check
         run: |
-          echo "TELEGRAM_BOT_TOKEN set: ${{ secrets.TELEGRAM_BOT_TOKEN != '' }}"
-          echo "TOKEN_GITHUB set:       ${{ secrets.TOKEN_GITHUB != '' }}"
+          echo "TELEGRAM_API_REPORT_TOKEN set: ${{ secrets.TELEGRAM_API_REPORT_TOKEN != '' }}"
+          echo "TOKEN_GITHUB set:              ${{ secrets.TOKEN_GITHUB != '' }}"
 
       - name: 4. 🪶 Fetch Telegram Test
         run: |
