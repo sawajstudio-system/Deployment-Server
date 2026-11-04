@@ -1,4 +1,4 @@
-name: 🧹 Cleaner
+name: 🧹 History Cleaner
 
 on:
   workflow_dispatch:
@@ -6,22 +6,19 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: write
-
     env:
-      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
 
     steps:
       - name: 1. 📥 Checkout Public Repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.TOKEN_GITHUB }}
 
-      - name: 2. 🔒 Clone Private Backend in Air
+      - name: 2. 🔒 Clone Private Backend
         run: |
           git clone https://${{ secrets.TOKEN_GITHUB }}@github.com/sawajstudio-system/Backend.git ${{ runner.temp }}/private_repo
 
@@ -30,19 +27,19 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 4. 📦 Install Deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
+      - name: 4. 📦 Install requests
+        run: pip install requests
 
-      - name: 5. 🧹 Run Safe Cleaner
+      - name: 5. 🪶 Fetch & Run History Cleaner
         run: |
-          cp ${{ runner.temp }}/private_repo/System_room/cleaner.py ${{ runner.temp }}/cleaner.py
-          python ${{ runner.temp }}/cleaner.py
+          set +e
+          curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/Git_room/history_cleaner.py" \
+            -o /tmp/history_cleaner.py
+          if [ -s /tmp/history_cleaner.py ]; then python /tmp/history_cleaner.py; else echo "❌ Download FAILED"; fi
+          rm -f /tmp/history_cleaner.py
 
-      - name: 6. 💨 Vanish from Air
+      - name: 6. 💨 Cleanup
         if: always()
-        run: |
-          rm -rf ${{ runner.temp }}/private_repo
-          rm -f ${{ runner.temp }}/cleaner.py
-          echo "✅ Hawa mein hi gayab ho gaya!"
+        run: rm -rf ${{ runner.temp }}/private_repo
