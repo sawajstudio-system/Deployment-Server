@@ -1,0 +1,42 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 SAVE THIS FILE AT:
+#    Firent/.github/workflows/🌐QuranTafsir.yml
+# ══════════════════════════════════════════════════════════════════════════════
+name: 🌐 Quran Tafsir URL Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: 2. 📦 Install requests
+        run: pip install requests
+        
+      - name: 3. 🪶 Fetch & Run Tafsir Test
+        run: |
+          echo "📥 Downloading quran_tafsir.py..."
+          curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/URL_room/Islamic/quran_tafsir.py" \
+            -o /tmp/quran_tafsir.py
+          
+          if [ -s /tmp/quran_tafsir.py ]; then
+            echo "✅ File mil gayi!"
+            python /tmp/quran_tafsir.py
+          else
+            echo "❌ File download fail ho gaya."
+            exit 1
+          fi
+          rm -f /tmp/quran_tafsir.py
