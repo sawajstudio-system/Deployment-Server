@@ -1,4 +1,4 @@
-name: 📄 TXT Generator (Strong)
+name: 📄 TXT Generator (Full Dump)
 
 on:
   workflow_dispatch:
@@ -13,19 +13,15 @@ on:
           - 'Public Only'
           - 'Private Only'
       dry_run:
-        description: 'Dry run? (content fetch nahi hoga, sirf file list)'
+        description: 'Dry run? (content fetch nahi hoga)'
         required: false
         type: boolean
         default: false
-      max_files:
-        description: 'Max files per repo (default 5000)'
-        required: false
-        default: '5000'
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     env:
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
@@ -33,7 +29,6 @@ jobs:
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
       REPO_TARGET: ${{ github.event.inputs.repo_target }}
       DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
-      MAX_FILES: ${{ github.event.inputs.max_files }}
 
     steps:
       - name: 1. 🐍 Setup Python
