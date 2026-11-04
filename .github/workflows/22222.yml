@@ -1,0 +1,72 @@
+name: 🧹 Move Key-based APIs to A_API_room
+
+on:
+  workflow_dispatch:
+
+jobs:
+  move_files:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 2. 📦 Install requests
+        run: pip install requests
+
+      - name: 3. 🚚 Move Files via GitHub API
+        run: |
+          python -c "
+import os, requests, base64, sys
+
+token = os.getenv('TOKEN_GITHUB')
+repo = 'sawajstudio-system/Backend'
+base_url = f'https://api.github.com/repos/{repo}/contents/'
+headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github+json'}
+
+# Files to move: (old_path, new_path)
+moves = [
+    ('System_room/URL_room/Islamic/UMMAH.py', 'System_room/A_API_room/01_ai_models/UMMAH.py'),
+    ('System_room/URL_room/Islamic/quran_foundation.py', 'System_room/A_API_room/01_ai_models/quran_foundation.py'),
+    ('System_room/URL_room/Music/natural_sound.py', 'System_room/A_API_room/02_audio_media/natural_sound.py')
+]
+
+def get_file(path):
+    r = requests.get(base_url + path, headers=headers)
+    return r.json() if r.status_code == 200 else None
+
+def create_file(path, content, message):
+    payload = {'message': message, 'content': content}
+    r = requests.put(base_url + path, headers=headers, json=payload)
+    return r.status_code in (200, 201)
+
+def delete_file(path, sha, message):
+    payload = {'message': message, 'sha': sha}
+    r = requests.delete(base_url + path, headers=headers, json=payload)
+    return r.status_code == 200
+
+for old_path, new_path in moves:
+    print(f'🔄 Moving: {old_path} -> {new_path}')
+    file_data = get_file(old_path)
+    
+    if not file_data or 'content' not in file_data:
+        print(f'  ⚠️ Skipped: File not found in URL_room')
+        continue
+        
+    # Create new file in API room
+    if create_file(new_path, file_data['content'], f'Move {old_path.split(\"/\")[-1]} to API room'):
+        print(f'  ✅ Created: {new_path}')
+        # Delete old file
+        if delete_file(old_path, file_data['sha'], f'Delete old {old_path.split(\"/\")[-1]}'):
+            print(f'  🗑️ Deleted old: {old_path}')
+        else:
+            print(f'  ⚠️ Failed to delete old file: {old_path}')
+    else:
+        print(f'  ❌ Failed to create {new_path}')
+
+print('✨ Done!')
+"
