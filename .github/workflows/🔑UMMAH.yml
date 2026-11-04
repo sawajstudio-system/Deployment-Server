@@ -1,3 +1,7 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 SAVE THIS FILE AT:
+#    Firent/.github/workflows/🔑UMMAH.yml
+# ══════════════════════════════════════════════════════════════════════════════
 name: 🌐 UMMAH API Test
 
 on:
@@ -23,12 +27,10 @@ jobs:
         
       - name: 3. 🪶 Fetch & Run UMMAH Test
         run: |
-          echo "📥 Downloading UMMAH.py from Islamic folder..."
-          set +e
-          # Path exactly Islamic folder ka hai
+          echo "📥 Downloading UMMAH.py from A_API_room/Islamic..."
           curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
             -H "Accept: application/vnd.github.raw" \
-            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/URL_room/Islamic/UMMAH.py" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/Islamic/UMMAH.py" \
             -o /tmp/UMMAH.py
           
           if [ -s /tmp/UMMAH.py ]; then
@@ -38,5 +40,4 @@ jobs:
             echo "❌ File download fail ho gaya."
             exit 1
           fi
-          
           rm -f /tmp/UMMAH.py
