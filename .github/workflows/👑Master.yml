@@ -10,7 +10,7 @@ on:
 jobs:
   run_all:
     runs-on: ubuntu-latest
-    timeout-minutes: 180 # Max 3 ghante tak chalega
+    timeout-minutes: 180 # 3 ghante tak max wait karega
 
     steps:
       - name: 📥 Checkout Repository
@@ -23,50 +23,42 @@ jobs:
           echo "🔍 Fetching all workflows..."
           gh api repos/sawajstudio-system/Firent/actions/workflows --paginate > /tmp/workflows.json
           
-          # List nikaalna: ID aur Name
-          jq -r '.workflows[] | "\(.id)|\(.name)"' /tmp/workflows.json > /tmp/wf_list.txt
+          # Saari workflows ki list banao (Master ko chhod kar)
+          jq -r '.workflows[] | select(.name | contains("Master Runner") | not) | "\(.id)|\(.name)"' /tmp/workflows.json > /tmp/wf_list.txt
           
           echo "======================================"
           
-          # Loop chalao
           while IFS='|' read -r id name; do
-            
-            # Master khud ko skip karega
-            if [[ "$name" == *"Master Runner"* ]]; then
-              continue
-            fi
-            
             echo "▶️ Triggering: $name (ID: $id)"
+            
+            # Workflow trigger karo
             gh workflow run $id
             
             # 10 second wait taaki run queue mein aa jaye
             sleep 10
             
-            # Start time note karo
+            # Run ID dhoondhna
             START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            
-            # Run ID dhoondho (naya banne wala)
             RUN_ID=""
             while [[ -z "$RUN_ID" ]]; do
               sleep 5
               RUN_ID=$(gh api "repos/sawajstudio-system/Firent/actions/workflows/$id/runs?per_page=10" --jq ".workflow_runs[] | select(.created_at >= \"$START_TIME\") | .id" | head -n 1)
             done
             
-            echo "   ⏳ Waiting for run ID: $RUN_ID..."
+            echo "   ⏳ Waiting for: $name (Run ID: $RUN_ID)..."
             
-            # Jab tak 'completed' na ho, wait karo
+            # Jab tak completed na ho, wait karo
             STATUS=""
             while [[ "$STATUS" != "completed" ]]; do
               sleep 15
               STATUS=$(gh api "repos/sawajstudio-system/Firent/actions/runs/$RUN_ID" --jq ".status")
-              echo "      Current Status: $STATUS"
+              echo "      Status: $STATUS"
             done
             
-            # Result check karo
             CONCLUSION=$(gh api "repos/sawajstudio-system/Firent/actions/runs/$RUN_ID" --jq ".conclusion")
-            echo "✅ Finished: $name -> $CONCLUSION"
+            echo "✅ Finished: $name -> Result: $CONCLUSION"
             echo "--------------------------------------"
             
           done < /tmp/wf_list.txt
           
-          echo "🎉 All workflows ran sequentially!"
+          echo "🎉 All workflows triggered and completed one by one!"
