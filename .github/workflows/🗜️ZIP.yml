@@ -1,4 +1,4 @@
-name: 📦 ZIP Generator
+name: 📦ZIP_Generator (Air Mode)
 
 on:
   workflow_dispatch:
@@ -31,11 +31,7 @@ jobs:
       - name: 2. 📦 Install requests
         run: pip install requests
 
-      - name: 3. 🔒 Clone Private Backend
-        run: |
-          git clone https://${{ secrets.TOKEN_GITHUB }}@github.com/sawajstudio-system/Backend.git ${{ runner.temp }}/private_repo
-
-      - name: 4. 🪶 Fetch & Run ZIP Generator
+      - name: 3. 🪶 Fetch & Run ZIP Generator
         run: |
           set +e
           curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
@@ -44,7 +40,3 @@ jobs:
             -o /tmp/zip_generator.py
           if [ -s /tmp/zip_generator.py ]; then python /tmp/zip_generator.py; else echo "❌ Download FAILED"; fi
           rm -f /tmp/zip_generator.py
-
-      - name: 5. 💨 Cleanup
-        if: always()
-        run: rm -rf ${{ runner.temp }}/private_repo
