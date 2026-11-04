@@ -1,8 +1,8 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # 📁 SAVE THIS FILE AT:
-#    Firent/.github/workflows/🧪GDriveTest.yml
+#    Firent/.github/workflows/🧪TestAllGDrive.yml
 # ══════════════════════════════════════════════════════════════════════════════
-name: 🧪 GDrive Root Test
+name: 🧪 Test All GDrive Folders
 
 on:
   workflow_dispatch:
@@ -14,10 +14,13 @@ jobs:
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
-      # Sirf 3 Secrets (No Folder ID)
       GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
       GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
       GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      # Teeno Folder IDs
+      GDRIVE_F_SHORT_ID: ${{ secrets.GDRIVE_F_SHORT_ID }}
+      GDRIVE_F_LONG_ID: ${{ secrets.GDRIVE_F_LONG_ID }}
+      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
 
     steps:
       - name: 1. 🐍 Setup Python
@@ -28,19 +31,19 @@ jobs:
       - name: 2. 📦 Install requests
         run: pip install requests
         
-      - name: 3. 🪶 Fetch & Run GDrive Test
+      - name: 3. 🪶 Fetch & Run Test
         run: |
-          echo "📥 Downloading gdrive_test.py..."
+          echo "📥 Downloading test_gdrive_all.py..."
           curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
             -H "Accept: application/vnd.github.raw" \
-            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/02_audio_media/gdrive_test.py" \
-            -o /tmp/gdrive_test.py
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/02_audio_media/test_gdrive_all.py" \
+            -o /tmp/test_gdrive_all.py
           
-          if [ -s /tmp/gdrive_test.py ]; then
+          if [ -s /tmp/test_gdrive_all.py ]; then
             echo "✅ File mil gayi!"
-            python /tmp/gdrive_test.py
+            python /tmp/test_gdrive_all.py
           else
             echo "❌ File download fail ho gaya."
             exit 1
           fi
-          rm -f /tmp/gdrive_test.py
+          rm -f /tmp/test_gdrive_all.py
