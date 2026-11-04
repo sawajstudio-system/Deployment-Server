@@ -1,0 +1,151 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 FILE: Firent/.github/workflows/🔄Auto-Update-Master.yml
+# 📝 DESCRIPTION: Automatically updates Master.yml when workflows are added/deleted
+# ══════════════════════════════════════════════════════════════════════════════
+
+name: 🔄Auto-Update
+
+on:
+  push:
+    paths:
+      - '.github/workflows/**.yml'
+      - '.github/workflows/**.yaml'
+  workflow_dispatch:
+
+jobs:
+  update_master:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 📥 Checkout Firent Repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.TOKEN_GITHUB }}
+          fetch-depth: 0
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install PyGithub
+        run: pip install PyGithub
+
+      - name: 🚀 Sync Files and Update Master
+        run: |
+          cat << 'EOF' > /tmp/update_master.py
+          import os
+          import sys
+          from github import Github
+
+          token = os.getenv('TOKEN_GITHUB')
+          if not token:
+              print("❌ TOKEN_GITHUB missing!")
+              sys.exit(1)
+              
+          g = Github(token)
+          repo = g.get_repo('sawajstudio-system/Firent')
+
+          print("🔍 Scanning Firent Repo for YAML files...")
+          try:
+              workflows_dir = '.github/workflows'
+              files = repo.get_contents(workflows_dir)
+          except Exception as e:
+              print(f"❌ Could not access workflows folder: {e}")
+              sys.exit(1)
+
+          yaml_files = []
+          for f in files:
+              if f.name.endswith('.yml') or f.name.endswith('.yaml'):
+                  if 'Master' not in f.name and 'Auto-Update' not in f.name and 'Cleaner' not in f.name:
+                      yaml_files.append(f.name)
+
+          print(f"📋 Total {len(yaml_files)} valid files found in Firent.")
+
+          master_path = '.github/workflows/👑Master.yml'
+          try:
+              master_file = repo.get_contents(master_path)
+              current_content = master_file.decoded_content.decode('utf-8')
+          except Exception as e:
+              print(f"❌ Master.yml not found! Error: {e}")
+              sys.exit(1)
+
+          new_inputs = ""
+          for yf in sorted(yaml_files):
+              clean_name = yf.replace('.yml', '').replace('.yaml', '').replace(' ', '_').replace('-', '_')
+              clean_name = ''.join(c for c in clean_name if c.isalnum() or c=='_')
+              new_inputs += f"      run_{clean_name}: {{ description: '{yf}', type: boolean, default: false }}\n"
+
+          checkbox_logic = ""
+          for yf in sorted(yaml_files):
+              clean_name = yf.replace('.yml', '').replace('.yaml', '').replace(' ', '_').replace('-', '_')
+              clean_name = ''.join(c for c in clean_name if c.isalnum() or c=='_')
+              wf_name = yf.replace('.yml', '').replace('.yaml', '')
+              
+              checkbox_logic += f'            [[ "${{{{ github.event.inputs.run_{clean_name} }}}}" == "true" ]] && {{ echo "🚀 Triggering: {yf}"; gh workflow run "{wf_name}.yml" --repo sawajstudio-system/Firent || echo "Failed to trigger {yf}"; sleep 2; }}\n'
+
+          new_master_content = f"""name: 👑 Master Runner (Auto-Synced)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_all:
+        description: '🌟 Sari files ek sath chalayein'
+        type: boolean
+        default: true
+
+      # ── AUTO-GENERATED CHECKBOXES ──
+{new_inputs}
+
+jobs:
+  run_all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🚀 Trigger Workflows
+        env:
+          GH_TOKEN: ${{{{ secrets.TOKEN_GITHUB }}}}
+        run: |
+          echo "Fetching current workflows..."
+          gh api repos/sawajstudio-system/Firent/actions/workflows --paginate > /tmp/workflows.json
+
+          if [[ "${{{{ github.event.inputs.run_all }}}}" == "true" ]]; then
+            echo "🌟 Running ALL workflows..."
+            jq -r '.workflows[] | select(.name | contains("Master Runner") | not) | select(.name | contains("History Cleaner") | not) | select(.name | contains("Auto-Update") | not) | "\\(.id)|\\(.name)"' /tmp/workflows.json > /tmp/wf_list.txt
+            while IFS='|' read -r id name; do
+              echo "🚀 Triggering: $name"
+              gh workflow run $id --repo sawajstudio-system/Firent || echo "Failed: $name"
+              sleep 3
+            done < /tmp/wf_list.txt
+
+            echo "Waiting 2 mins for Cleaner..."
+            sleep 120
+            CLEANER_ID=$(jq -r '.workflows[] | select(.name | contains("History Cleaner")) | .id' /tmp/workflows.json)
+            gh workflow run $CLEANER_ID --repo sawajstudio-system/Firent || echo "Failed to trigger Cleaner"
+          else
+            echo "☑️ Running Selected Workflows..."
+{checkbox_logic}
+          fi
+"""
+
+          try:
+              if current_content != new_master_content:
+                  repo.update_file(
+                      master_path, 
+                      '🔄 Auto-Sync: Master updated with latest files', 
+                      new_master_content, 
+                      master_file.sha
+                  )
+                  print('✅ Master.yml successfully updated!')
+              else:
+                  print('ℹ️ No changes needed. Master is already up to date.')
+          except Exception as e:
+              print(f'❌ Error updating file: {e}')
+          EOF
+          python /tmp/update_master.py
