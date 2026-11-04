@@ -1,0 +1,42 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 SAVE THIS FILE AT:
+#    Firent/.github/workflows/🌐HijriDate.yml
+# ══════════════════════════════════════════════════════════════════════════════
+name: 🌐 Hijri Date URL Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: 2. 📦 Install requests
+        run: pip install requests
+        
+      - name: 3. 🪶 Fetch & Run Hijri Date Test
+        run: |
+          echo "📥 Downloading hijri_date.py..."
+          curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/URL_room/Islamic/hijri_date.py" \
+            -o /tmp/hijri_date.py
+          
+          if [ -s /tmp/hijri_date.py ]; then
+            echo "✅ File mil gayi!"
+            python /tmp/hijri_date.py
+          else
+            echo "❌ File download fail ho gaya."
+            exit 1
+          fi
+          rm -f /tmp/hijri_date.py
