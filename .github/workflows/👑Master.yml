@@ -1,7 +1,3 @@
-# ══════════════════════════════════════════════════════════════════════════════
-# 📁 SAVE THIS FILE AT:
-#    Firent/.github/workflows/👑Master.yml
-# ══════════════════════════════════════════════════════════════════════════════
 name: 👑 Master Runner (All At Once + Cleaner Last)
 
 on:
@@ -15,20 +11,20 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🚀 Trigger All Workflows (Except Cleaner)
+      - name: 🚀 Trigger All Active Workflows (Except Master & Cleaner)
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GITHUB }}
         run: |
-          echo "🔍 Fetching all workflows..."
-          gh api repos/sawajstudio-system/Firent/actions/workflows --paginate > /tmp/workflows.json
+          echo "🔍 Fetching all workflows for ${{ github.repository }}..."
+          gh api repos/${{ github.repository }}/actions/workflows --paginate > /tmp/workflows.json
           
-          # Sirf unko trigger karo jo Master aur Cleaner nahi hain
-          jq -r '.workflows[] | select(.name | contains("Master Runner") | not) | select(.name | contains("History Cleaner") | not) | "\(.id)|\(.name)"' /tmp/workflows.json > /tmp/wf_list.txt
+          # Sirf active (enabled) workflows ko lo, jo Master aur Cleaner na hon
+          jq -r '.workflows[] | select(.state == "active") | select(.name | contains("Master Runner") | not) | select(.name | contains("History Cleaner") | not) | "\(.id)|\(.name)"' /tmp/workflows.json > /tmp/wf_list.txt
           
           echo "======================================"
           while IFS='|' read -r id name; do
             echo "🚀 Triggering: $name (ID: $id)"
-            gh workflow run $id
+            gh workflow run $id || echo "⚠️ Failed to trigger $name"
             sleep 1
           done < /tmp/wf_list.txt
           
@@ -42,7 +38,7 @@ jobs:
           GH_TOKEN: ${{ secrets.TOKEN_GITHUB }}
         run: |
           echo "🔍 Finding History Cleaner..."
-          CLEANER_ID=$(gh api repos/sawajstudio-system/Firent/actions/workflows --paginate --jq '.workflows[] | select(.name | contains("History Cleaner")) | .id')
+          CLEANER_ID=$(gh api repos/${{ github.repository }}/actions/workflows --paginate --jq '.workflows[] | select(.name | contains("History Cleaner")) | .id')
           
           if [[ -n "$CLEANER_ID" ]]; then
             echo "🧹 Triggering History Cleaner (ID: $CLEANER_ID) at the end..."
