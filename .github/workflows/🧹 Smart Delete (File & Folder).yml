@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       file_to_delete:
-        description: '📄 File ka naam likhein (jaise: 10_J_Pokemon/pokemon.py)'
+        description: '📄 File ka naam likhein (Khali chhodein to sabhi Public & Private files/folders dikhenge)'
         required: false
         type: string
       folder_to_delete:
-        description: '📁 Folder ka naam likhein (jaise: 10_J_Pokemon)'
+        description: '📁 Folder ka naam likhein (Khali chhodein to sabhi Public & Private files/folders dikhenge)'
         required: false
         type: string
 
@@ -30,76 +30,91 @@ jobs:
       - name: 2. 📦 Install requests
         run: pip install requests
 
-      - name: 3. 🗑️ Run Smart Deleter
+      - name: 3. 🗑️ Run Smart Deleter (Public & Private Support)
         run: |
           python -c "
-import os, requests, sys
+          import os, requests, sys
 
-token = os.getenv('TOKEN_GITHUB')
-file_target = os.getenv('FILE_TARGET').strip()
-folder_target = os.getenv('FOLDER_TARGET').strip()
-repo = 'sawajstudio-system/Backend'
-base_dir = 'System_room/B_URL_room'
+          token = os.getenv('TOKEN_GITHUB')
+          file_target = (os.getenv('FILE_TARGET') or '').strip()
+          folder_target = (os.getenv('FOLDER_TARGET') or '').strip()
+          repo = 'sawajstudio-system/Backend'
+          base_dir = 'System_room/B_URL_room'
 
-headers = {
-    'Authorization': f'token {token}',
-    'Accept': 'application/vnd.github+json'
-}
+          headers = {
+              'Authorization': f'token {token}',
+              'Accept': 'application/vnd.github+json'
+          }
 
-def delete_item(item_path, sha):
-    url = f'https://api.github.com/repos/{repo}/contents/{item_path}'
-    res = requests.delete(url, headers=headers, json={'message': f'Delete {item_path}', 'sha': sha})
-    return res.status_code == 200
+          def delete_item(item_path, sha):
+              url = f'https://api.github.com/repos/{repo}/contents/{item_path}'
+              res = requests.delete(url, headers=headers, json={'message': f'Delete {item_path}', 'sha': sha})
+              return res.status_code == 200
 
-if file_target:
-    print(f'🔍 File delete karne ki koshish kar rahe hain: {file_target}')
-    # Agar user ne sirf file ka naam diya hai, toh usko dhoondhna padega
-    # Hum seedha path assume karenge ki user ne poora path diya hai
-    if not file_target.startswith('System_room/'):
-        full_path = f'{base_dir}/{file_target}'
-    else:
-        full_path = file_target
-        
-    url = f'https://api.github.com/repos/{repo}/contents/{full_path}'
-    r = requests.get(url, headers=headers)
-    
-    if r.status_code == 200:
-        data = r.json()
-        if isinstance(data, list):
-            print(f'❌ Error: {file_target} ek folder hai, file nahi. Folder delete box use karein.')
-            sys.exit(1)
-        else:
-            if delete_item(data['path'], data['sha']):
-                print(f'✅ File {file_target} delete ho gayi!')
-            else:
-                print(f'❌ File delete nahi ho payi.')
-    else:
-        print(f'❌ File nahi mili ya path galat hai.')
+          # Agar dono inputs khali hain, toh saare public aur private folders/files ki list print kar do
+          if not file_target and not folder_target:
+              print('🔍 Aapne koi naam nahi diya. System_room/B_URL_room ke andar ke saare Public & Private folders aur files ki list yeh rahi:\n')
+              url = f'https://api.github.com/repos/{repo}/contents/{base_dir}'
+              r = requests.get(url, headers=headers)
+              if r.status_code == 200:
+                  items = r.json()
+                  if isinstance(items, list):
+                      for item in items:
+                          if item['type'] == 'dir':
+                              print(f'  📁 Folder: {item[\"name\"]}')
+                          else:
+                              print(f'  📄 File:   {item[\"name\"]}')
+                  else:
+                      print('⚠️ Directory khali hai ya galat hai.')
+              else:
+                  print(f'❌ Repository ya path access karne mein error aaya. Status Code: {r.status_code}')
+              sys.exit(0)
 
-elif folder_target:
-    print(f'🔍 Folder delete karne ki koshish kar rahe hain: {folder_target}')
-    if not folder_target.startswith('System_room/'):
-        full_path = f'{base_dir}/{folder_target}'
-    else:
-        full_path = folder_target
-        
-    url = f'https://api.github.com/repos/{repo}/contents/{full_path}'
-    r = requests.get(url, headers=headers)
-    
-    if r.status_code == 200:
-        data = r.json()
-        if isinstance(data, list):
-            print(f'📁 Folder mila. Andar ki files delete ki ja rahi hain...')
-            for file in data:
-                if delete_item(file['path'], file['sha']):
-                    print(f'  ✅ Deleted: {file[\"name\"]}')
-            print(f'🎉 Folder {folder_target} ki saari files delete ho gayi!')
-        else:
-            print(f'❌ Error: {folder_target} ek file hai, folder nahi. File delete box use karein.')
-            sys.exit(1)
-    else:
-        print(f'❌ Folder nahi mila ya path galat hai.')
-        
-else:
-    print('⚠️ Aapne na File ka naam dala, na Folder ka. Kuch delete nahi hoga.')
-"
+          if file_target:
+              print(f'🔍 File delete karne ki koshish kar rahe hain: {file_target}')
+              if not file_target.startswith('System_room/'):
+                  full_path = f'{base_dir}/{file_target}'
+              else:
+                  full_path = file_target
+                  
+              url = f'https://api.github.com/repos/{repo}/contents/{full_path}'
+              r = requests.get(url, headers=headers)
+              
+              if r.status_code == 200:
+                  data = r.json()
+                  if isinstance(data, list):
+                      print(f'❌ Error: {file_target} ek folder hai, file nahi. Folder delete box use karein.')
+                      sys.exit(1)
+                  else:
+                      if delete_item(data['path'], data['sha']):
+                          print(f'✅ File {file_target} delete ho gayi!')
+                      else:
+                          print(f'❌ File delete nahi ho payi.')
+              else:
+                  print(f'❌ File nahi mili ya path galat hai.')
+
+          elif folder_target:
+              print(f'🔍 Folder delete karne ki koshish kar rahe hain: {folder_target}')
+              if not folder_target.startswith('System_room/'):
+                  full_path = f'{base_dir}/{folder_target}'
+              else:
+                  full_path = folder_target
+                  
+              url = f'https://api.github.com/repos/{repo}/contents/{full_path}'
+              r = requests.get(url, headers=headers)
+              
+              if r.status_code == 200:
+                  data = r.json()
+                  if isinstance(data, list):
+                      print(f'📁 Folder mila. Andar ki files delete ki ja rahi hain...')
+                      for file in data:
+                          file_name = file['name']
+                          if delete_item(file['path'], file['sha']):
+                              print(f'  ✅ Deleted: {file_name}')
+                      print(f'🎉 Folder {folder_target} ki saari files delete ho gayi!')
+                  else:
+                      print(f'❌ Error: {folder_target} ek file hai, folder nahi. File delete box use karein.')
+                      sys.exit(1)
+              else:
+                  print(f'❌ Folder nahi mila ya path galat hai.')
+          "
