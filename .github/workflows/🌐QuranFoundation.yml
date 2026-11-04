@@ -29,10 +29,10 @@ jobs:
         
       - name: 3. 🪶 Fetch & Run Quran Foundation Test
         run: |
-          echo "📥 Downloading quran_foundation.py..."
+          echo "📥 Downloading quran_foundation.py from A_API_room/Islamic..."
           curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
             -H "Accept: application/vnd.github.raw" \
-            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/URL_room/Islamic/quran_foundation.py" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/Islamic/quran_foundation.py" \
             -o /tmp/quran_foundation.py
           
           if [ -s /tmp/quran_foundation.py ]; then
