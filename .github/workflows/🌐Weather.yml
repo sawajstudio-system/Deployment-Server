@@ -29,10 +29,11 @@ jobs:
         run: |
           echo "📥 Downloading weather.py..."
           set +e
+          # Path update kiya gaya hai (01_A_Weather)
           curl -sSL -f \
             -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
             -H "Accept: application/vnd.github.raw" \
-            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/B_URL_room/01_Weather/weather.py" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/B_URL_room/01_A_Weather/weather.py" \
             -o /tmp/weather.py
           
           if [ -f /tmp/weather.py ] && [ -s /tmp/weather.py ]; then
