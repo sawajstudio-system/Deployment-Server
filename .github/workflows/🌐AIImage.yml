@@ -32,7 +32,7 @@ jobs:
           curl -sSL -f \
             -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
             -H "Accept: application/vnd.github.raw" \
-            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/URL_room/01_AI_Image/ai_image.py" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/URL_room/AI/ai_image.py" \
             -o /tmp/ai_image.py
           
           if [ -f /tmp/ai_image.py ] && [ -s /tmp/ai_image.py ]; then
