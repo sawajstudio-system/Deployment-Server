@@ -1,10 +1,10 @@
-name: 🗜️ZIP
+name: 📦 ZIP Generator
 
 on:
   workflow_dispatch:
     inputs:
       repo_target:
-        description: '📦 Kaunsa repo ka code ZIP me daalna hai?'
+        description: 'Kaunsa repo ka code ZIP me daalna hai?'
         required: true
         type: choice
         default: 'Public + Private'
@@ -16,10 +16,6 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: write
-
     env:
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
@@ -27,32 +23,28 @@ jobs:
       REPO_TARGET: ${{ github.event.inputs.repo_target }}
 
     steps:
-      - name: 1. 📥 Checkout Public Repo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 2. 🔒 Clone Private Backend (script source)
-        run: |
-          git clone https://${{ secrets.TOKEN_GITHUB }}@github.com/sawajstudio-system/Backend.git ${{ runner.temp }}/private_repo
-
-      - name: 3. 🐍 Setup Python
+      - name: 1. 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: 4. 📦 Install Deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
+      - name: 2. 📦 Install requests
+        run: pip install requests
 
-      - name: 5. 🗜️ Generate ZIP
+      - name: 3. 🔒 Clone Private Backend
         run: |
-          python ${{ runner.temp }}/private_repo/System_room/generate_zip.py
+          git clone https://${{ secrets.TOKEN_GITHUB }}@github.com/sawajstudio-system/Backend.git ${{ runner.temp }}/private_repo
 
-      - name: 6. 💨 Vanish from Air
+      - name: 4. 🪶 Fetch & Run ZIP Generator
+        run: |
+          set +e
+          curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/Git_room/zip_generator.py" \
+            -o /tmp/zip_generator.py
+          if [ -s /tmp/zip_generator.py ]; then python /tmp/zip_generator.py; else echo "❌ Download FAILED"; fi
+          rm -f /tmp/zip_generator.py
+
+      - name: 5. 💨 Cleanup
         if: always()
-        run: |
-          rm -rf ${{ runner.temp }}/private_repo
-          rm -f Output.zip
-          echo "✅ Hawa mein hi gayab ho gaya!"
+        run: rm -rf ${{ runner.temp }}/private_repo
