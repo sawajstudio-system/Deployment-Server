@@ -2,7 +2,7 @@
 # 📁 SAVE THIS FILE AT:
 #    Firent/.github/workflows/🧪GDriveTest.yml
 # ══════════════════════════════════════════════════════════════════════════════
-name: 🧪 GDrive Test
+name: 🧪 GDrive Root Test
 
 on:
   workflow_dispatch:
@@ -14,10 +14,10 @@ jobs:
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      # Sirf 3 Secrets (No Folder ID)
       GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
       GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
       GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
-      GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
 
     steps:
       - name: 1. 🐍 Setup Python
