@@ -2,7 +2,7 @@
 # 📁 SAVE THIS FILE AT:
 #    Firent/.github/workflows/🐙GitHub.yml
 # ══════════════════════════════════════════════════════════════════════════════
-name: 🐙 GitHub Token Test
+name: 🐙 GitHub API Test
 
 on:
   workflow_dispatch:
@@ -25,33 +25,25 @@ jobs:
       - name: 2. 📦 Install requests
         run: pip install requests
 
-      - name: 3. 🔍 Debug — Env Check
-        run: |
-          echo "TOKEN_GITHUB set:          ${{ secrets.TOKEN_GITHUB != '' }}"
-          echo "TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN != '' }}"
-
-      - name: 4. 🪶 Fetch GitHub Test
+      - name: 3. 🪶 Fetch GitHub Test
         run: |
           echo "📥 Downloading github.py..."
           set +e
           curl -sSL -f \
             -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
             -H "Accept: application/vnd.github.raw" \
-            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/04_utils/github.py" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/Git_room/github.py" \
             -o /tmp/github.py
           
           if [ -f /tmp/github.py ] && [ -s /tmp/github.py ]; then
             echo "✅ Downloaded: $(wc -c < /tmp/github.py) bytes"
+            python /tmp/github.py
           else
             echo "❌ Download FAILED"
             exit 1
           fi
 
-      - name: 5. 🧪 Run GitHub Test
-        continue-on-error: true
-        run: python /tmp/github.py
-
-      - name: 6. 💨 Vanished
+      - name: 4. 💨 Vanished
         if: always()
         run: |
           rm -f /tmp/github.py
