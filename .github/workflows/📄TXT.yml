@@ -1,4 +1,4 @@
-name: 📄 TXT Generator (Air Mode)
+name: 📄 TXT Generator (Strong)
 
 on:
   workflow_dispatch:
@@ -12,15 +12,28 @@ on:
           - 'Public + Private'
           - 'Public Only'
           - 'Private Only'
+      dry_run:
+        description: 'Dry run? (content fetch nahi hoga, sirf file list)'
+        required: false
+        type: boolean
+        default: false
+      max_files:
+        description: 'Max files per repo (default 5000)'
+        required: false
+        default: '5000'
 
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+
     env:
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
       REPO_TARGET: ${{ github.event.inputs.repo_target }}
+      DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
+      MAX_FILES: ${{ github.event.inputs.max_files }}
 
     steps:
       - name: 1. 🐍 Setup Python
@@ -33,16 +46,17 @@ jobs:
 
       - name: 3. 🪶 Fetch & Run TXT Generator
         run: |
-          set +e
-          curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+          set -e
+          curl -sSL -f \
+            -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
             -H "Accept: application/vnd.github.raw" \
             "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/Git_room/txt_generator.py" \
             -o /tmp/txt_generator.py
-          
-          if [ -s /tmp/txt_generator.py ]; then 
-            python /tmp/txt_generator.py
-          else 
+
+          if [ ! -s /tmp/txt_generator.py ]; then
             echo "❌ Download FAILED"
             exit 1
           fi
+
+          python /tmp/txt_generator.py
           rm -f /tmp/txt_generator.py
