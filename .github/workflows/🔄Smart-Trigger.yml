@@ -1,3 +1,8 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 FILE: Firent/.github/workflows/🔄Smart-Trigger.yml
+# 📝 DESCRIPTION: Automatically syncs and updates Master.yml with Real Workflow Names
+# ══════════════════════════════════════════════════════════════════════════════
+
 name: 🔄 Smart Trigger
 
 on:
@@ -10,8 +15,6 @@ on:
 jobs:
   update_master:
     runs-on: ubuntu-latest
-    env:
-      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
 
     steps:
       - name: 📥 Checkout Firent Repo
@@ -25,69 +28,76 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 📦 Install PyGithub
-        run: pip install PyGithub
+      - name: 📦 Install Dependencies (PyGithub & PyYAML)
+        run: pip install PyGithub PyYAML
 
-      - name: 📝 Create Python Script
+      - name: 🚀 Run Advanced Sync & Update Script
+        env:
+          TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
         run: |
-          # Yahan hum script file bana rahe hain
-          cat << 'PYEOF' > /tmp/update_master.py
-import os
-import sys
-from github import Github
+          python3 - << 'PYEOF'
+          import os
+          import sys
+          import yaml
+          from github import Github
 
-token = os.getenv('TOKEN_GITHUB')
-if not token:
-    print("❌ TOKEN_GITHUB missing!")
-    sys.exit(1)
-    
-g = Github(token)
-repo = g.get_repo('sawajstudio-system/Firent')
+          token = os.getenv('TOKEN_GITHUB')
+          if not token:
+              print("❌ TOKEN_GITHUB missing!")
+              sys.exit(1)
+              
+          g = Github(token)
+          repo = g.get_repo('sawajstudio-system/Firent')
 
-print("🔍 Scanning Firent Repo for YAML files...")
-try:
-    workflows_dir = '.github/workflows'
-    files = repo.get_contents(workflows_dir)
-except Exception as e:
-    print(f"❌ Could not access workflows folder: {e}")
-    sys.exit(1)
+          print("🔍 Scanning Firent Repo for workflow files...")
+          try:
+              workflows_dir = '.github/workflows'
+              files = repo.get_contents(workflows_dir)
+          except Exception as e:
+              print(f"❌ Could not access workflows folder: {e}")
+              sys.exit(1)
 
-# 1. List nikaalo (Faltu files chhod kar)
-yaml_files = []
-for f in files:
-    if f.name.endswith('.yml') or f.name.endswith('.yaml'):
-        if ('Master' not in f.name and 'Auto-Update' not in f.name 
-            and 'Cleaner' not in f.name and 'Smart-Trigger' not in f.name):
-            yaml_files.append(f.name)
+          valid_workflows = []
+          for f in files:
+              if f.name.endswith('.yml') or f.name.endswith('.yaml'):
+                  if not any(excluded in f.name for excluded in ['Master', 'Auto-Update', 'Cleaner', 'Smart-Trigger']):
+                      try:
+                          content = f.decoded_content.decode('utf-8')
+                          parsed_yaml = yaml.safe_load(content)
+                          wf_display_name = parsed_yaml.get('name', f.name) if isinstance(parsed_yaml, dict) else f.name
+                      except Exception:
+                          wf_display_name = f.name
+                      
+                      valid_workflows.append({
+                          'filename': f.name,
+                          'display_name': wf_display_name,
+                          'base_name': f.name.rsplit('.', 1)[0]
+                      })
 
-print(f"📋 Total {len(yaml_files)} valid files found in Firent.")
+          print(f"📋 Total {len(valid_workflows)} valid workflows found.")
 
-# 2. Master.yml ka current content padho
-master_path = '.github/workflows/👑Master.yml'
-try:
-    master_file = repo.get_contents(master_path)
-except Exception as e:
-    print(f"❌ Master.yml not found! Error: {e}")
-    sys.exit(1)
+          master_path = '.github/workflows/👑Master.yml'
+          try:
+              master_file = repo.get_contents(master_path)
+          except Exception as e:
+              print(f"❌ Master.yml not found! Error: {e}")
+              sys.exit(1)
 
-# 3. Naye Inputs (Checkboxes) generate karo
-new_inputs = ""
-for yf in sorted(yaml_files):
-    clean_name = yf.replace('.yml', '').replace('.yaml', '').replace(' ', '_').replace('-', '_')
-    clean_name = ''.join(c for c in clean_name if c.isalnum() or c=='_')
-    new_inputs += f"      run_{clean_name}: {{ description: '{yf}', type: boolean, default: false }}\n"
+          inputs_lines = []
+          logic_lines = []
 
-# 4. Naya Trigger Logic generate karo
-checkbox_logic = ""
-for yf in sorted(yaml_files):
-    clean_name = yf.replace('.yml', '').replace('.yaml', '').replace(' ', '_').replace('-', '_')
-    clean_name = ''.join(c for c in clean_name if c.isalnum() or c=='_')
-    wf_name = yf.replace('.yml', '').replace('.yaml', '')
-    
-    checkbox_logic += f'            [[ "${{{{ github.event.inputs.run_{clean_name} }}}}" == "true" ]] && {{ echo "🚀 Triggering: {yf}"; gh workflow run "{wf_name}.yml" --repo sawajstudio-system/Firent || echo "Failed to trigger {yf}"; sleep 2; }}\n'
+          for wf in sorted(valid_workflows, key=lambda x: x['filename']):
+              clean_name = wf['base_name'].replace(' ', '_').replace('-', '_')
+              clean_name = ''.join(c for c in clean_name if c.isalnum() or c=='_')
+              
+              desc = f"{wf['display_name']} ({wf['filename']})"
+              inputs_lines.append(f"      run_{clean_name}: {{ description: '{desc}', type: boolean, default: false }}")
+              logic_lines.append(f'            [[ "${{{{ github.event.inputs.run_{clean_name} }}}}" == "true" ]] && {{ echo "🚀 Triggering: {wf["filename"]}"; gh workflow run "{wf["filename"]}" --repo sawajstudio-system/Firent || echo "Failed to trigger {wf["filename"]}"; sleep 2; }}')
 
-# 5. Naya Master Content taiyaar karo (Safe tarika)
-part1 = """name: 👑 Master Runner (Auto-Synced)
+          inputs_str = "\n".join(inputs_lines)
+          logic_str = "\n".join(logic_lines)
+
+          master_content = f"""name: 👑 Master Runner (Auto-Synced)
 
 on:
   workflow_dispatch:
@@ -97,10 +107,9 @@ on:
         type: boolean
         default: true
 
-      # ── AUTO-GENERATED CHECKBOXES ──
-"""
+      # ── AUTO-GENERATED CHECKBOXES (Synced by Smart-Trigger) ──
+{inputs_str}
 
-part2 = """
 jobs:
   run_all:
     runs-on: ubuntu-latest
@@ -112,12 +121,12 @@ jobs:
 
       - name: 🚀 Trigger Workflows
         env:
-          GH_TOKEN: ${{ secrets.TOKEN_GITHUB }}
+          TOKEN_GITHUB: ${{{{ secrets.TOKEN_GITHUB }}}}
         run: |
           echo "Fetching current workflows..."
           gh api repos/sawajstudio-system/Firent/actions/workflows --paginate > /tmp/workflows.json
 
-          if [[ "${{ github.event.inputs.run_all }}" == "true" ]]; then
+          if [[ "${{{{ github.event.inputs.run_all }}}}" == "true" ]]; then
             echo "🌟 Running ALL workflows..."
             jq -r '.workflows[] | select(.name | contains("Master Runner") | not) | select(.name | contains("History Cleaner") | not) | select(.name | contains("Auto-Update") | not) | select(.name | contains("Smart Trigger") | not) | "\\(.id)|\\(.name)"' /tmp/workflows.json > /tmp/wf_list.txt
             while IFS='|' read -r id name; do
@@ -132,29 +141,28 @@ jobs:
             gh workflow run $CLEANER_ID --repo sawajstudio-system/Firent || echo "Failed to trigger Cleaner"
           else
             echo "☑️ Running Selected Workflows..."
-"""
-
-part3 = """
+{logic_str}
           fi
 """
 
-master_content = part1 + new_inputs + part2 + checkbox_logic + part3
+          # Validate generated master content YAML before saving
+          try:
+              yaml.safe_load(master_content)
+          except Exception as ye:
+              print(f"❌ Generated Master YAML is invalid: {ye}")
+              sys.exit(1)
 
-# 6. File ko update karo
-try:
-    if master_file.decoded_content.decode('utf-8') != master_content:
-        repo.update_file(
-            master_path, 
-            '🔄 Smart Trigger: Master synced with latest files', 
-            master_content, 
-            master_file.sha
-        )
-        print('✅ Master.yml successfully updated!')
-    else:
-        print('ℹ️ No changes needed. Master is already up to date.')
-except Exception as e:
-    print(f'❌ Error updating file: {e}')
-PYEOF
-
-      - name: 🚀 Run Update Script
-        run: python /tmp/update_master.py
+          try:
+              if master_file.decoded_content.decode('utf-8') != master_content:
+                  repo.update_file(
+                      master_path, 
+                      '🔄 Smart Trigger: Master synced with real workflow names & YAML validation', 
+                      master_content, 
+                      master_file.sha
+                  )
+                  print('✅ Master.yml successfully updated and verified!')
+              else:
+                  print('ℹ️ No changes needed. Master is already up to date.')
+          except Exception as e:
+              print(f'❌ Error updating file: {e}')
+          PYEOF
