@@ -1,0 +1,50 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 SAVE THIS FILE AT:
+#    Firent/.github/workflows/🌐Translator.yml
+# ══════════════════════════════════════════════════════════════════════════════
+name: 🌐 Translator URL Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 2. 📦 Install requests
+        run: pip install requests
+
+      - name: 3. 🪶 Fetch & Run Translator Test
+        run: |
+          echo "📥 Downloading translator.py..."
+          set +e
+          curl -sSL -f \
+            -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/URL_room/Other/translator.py" \
+            -o /tmp/translator.py
+          
+          if [ -f /tmp/translator.py ] && [ -s /tmp/translator.py ]; then
+            echo "✅ Downloaded: $(wc -c < /tmp/translator.py) bytes"
+            python /tmp/translator.py
+          else
+            echo "❌ Download FAILED"
+            exit 1
+          fi
+
+      - name: 4. 💨 Vanished
+        if: always()
+        run: |
+          rm -f /tmp/translator.py
+          echo "✅ Hawa mein hi ud gaya!"
