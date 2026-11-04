@@ -1,0 +1,45 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 SAVE THIS FILE AT:
+#    Firent/.github/workflows/🌐QuranFoundation.yml
+# ══════════════════════════════════════════════════════════════════════════════
+name: 🌐 Quran Foundation Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      QF_CLIENT_ID: ${{ secrets.QF_CLIENT_ID }}
+      QF_CLIENT_SECRET: ${{ secrets.QF_CLIENT_SECRET }}
+      QF_ENV: ${{ secrets.QF_ENV }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: 2. 📦 Install requests
+        run: pip install requests
+        
+      - name: 3. 🪶 Fetch & Run Quran Foundation Test
+        run: |
+          echo "📥 Downloading quran_foundation.py..."
+          curl -sSL -f -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/URL_room/Islamic/quran_foundation.py" \
+            -o /tmp/quran_foundation.py
+          
+          if [ -s /tmp/quran_foundation.py ]; then
+            echo "✅ File mil gayi!"
+            python /tmp/quran_foundation.py
+          else
+            echo "❌ File download fail ho gaya."
+            exit 1
+          fi
+          rm -f /tmp/quran_foundation.py
