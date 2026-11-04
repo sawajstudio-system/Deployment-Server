@@ -1,0 +1,93 @@
+name: 🧹 One-Time Delete
+
+on:
+  workflow_dispatch:
+
+jobs:
+  delete_and_self_destruct:
+    runs-on: ubuntu-latest
+
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 2. 📦 Install requests
+        run: pip install requests
+
+      - name: 3. 🗑️ Delete Folders & Self-Destruct
+        run: |
+          python -c "
+import os, requests, sys
+
+token = os.getenv('TOKEN_GITHUB')
+repo = 'sawajstudio-system/Backend'
+pub_repo = 'sawajstudio-system/Firent' # Public repo for self-destruct
+base_dir = 'System_room/B_URL_room'
+
+headers = {
+    'Authorization': f'token {token}',
+    'Accept': 'application/vnd.github+json'
+}
+
+# Aapke diye gaye 13 folders ki list
+folders_to_delete = [
+    '06_F_Universities', '09_I_IPInfo', '10_J_Pokemon', 
+    '14_N_SpaceX', '16_P_GitHub', '17_Q_RandomUser', 
+    '18_R_JSONPlaceholder', '20_T_HarryPotter', '22_V_Countries2', 
+    '23_W_Coffee', '24_X_Bored', '25_Y_Analytics', '26_Z_HTTPBin'
+]
+
+def delete_item(item_path, sha, target_repo):
+    url = f'https://api.github.com/repos/{target_repo}/contents/{item_path}'
+    res = requests.delete(url, headers=headers, json={'message': f'Delete {item_path}', 'sha': sha})
+    return res.status_code == 200
+
+print('🚀 Starting One-Time Delete...')
+
+# 1. Delete Folders in Backend
+for folder in folders_to_delete:
+    full_path = f'{base_dir}/{folder}'
+    url = f'https://api.github.com/repos/{repo}/contents/{full_path}'
+    r = requests.get(url, headers=headers)
+    
+    if r.status_code == 200:
+        data = r.json()
+        if isinstance(data, list):
+            print(f'📁 Deleting {folder}...')
+            for file in data:
+                if delete_item(file['path'], file['sha'], repo):
+                    print(f'  ✅ Deleted: {file[\"name\"]}')
+        else:
+            print(f'  ⚠️ {folder} is not a folder.')
+    else:
+        print(f'  ❌ {folder} not found.')
+
+# 2. Delete the old URL_test.py file (if exists)
+old_test_url = f'https://api.github.com/repos/{repo}/contents/{base_dir}/Url_test.py'
+r_test = requests.get(old_test_url, headers=headers)
+if r_test.status_code == 200:
+    data = r_test.json()
+    if delete_item(data['path'], data['sha'], repo):
+        print('✅ Deleted old Url_test.py')
+
+# 3. Self-Destruct this workflow file in Public Repo
+self_workflow_path = '.github/workflows/🧹One-Time-Delete.yml'
+self_url = f'https://api.github.com/repos/{pub_repo}/contents/{self_workflow_path}'
+r_self = requests.get(self_url, headers=headers)
+
+if r_self.status_code == 200:
+    data = r_self.json()
+    if delete_item(data['path'], data['sha'], pub_repo):
+        print('💥 Self-Destruct: Workflow file successfully deleted from Public Repo!')
+    else:
+        print('❌ Self-Destruct failed. Please delete manually.')
+else:
+    print('⚠️ Self-Destruct file not found in Public Repo.')
+
+print('🎉 All done!')
+"
