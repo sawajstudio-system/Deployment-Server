@@ -1,0 +1,63 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 SAVE THIS FILE AT:
+#    Firent/.github/workflows/📸Cloudinary.yml
+# ══════════════════════════════════════════════════════════════════════════════
+name: 📸 Cloudinary API Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 2. 📦 Install requests
+        run: pip install requests
+
+      - name: 3. 🔍 Debug — Env Check
+        run: |
+          echo "CLOUDINARY_CLOUD_NAME set: ${{ secrets.CLOUDINARY_CLOUD_NAME != '' }}"
+          echo "CLOUDINARY_API_KEY set:    ${{ secrets.CLOUDINARY_API_KEY != '' }}"
+          echo "CLOUDINARY_API_SECRET set: ${{ secrets.CLOUDINARY_API_SECRET != '' }}"
+          echo "TOKEN_GITHUB set:          ${{ secrets.TOKEN_GITHUB != '' }}"
+
+      - name: 4. 🪶 Fetch Cloudinary Test
+        run: |
+          echo "📥 Downloading cloudinary.py..."
+          set +e
+          curl -sSL -f \
+            -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/02_audio_media/cloudinary.py" \
+            -o /tmp/cloudinary.py
+          
+          if [ -f /tmp/cloudinary.py ] && [ -s /tmp/cloudinary.py ]; then
+            echo "✅ Downloaded: $(wc -c < /tmp/cloudinary.py) bytes"
+          else
+            echo "❌ Download FAILED"
+            exit 1
+          fi
+
+      - name: 5. 🧪 Run Cloudinary Test
+        continue-on-error: true
+        run: python /tmp/cloudinary.py
+
+      - name: 6. 💨 Vanished
+        if: always()
+        run: |
+          rm -f /tmp/cloudinary.py
+          echo "✅ Hawa mein hi ud gaya!"

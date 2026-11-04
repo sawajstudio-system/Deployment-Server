@@ -1,0 +1,69 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 SAVE THIS FILE AT:
+#    Firent/.github/workflows/🧠Cohere.yml
+# ══════════════════════════════════════════════════════════════════════════════
+name: 🧠 Cohere API Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 2. 📦 Install requests
+        run: pip install requests
+
+      - name: 3. 🔍 Debug — Env Check
+        run: |
+          echo "COHERE_API_KEY set: ${{ secrets.COHERE_API_KEY != '' }}"
+          echo "TOKEN_GITHUB set:   ${{ secrets.TOKEN_GITHUB != '' }}"
+
+      - name: 4. 🔍 Debug — Check File in Backend
+        run: |
+          echo "🔍 Checking cohere.py in Backend repo..."
+          set +e
+          HTTP_CODE=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/01_ai_models/cohere.py")
+          echo "HTTP Status: $HTTP_CODE"
+
+      - name: 5. 🪶 Fetch Cohere Test
+        run: |
+          echo "📥 Downloading cohere.py..."
+          set +e
+          curl -sSL -f \
+            -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/01_ai_models/cohere.py" \
+            -o /tmp/cohere.py
+          
+          if [ -f /tmp/cohere.py ] && [ -s /tmp/cohere.py ]; then
+            echo "✅ Downloaded: $(wc -c < /tmp/cohere.py) bytes"
+          else
+            echo "❌ Download FAILED"
+            exit 1
+          fi
+
+      - name: 6. 🧪 Run Cohere Test
+        continue-on-error: true
+        run: python /tmp/cohere.py
+
+      - name: 7. 💨 Vanished
+        if: always()
+        run: |
+          rm -f /tmp/cohere.py /tmp/resp.json
+          echo "✅ Hawa mein hi ud gaya!"

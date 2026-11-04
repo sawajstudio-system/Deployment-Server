@@ -1,0 +1,58 @@
+name: 🗜️ZIP
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_target:
+        description: '📦 Kaunsa repo ka code ZIP me daalna hai?'
+        required: true
+        type: choice
+        default: 'Public + Private'
+        options:
+          - 'Public + Private'
+          - 'Public Only'
+          - 'Private Only'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      REPO_TARGET: ${{ github.event.inputs.repo_target }}
+
+    steps:
+      - name: 1. 📥 Checkout Public Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 2. 🔒 Clone Private Backend (script source)
+        run: |
+          git clone https://${{ secrets.TOKEN_GITHUB }}@github.com/sawajstudio-system/Backend.git ${{ runner.temp }}/private_repo
+
+      - name: 3. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 4. 📦 Install Deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: 5. 🗜️ Generate ZIP
+        run: |
+          python ${{ runner.temp }}/private_repo/System_room/generate_zip.py
+
+      - name: 6. 💨 Vanish from Air
+        if: always()
+        run: |
+          rm -rf ${{ runner.temp }}/private_repo
+          rm -f Output.zip
+          echo "✅ Hawa mein hi gayab ho gaya!"

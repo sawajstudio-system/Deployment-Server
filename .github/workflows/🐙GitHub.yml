@@ -1,0 +1,58 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 SAVE THIS FILE AT:
+#    Firent/.github/workflows/🐙GitHub.yml
+# ══════════════════════════════════════════════════════════════════════════════
+name: 🐙 GitHub Token Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 2. 📦 Install requests
+        run: pip install requests
+
+      - name: 3. 🔍 Debug — Env Check
+        run: |
+          echo "TOKEN_GITHUB set:          ${{ secrets.TOKEN_GITHUB != '' }}"
+          echo "TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN != '' }}"
+
+      - name: 4. 🪶 Fetch GitHub Test
+        run: |
+          echo "📥 Downloading github.py..."
+          set +e
+          curl -sSL -f \
+            -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/04_utils/github.py" \
+            -o /tmp/github.py
+          
+          if [ -f /tmp/github.py ] && [ -s /tmp/github.py ]; then
+            echo "✅ Downloaded: $(wc -c < /tmp/github.py) bytes"
+          else
+            echo "❌ Download FAILED"
+            exit 1
+          fi
+
+      - name: 5. 🧪 Run GitHub Test
+        continue-on-error: true
+        run: python /tmp/github.py
+
+      - name: 6. 💨 Vanished
+        if: always()
+        run: |
+          rm -f /tmp/github.py
+          echo "✅ Hawa mein hi ud gaya!"

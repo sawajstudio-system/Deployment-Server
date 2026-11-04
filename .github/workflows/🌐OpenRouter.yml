@@ -1,0 +1,74 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 SAVE THIS FILE AT:
+#    Firent/.github/workflows/🌐OpenRouter.yml
+# ══════════════════════════════════════════════════════════════════════════════
+name: 🌐 OpenRouter API Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 2. 📦 Install requests
+        run: pip install requests
+
+      - name: 3. 🔍 Debug — Env Check
+        run: |
+          echo "OPENROUTER_API_KEY set: ${{ secrets.OPENROUTER_API_KEY != '' }}"
+          echo "TOKEN_GITHUB set:       ${{ secrets.TOKEN_GITHUB != '' }}"
+
+      - name: 4. 🔍 Debug — Check File in Backend
+        run: |
+          echo "🔍 Checking openrouter.py in Backend repo..."
+          set +e
+          HTTP_CODE=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/01_ai_models/openrouter.py")
+          echo "HTTP Status: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ File exists in Backend!"
+          else
+            echo "❌ File check failed with status: $HTTP_CODE"
+          fi
+
+      - name: 5. 🪶 Fetch OpenRouter Test
+        run: |
+          echo "📥 Downloading openrouter.py..."
+          set +e
+          curl -sSL -f \
+            -H "Authorization: token ${{ secrets.TOKEN_GITHUB }}" \
+            -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/A_API_room/01_ai_models/openrouter.py" \
+            -o /tmp/openrouter.py
+          
+          if [ -f /tmp/openrouter.py ] && [ -s /tmp/openrouter.py ]; then
+            echo "✅ Downloaded: $(wc -c < /tmp/openrouter.py) bytes"
+          else
+            echo "❌ Download FAILED"
+            exit 1
+          fi
+
+      - name: 6. 🧪 Run OpenRouter Test
+        continue-on-error: true
+        run: python /tmp/openrouter.py
+
+      - name: 7. 💨 Vanished
+        if: always()
+        run: |
+          rm -f /tmp/openrouter.py /tmp/resp.json
+          echo "✅ Hawa mein hi ud gaya!"
