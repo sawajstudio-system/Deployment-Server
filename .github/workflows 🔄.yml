@@ -1,0 +1,181 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 FILE: .github/workflows/🔄Smart-Trigger.yml
+# 📝 DESCRIPTION: Automatically syncs and updates Master.yml with Dynamic Repository Detection
+# ══════════════════════════════════════════════════════════════════════════════
+
+name: 🔄
+
+on:
+  push:
+    paths:
+      - '.github/workflows/**.yml'
+      - '.github/workflows/**.yaml'
+  workflow_dispatch:
+
+jobs:
+  update_master:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.TOKEN_GITHUB }}
+          fetch-depth: 0
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install Dependencies (PyGithub & PyYAML)
+        run: pip install PyGithub PyYAML
+
+      - name: 🚀 Run Dynamic Sync & Update Script
+        env:
+          TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - << 'PYEOF'
+          import os
+          import sys
+          import yaml
+          from github import Github
+
+          token = os.getenv('TOKEN_GITHUB')
+          repo_name = os.getenv('GITHUB_REPOSITORY')
+
+          if not token:
+              print("❌ TOKEN_GITHUB missing!")
+              sys.exit(1)
+          if not repo_name:
+              print("❌ GITHUB_REPOSITORY missing!")
+              sys.exit(1)
+              
+          print(f"🔗 Target Repository: {repo_name}")
+          g = Github(token)
+          repo = g.get_repo(repo_name)
+
+          print("🔍 Scanning Repository for workflow files...")
+          try:
+              workflows_dir = '.github/workflows'
+              files = repo.get_contents(workflows_dir)
+          except Exception as e:
+              print(f"❌ Could not access workflows folder: {e}")
+              sys.exit(1)
+
+          valid_workflows = []
+          for f in files:
+              if f.name.endswith('.yml') or f.name.endswith('.yaml'):
+                  if not any(excluded in f.name for excluded in ['Master', 'Auto-Update', 'Cleaner', 'Smart-Trigger']):
+                      try:
+                          content = f.decoded_content.decode('utf-8')
+                          parsed_yaml = yaml.safe_load(content)
+                          wf_display_name = parsed_yaml.get('name', f.name) if isinstance(parsed_yaml, dict) else f.name
+                      except Exception:
+                          wf_display_name = f.name
+                      
+                      valid_workflows.append({
+                          'filename': f.name,
+                          'display_name': wf_display_name,
+                          'base_name': f.name.rsplit('.', 1)[0]
+                      })
+
+          print(f"📋 Total {len(valid_workflows)} valid workflows found.")
+
+          master_path = '.github/workflows/👑Master.yml'
+          try:
+              master_file = repo.get_contents(master_path)
+          except Exception as e:
+              print(f"❌ Master.yml not found! Error: {e}")
+              sys.exit(1)
+
+          inputs_lines = []
+          logic_lines = []
+
+          for wf in sorted(valid_workflows, key=lambda x: x['filename']):
+              clean_name = wf['base_name'].replace(' ', '_').replace('-', '_')
+              clean_name = ''.join(c for c in clean_name if c.isalnum() or c=='_')
+              
+              safe_desc = str(wf['display_name']).replace("'", "").replace('"', "")
+              desc = f"{safe_desc} ({wf['filename']})"
+              
+              inputs_lines.append(f"      run_{clean_name}:")
+              inputs_lines.append(f"        description: '{desc}'")
+              inputs_lines.append(f"        type: boolean")
+              inputs_lines.append(f"        default: false")
+
+              logic_lines.append(f'            [[ "${{{{ github.event.inputs.run_{clean_name} }}}}" == "true" ]] && {{ echo "🚀 Triggering: {wf["filename"]}"; gh workflow run "{wf["filename"]}" --repo {repo_name} || echo "Failed to trigger {wf["filename"]}"; sleep 2; }}')
+
+          inputs_str = "\n".join(inputs_lines)
+          logic_str = "\n".join(logic_lines)
+
+          master_content = f"""name: 👑 Master Runner (Auto-Synced)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_all:
+        description: '🌟 Sari files ek sath chalayein'
+        type: boolean
+        default: true
+
+      # ── AUTO-GENERATED CHECKBOXES (Synced by Smart-Trigger) ──
+{inputs_str}
+
+jobs:
+  run_all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🚀 Trigger Workflows
+        env:
+          TOKEN_GITHUB: ${{{{ secrets.TOKEN_GITHUB }}}
+          REPO_NAME: ${{{{ github.repository }}}
+        run: |
+          echo "Fetching current workflows..."
+          gh api repos/$REPO_NAME/actions/workflows --paginate > /tmp/workflows.json
+
+          if [[ "${{{{ github.event.inputs.run_all }}}}" == "true" ]]; then
+            echo "🌟 Running ALL workflows..."
+            jq -r '.workflows[] | select(.name | contains("Master Runner") | not) | select(.name | contains("History Cleaner") | not) | select(.name | contains("Auto-Update") | not) | select(.name | contains("Smart Trigger") | not) | "\\(.id)|\\(.name)"' /tmp/workflows.json > /tmp/wf_list.txt
+            while IFS='|' read -r id name; do
+              echo "🚀 Triggering: $name"
+              gh workflow run $id --repo $REPO_NAME || echo "Failed: $name"
+              sleep 3
+            done < /tmp/wf_list.txt
+
+            echo "Waiting 2 mins for Cleaner..."
+            sleep 120
+            CLEANER_ID=$(jq -r '.workflows[] | select(.name | contains("History Cleaner")) | .id' /tmp/workflows.json)
+            gh workflow run $CLEANER_ID --repo $REPO_NAME || echo "Failed to trigger Cleaner"
+          else
+            echo "☑️ Running Selected Workflows..."
+{logic_str}
+          fi
+"""
+
+          try:
+              yaml.safe_load(master_content)
+          except Exception as ye:
+              print(f"❌ Generated Master YAML is invalid: {ye}")
+              sys.exit(1)
+
+          try:
+              if master_file.decoded_content.decode('utf-8') != master_content:
+                  repo.update_file(
+                      master_path, 
+                      '🔄 Smart Trigger: Master synced dynamically with repository', 
+                      master_content, 
+                      master_file.sha
+                  )
+                  print('✅ Master.yml successfully updated and verified!')
+              else:
+                  print('ℹ️ No changes needed. Master is already up to date.')
+          except Exception as e:
+              print(f'❌ Error updating file: {e}')
+          PYEOF
