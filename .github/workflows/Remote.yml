@@ -1,0 +1,16 @@
+name: Copy Token to Remote
+
+on:
+  workflow_dispatch:
+
+jobs:
+  copy_token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set TOKEN_GITHUB in Remote Repository
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GITHUB }}
+          SECRET_VALUE: ${{ secrets.TOKEN_GITHUB }}
+        run: |
+          echo "$SECRET_VALUE" | gh secret set TOKEN_GITHUB --repo sawajstudio-system/Remote
+          echo "Sirf TOKEN_GITHUB successfully Remote repo mein set ho gaya hai!"
