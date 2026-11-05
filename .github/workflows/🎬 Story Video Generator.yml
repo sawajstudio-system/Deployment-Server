@@ -1,0 +1,107 @@
+name: 🎬 Story Video Generator
+
+on:
+  schedule:
+    - cron: '30 23 * * *'   # रोज़ सुबह 5:00 AM IST
+  workflow_dispatch:        # मैन्युअली रन करने के लिए (Test)
+
+jobs:
+  story_pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      # --- GitHub Token (For fetching files) ---
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      
+      # --- Google Drive Secrets ---
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
+      
+      # --- API Keys ---
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 2. 📦 Install FFmpeg & Fonts
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
+
+      - name: 3. 📥 Install Python Packages
+        run: |
+          pip install requests edge-tts google-api-python-client google-auth-httplib2 google-auth-oauthlib Pillow mutagen
+
+      - name: 4. 🪶 Fetch Files from Backend
+        run: |
+          echo "📥 Creating Folders..."
+          mkdir -p Video_Generator/Story_Generator/temp
+          mkdir -p Video_Generator/Uploader/Drive
+          mkdir -p Video_Generator/Fetching/Islamic/Hadis/URL
+          mkdir -p Video_Generator/Fetching/Translator/URL
+          mkdir -p Video_Generator/Fetching/audio_TTS/API
+          mkdir -p Video_Generator/Fetching/Background/Video/API
+          mkdir -p Video_Generator/Fetching/Background/Music/API
+          
+          BASE="https://api.github.com/repos/sawajstudio-system/Backend/contents/Video_Generator"
+          
+          echo "📥 Fetching Story Generator Files..."
+          curl -sSL -H "Authorization: token $TOKEN_GITHUB" -H "Accept: application/vnd.github.raw" \
+            "$BASE/Story_Generator/main.py" -o Video_Generator/Story_Generator/main.py
+          curl -sSL -H "Authorization: token $TOKEN_GITHUB" -H "Accept: application/vnd.github.raw" \
+            "$BASE/Story_Generator/Story_Render.py" -o Video_Generator/Story_Generator/Story_Render.py
+            
+          echo "📥 Fetching Uploader..."
+          curl -sSL -H "Authorization: token $TOKEN_GITHUB" -H "Accept: application/vnd.github.raw" \
+            "$BASE/Uploader/Drive/story_upload.py" -o Video_Generator/Uploader/Drive/story_upload.py
+
+          echo "📥 Fetching Fetching Modules..."
+          curl -sSL -H "Authorization: token $TOKEN_GITHUB" -H "Accept: application/vnd.github.raw" \
+            "$BASE/Fetching/Islamic/Hadis/URL/fawaz.py" -o Video_Generator/Fetching/Islamic/Hadis/URL/fawaz.py
+          curl -sSL -H "Authorization: token $TOKEN_GITHUB" -H "Accept: application/vnd.github.raw" \
+            "$BASE/Fetching/Translator/URL/mymemory.py" -o Video_Generator/Fetching/Translator/URL/mymemory.py
+          curl -sSL -H "Authorization: token $TOKEN_GITHUB" -H "Accept: application/vnd.github.raw" \
+            "$BASE/Fetching/audio_TTS/API/elevenlabs.py" -o Video_Generator/Fetching/audio_TTS/API/elevenlabs.py
+          curl -sSL -H "Authorization: token $TOKEN_GITHUB" -H "Accept: application/vnd.github.raw" \
+            "$BASE/Fetching/Background/Video/API/pexels.py" -o Video_Generator/Fetching/Background/Video/API/pexels.py
+          curl -sSL -H "Authorization: token $TOKEN_GITHUB" -H "Accept: application/vnd.github.raw" \
+            "$BASE/Fetching/Background/Music/API/freesound.py" -o Video_Generator/Fetching/Background/Music/API/freesound.py
+
+          echo "📥 Creating __init__.py files..."
+          touch Video_Generator/__init__.py
+          touch Video_Generator/Story_Generator/__init__.py
+          touch Video_Generator/Uploader/__init__.py
+          touch Video_Generator/Uploader/Drive/__init__.py
+          touch Video_Generator/Fetching/__init__.py
+          touch Video_Generator/Fetching/Islamic/__init__.py
+          touch Video_Generator/Fetching/Islamic/Hadis/__init__.py
+          touch Video_Generator/Fetching/Islamic/Hadis/URL/__init__.py
+          touch Video_Generator/Fetching/Translator/__init__.py
+          touch Video_Generator/Fetching/Translator/URL/__init__.py
+          touch Video_Generator/Fetching/audio_TTS/__init__.py
+          touch Video_Generator/Fetching/audio_TTS/API/__init__.py
+          touch Video_Generator/Fetching/Background/__init__.py
+          touch Video_Generator/Fetching/Background/Video/__init__.py
+          touch Video_Generator/Fetching/Background/Video/API/__init__.py
+          touch Video_Generator/Fetching/Background/Music/__init__.py
+          touch Video_Generator/Fetching/Background/Music/API/__init__.py
+
+      - name: 5. 🧪 Run Story Pipeline
+        run: |
+          cd Video_Generator/Story_Generator
+          python main.py
+
+      - name: 6. 💨 Vanished (Cleanup)
+        if: always()
+        run: |
+          rm -rf Video_Generator
+          echo "✅ Hawa mein hi ud gaya!"
