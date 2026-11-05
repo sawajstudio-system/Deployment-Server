@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 60
 
     env:
-      # 🟢 यहाँ Telegram की Keys जोड़ दी गई हैं (असली गड़बड़ यहीं थी)
+      # 🟢 यहाँ Telegram की Keys जोड़ दी गई हैं
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
 
@@ -44,7 +44,7 @@ jobs:
       - name: 1. 📥 Checkout Backend Repo
         uses: actions/checkout@v4
         with:
-          repository: 'sawajstudio-system/Backend' # तुम्हारा Private Repo
+          repository: 'sawajstudio-system/Backend'
           token: ${{ secrets.TOKEN_GITHUB }}
 
       - name: 2. 🐍 Setup Python
