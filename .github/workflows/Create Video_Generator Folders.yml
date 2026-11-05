@@ -1,0 +1,73 @@
+name: 🛠️ Create Video_Generator Folders
+
+on:
+  workflow_dispatch: # इसे तुम मैन्युअली रन करोगे
+
+jobs:
+  setup_structure:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Repo में फोल्डर्स बनाने की परमिशन
+
+    steps:
+      - name: 📥 Checkout Backend Repo
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Backend' # तुम्हारा Private Repo
+          token: ${{ secrets.TOKEN_GITHUB }}
+
+      - name: 🚀 Create Folders via Python
+        run: |
+          python - << 'PYEOF'
+          import os
+
+          # 📂 तुम्हारा बिल्कुल सटीक स्ट्रक्चर
+          folders = [
+              "Video_Generator/assets/fonts",
+              "Video_Generator/Uploader/Drive",
+              
+              "Video_Generator/Fetching/Background/Video/API",
+              "Video_Generator/Fetching/Background/Video/URL",
+              "Video_Generator/Fetching/Background/Photo/API",
+              "Video_Generator/Fetching/Background/Photo/URL",
+              "Video_Generator/Fetching/Background/Music/API",
+              "Video_Generator/Fetching/Background/Music/URL",
+              
+              "Video_Generator/Fetching/Hadith/API",
+              "Video_Generator/Fetching/Hadith/URL",
+              
+              "Video_Generator/Fetching/AI/API",
+              "Video_Generator/Fetching/AI/URL",
+              
+              "Video_Generator/Fetching/audio_TTS/API",
+              "Video_Generator/Fetching/audio_TTS/URL",
+              
+              "Video_Generator/Fetching/Translator/API",
+              "Video_Generator/Fetching/Translator/URL",
+              
+              "Video_Generator/Fetching/Islamic/API",
+              "Video_Generator/Fetching/Islamic/URL",
+              
+              "Video_Generator/Fetching/Intro_Outro_CTA",
+              
+              "Video_Generator/Story_Generator/temp",
+              "Video_Generator/Short_Generator/temp",
+              "Video_Generator/Long_Generator/temp"
+          ]
+
+          # फोल्डर बनाओ
+          for folder in folders:
+              os.makedirs(folder, exist_ok=True)
+              # Git में खाली फोल्डर ट्रैक करने के लिए .gitkeep ज़रूरी है
+              open(os.path.join(folder, ".gitkeep"), "a").close()
+
+          print("✅ सारा फोल्डर स्ट्रक्चर बन गया भाई!")
+          PYEOF
+
+      - name: 📤 Commit & Push changes
+        run: |
+          git config --global user.name "SawajStudio Bot"
+          git config --global user.email "bot@sawajstudio.com"
+          git add .
+          git commit -m "🚀 Auto-generated folder structure via YAML" || echo "No changes to commit"
+          git push
