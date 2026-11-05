@@ -1,22 +1,52 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # 📁 FILE: .github/workflows/Test_Runner.yml
-# 🎯 PURPOSE: Master Test Runner (Clean UI, No Emojis, No Story)
+# 🎯 PURPOSE: Tick (ON/OFF) + Full List (Dropdown) System
 # ══════════════════════════════════════════════════════════════════════════════
 name: Test_Runner
 
 on:
   workflow_dispatch:
     inputs:
-      test_name:
-        description: 'Kaunsa test chalana hai?'
-        required: true
+      # ─── TICK KARNE KE OPTIONS (ON/OFF) ───
+      run_all:
+        description: 'ALL 33 Tests (Saare tests ek saath chalao)'
+        type: boolean
+        default: false
+        
+      run_gemini:
+        description: 'Google Gemini'
+        type: boolean
+        default: false
+        
+      run_txt:
+        description: 'TXT Generator'
+        type: boolean
+        default: false
+        
+      run_zip:
+        description: 'ZIP Generator'
+        type: boolean
+        default: false
+        
+      run_quran:
+        description: 'Quran'
+        type: boolean
+        default: false
+        
+      run_hadees:
+        description: 'Hadees'
+        type: boolean
+        default: false
+
+      # ─── BAKI TESTS KI LIST (Dropdown) ───
+      other_test:
+        description: 'Ya fir List se ek test chunein (Agar Tick nahi kiya hai)'
         type: choice
-        default: 'Cloudflare'
+        default: 'None'
         options:
-          - 'ALL Tests (Sab chalao)'
+          - 'None'
           - 'Cloudflare'
           - 'Anges'
-          - 'Gemini'
           - 'Groq'
           - 'UMMAH'
           - 'Cohere'
@@ -24,11 +54,9 @@ on:
           - 'OpenRouter'
           - 'Magic'
           - 'Tanvo'
-          - 'Quran'
           - 'Quran Audio'
           - 'Quran Tafsir'
           - 'Quran Foundation'
-          - 'Hadees'
           - 'Zesyn Hadees'
           - 'Hijri Date'
           - 'Pexels'
@@ -44,189 +72,22 @@ on:
           - 'Telegram'
           - 'GitHub'
           - 'History Cleaner'
-          - 'TXT Generator'
-          - 'ZIP Generator'
           - 'Test All GDrive'
 
-      repo_target:
-        description: 'TXT/ZIP ke liye (baaki tests ignore karte hain)'
-        required: false
-        type: choice
-        default: 'Public + Private'
-        options:
-          - 'Public + Private'
-          - 'Public Only'
-          - 'Private Only'
-
+      # ─── SETTINGS ───
       dry_run:
-        description: 'TXT Generator ke liye dry run?'
-        required: false
+        description: 'TXT/ZIP ke liye Dry Run? (Bina download kiye test)'
         type: boolean
         default: false
 
       stop_on_first_fail:
         description: 'Pehli fail pe ruk jao?'
-        required: false
         type: boolean
         default: false
 
 # ══════════════════════════════════════════════════════════════════════════════
 jobs:
-
-  # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 1: SINGLE TEST
-  # ═══════════════════════════════════════════════════════════════════════════
-  run_single:
-    if: inputs.test_name != 'ALL Tests (Sab chalao)'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    env:
-      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
-      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
-      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-      MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
-      TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
-      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
-      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-      COVERR_API_KEY: ${{ secrets.COVERR_API_KEY }}
-      CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
-      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
-      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
-      UMMAH_API_KEY: ${{ secrets.UMMAH_API_KEY }}
-      QF_CLIENT_ID: ${{ secrets.QF_CLIENT_ID }}
-      QF_CLIENT_SECRET: ${{ secrets.QF_CLIENT_SECRET }}
-      QF_ENV: ${{ secrets.QF_ENV }}
-      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
-      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
-      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
-      GDRIVE_F_SHORT_ID: ${{ secrets.GDRIVE_F_SHORT_ID }}
-      GDRIVE_F_LONG_ID: ${{ secrets.GDRIVE_F_LONG_ID }}
-      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
-      REPO_TARGET: ${{ inputs.repo_target }}
-      DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
-
-    steps:
-      - name: 1. Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: 2. Install requests
-        run: pip install requests
-
-      - name: 3. Fetch & Run
-        env:
-          TEST_NAME: ${{ inputs.test_name }}
-        run: |
-          python << 'PYEOF'
-          import os, sys, subprocess, requests, time
-
-          TEST  = os.environ["TEST_NAME"]
-          TOKEN = os.environ["TOKEN_GITHUB"]
-
-          MAP = {
-              "Cloudflare":        "A_API_room/01_ai_models/cloudflare.py",
-              "Anges":             "A_API_room/01_ai_models/anges.py",
-              "Gemini":            "A_API_room/01_ai_models/gemini.py",
-              "Groq":              "A_API_room/01_ai_models/groq.py",
-              "UMMAH":             "A_API_room/Islamic/UMMAH.py",
-              "Cohere":            "A_API_room/01_ai_models/cohere.py",
-              "NVIDIA":            "A_API_room/01_ai_models/nvidia.py",
-              "OpenRouter":        "A_API_room/01_ai_models/openrouter.py",
-              "Magic":             "A_API_room/01_ai_models/magic.py",
-              "Tanvo":             "A_API_room/02_audio_media/tanvo.py",
-              "Quran":             "URL_room/Islamic/quran.py",
-              "Quran Audio":       "URL_room/Islamic/quran_audio.py",
-              "Quran Tafsir":      "URL_room/Islamic/quran_tafsir.py",
-              "Quran Foundation":  "A_API_room/Islamic/quran_foundation.py",
-              "Hadees":            "URL_room/Islamic/hadees.py",
-              "Zesyn Hadees":      "URL_room/Islamic/zesyn_hadees.py",
-              "Hijri Date":        "URL_room/Islamic/hijri_date.py",
-              "Pexels":            "A_API_room/05_video_services/pexels.py",
-              "Pixabay":           "A_API_room/05_video_services/pixabay.py",
-              "Coverr":            "A_API_room/05_video_services/coverr.py",
-              "AI Image":          "URL_room/AI/ai_image.py",
-              "Natural Sound":     "A_API_room/02_audio_media/natural_sound.py",
-              "ElevenLabs":        "A_API_room/02_audio_media/elevenlabs_test.py",
-              "Cloudinary":        "A_API_room/02_audio_media/cloudinary.py",
-              "Jokes":             "URL_room/Other/jokes.py",
-              "Quotes":            "URL_room/Other/quotes.py",
-              "Translator":        "URL_room/Other/translator.py",
-              "Telegram":          "A_API_room/03_integrations/telegram.py",
-              "GitHub":            "Git_room/github.py",
-              "History Cleaner":   "Git_room/history_cleaner.py",
-              "TXT Generator":     "Git_room/txt_generator.py",
-              "ZIP Generator":     "Git_room/zip_generator.py",
-              "Test All GDrive":   "A_API_room/02_audio_media/test_gdrive_all.py",
-          }
-
-          if TEST not in MAP:
-              print(f"Unknown test: {TEST}")
-              sys.exit(1)
-
-          rel = MAP[TEST]
-          url = f"https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/{rel}"
-
-          print(f"Fetching: System_room/{rel}")
-
-          content = None
-          for attempt in range(1, 4):
-              try:
-                  r = requests.get(url, headers={"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.raw"}, timeout=30)
-                  if r.status_code == 200:
-                      content = r.content
-                      print(f"Downloaded: {len(content)} bytes")
-                      break
-                  elif r.status_code == 404:
-                      print(f"File not found (404): {rel}")
-                      sys.exit(3) 
-                  elif r.status_code == 403:
-                      print(f"Rate limited. Waiting 60s...")
-                      time.sleep(60)
-                  else:
-                      print(f"HTTP {r.status_code}, retrying...")
-                      time.sleep(2 ** attempt)
-              except Exception as e:
-                  print(f"Attempt {attempt} failed: {e}")
-                  time.sleep(2 ** attempt)
-
-          if content is None:
-              print("Fetch failed after 3 attempts")
-              sys.exit(1)
-
-          if len(content) < 10:
-              print(f"File too small ({len(content)} bytes) — likely empty")
-              sys.exit(3)
-
-          with open("/tmp/run_me.py", "wb") as f:
-              f.write(content)
-
-          sys.stdout.flush()
-          rc = subprocess.run([sys.executable, "/tmp/run_me.py"]).returncode
-          sys.exit(rc)
-          PYEOF
-
-      - name: 4. Cleanup
-        if: always()
-        run: rm -f /tmp/run_me.py
-
-
-  # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 2: ALL TESTS
-  # ═══════════════════════════════════════════════════════════════════════════
-  run_all:
-    if: inputs.test_name == 'ALL Tests (Sab chalao)'
+  run_tests:
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -234,6 +95,8 @@ jobs:
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      
+      # APIs
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
@@ -262,7 +125,8 @@ jobs:
       GDRIVE_F_SHORT_ID: ${{ secrets.GDRIVE_F_SHORT_ID }}
       GDRIVE_F_LONG_ID: ${{ secrets.GDRIVE_F_LONG_ID }}
       GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
-      REPO_TARGET: ${{ inputs.repo_target }}
+      
+      REPO_TARGET: 'Public + Private'
       DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
       STOP_ON_FAIL: ${{ inputs.stop_on_first_fail && '1' || '0' }}
 
@@ -275,7 +139,15 @@ jobs:
       - name: 2. Install requests
         run: pip install requests
 
-      - name: 3. Run all tests
+      - name: 3. Execute Tests
+        env:
+          RUN_ALL: ${{ inputs.run_all }}
+          RUN_GEMINI: ${{ inputs.run_gemini }}
+          RUN_TXT: ${{ inputs.run_txt }}
+          RUN_ZIP: ${{ inputs.run_zip }}
+          RUN_QURAN: ${{ inputs.run_quran }}
+          RUN_HADEES: ${{ inputs.run_hadees }}
+          OTHER_TEST: ${{ inputs.other_test }}
         run: |
           python << 'PYEOF'
           import os, sys, subprocess, requests, time
@@ -286,7 +158,8 @@ jobs:
           STOP_ON_FAIL = os.environ.get("STOP_ON_FAIL", "0") == "1"
           SUMMARY_FILE = os.environ.get("GITHUB_STEP_SUMMARY", "/tmp/summary.md")
 
-          MAP = {
+          # Full MAP of all available tests
+          ALL_MAP = {
               "Cloudflare":        "A_API_room/01_ai_models/cloudflare.py",
               "Anges":             "A_API_room/01_ai_models/anges.py",
               "Gemini":            "A_API_room/01_ai_models/gemini.py",
@@ -321,6 +194,32 @@ jobs:
               "ZIP Generator":     "Git_room/zip_generator.py",
               "Test All GDrive":   "A_API_room/02_audio_media/test_gdrive_all.py",
           }
+
+          # ─── SMART SELECTION LOGIC ───
+          selected_tests = []
+          
+          if os.environ.get("RUN_ALL") == "true":
+              # Agar ALL tick kiya hai, toh saare tests chalao
+              selected_tests = list(ALL_MAP.keys())
+          else:
+              # Agar checkboxes tick kiye hain
+              if os.environ.get("RUN_GEMINI") == "true": selected_tests.append("Gemini")
+              if os.environ.get("RUN_TXT") == "true": selected_tests.append("TXT Generator")
+              if os.environ.get("RUN_ZIP") == "true": selected_tests.append("ZIP Generator")
+              if os.environ.get("RUN_QURAN") == "true": selected_tests.append("Quran")
+              if os.environ.get("RUN_HADEES") == "true": selected_tests.append("Hadees")
+              
+              # Agar List (Dropdown) se koi select kiya hai
+              other = os.environ.get("OTHER_TEST", "None")
+              if other != "None" and other in ALL_MAP:
+                  selected_tests.append(other)
+
+          # Duplicate tests hatao (agar galti se same test 2 baar select ho jaye)
+          selected_tests = list(dict.fromkeys(selected_tests))
+
+          if not selected_tests:
+              print("⚠️ Koi test select nahi kiya gaya. Kripya kisi ek ko Tick karein ya List se chunein.")
+              sys.exit(0)
 
           def tg(msg):
               if not TG_TOKEN or not TG_CHAT: return
@@ -342,13 +241,14 @@ jobs:
                   time.sleep(2 ** attempt)
               return ("FAIL_FETCH", None)
 
-          total = len(MAP)
-          tg(f"ALL Tests Started\nTotal: {total} tests")
+          total = len(selected_tests)
+          tg(f"🚀 Started\nTotal tests selected: {total}")
           results = []
           start_all = time.time()
           aborted = False
 
-          for idx, (name, rel) in enumerate(MAP.items(), 1):
+          for idx, name in enumerate(selected_tests, 1):
+              rel = ALL_MAP[name]
               print(f"\n[{idx}/{total}] {name}")
               t0 = time.time()
               status, duration, reason = None, 0, ""
@@ -378,13 +278,8 @@ jobs:
               results.append((name, status, duration, reason))
               print(f"{name}: {status} ({duration:.1f}s)")
 
-              if idx % 5 == 0 or idx == total:
-                  p = sum(1 for _, s, *_ in results if s == "PASS")
-                  f = sum(1 for _, s, *_ in results if s == "FAIL")
-                  tg(f"Progress {idx}/{total}\nPass: {p} | Fail: {f}")
-
               if STOP_ON_FAIL and status == "FAIL":
-                  print(f"\nSTOP_ON_FAIL at {name}")
+                  print(f"\n⛔ STOP_ON_FAIL at {name}")
                   aborted = True
                   break
 
@@ -406,9 +301,7 @@ jobs:
                       sf.write(f"| {n} | {s} | {d:.0f}s | {r or '-'} |\n")
           except Exception: pass
 
-          lines = [f"ALL Tests Done", f"Pass: {passed}", f"Fail: {failed}", f"Skip: {skipped}", f"Timeout: {timeout}", f"Total Time: {total_time:.0f}s"]
-          if aborted:
-              lines.append("\nAborted (stop_on_first_fail)")
+          lines = [f"🏁 Done\nPass: {passed} | Fail: {failed} | Skip: {skipped} | Timeout: {timeout}"]
           tg("\n".join(lines))
 
           if failed + timeout > 0: sys.exit(1)
