@@ -1,0 +1,145 @@
+name: 🛠️ One-Time Folder Structure Setup
+
+on:
+  workflow_dispatch: # इसे तुम मैन्युअली (एक बार) रन करोगे
+
+jobs:
+  create_structure:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Repo में फाइलें/फोल्डर्स बनाने और पुश करने की परमिशन
+
+    steps:
+      - name: 📥 Checkout Backend Repo
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Backend' # तुम्हारा Private Repo
+          token: ${{ secrets.TOKEN_GITHUB }}
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🚀 Create Folders & Empty Files
+        run: |
+          python - << 'PYEOF'
+          import os
+
+          # ── 1. सारे फोल्डर्स की लिस्ट ──
+          folders = [
+              "Video_Generator/assets/fonts",
+              "Video_Generator/Uploader/Drive",
+              
+              "Video_Generator/Fetching/Background/Video/API_fallback",
+              "Video_Generator/Fetching/Background/Video/URL_fallback",
+              "Video_Generator/Fetching/Background/Photo/API_fallback",
+              "Video_Generator/Fetching/Background/Photo/URL_fallback",
+              "Video_Generator/Fetching/Background/Music/API_fallback",
+              "Video_Generator/Fetching/Background/Music/URL_fallback",
+              
+              "Video_Generator/Fetching/AI/API_fallback",
+              "Video_Generator/Fetching/AI/URL_fallback",
+              
+              "Video_Generator/Fetching/audio_TTS/API_fallback",
+              "Video_Generator/Fetching/audio_TTS/URL_fallback",
+              
+              "Video_Generator/Fetching/Translator/API_fallback",
+              "Video_Generator/Fetching/Translator/URL_fallback",
+              
+              "Video_Generator/Fetching/Islamic/Hadis/API_fallback",
+              "Video_Generator/Fetching/Islamic/Hadis/URL_fallback",
+              "Video_Generator/Fetching/Islamic/Quran/API_fallback",
+              "Video_Generator/Fetching/Islamic/Quran/URL_fallback",
+              "Video_Generator/Fetching/Islamic/Dua/API_fallback",
+              "Video_Generator/Fetching/Islamic/Dua/URL_fallback",
+              "Video_Generator/Fetching/Islamic/Hijri_date/API_fallback",
+              "Video_Generator/Fetching/Islamic/Hijri_date/URL_fallback",
+              
+              "Video_Generator/Fetching/Intro_Outro_CTA/API_fallback",
+              "Video_Generator/Fetching/Intro_Outro_CTA/URL_fallback",
+              
+              "Video_Generator/Story_Generator/temp",
+              "Video_Generator/Short_Generator/temp",
+              "Video_Generator/Long_Generator/temp"
+          ]
+
+          # ── 2. सारी खाली फाइलों की लिस्ट ──
+          files = [
+              "Video_Generator/Uploader/Drive/story_upload.py",
+              
+              "Video_Generator/Fetching/Background/Video/API_fallback/pexels.py",
+              "Video_Generator/Fetching/Background/Video/API_fallback/pixabay.py",
+              "Video_Generator/Fetching/Background/Video/API_fallback/coverr.py",
+              
+              "Video_Generator/Fetching/Background/Photo/API_fallback/pexels.py",
+              "Video_Generator/Fetching/Background/Photo/API_fallback/pixabay.py",
+              "Video_Generator/Fetching/Background/Photo/URL_fallback/pollinations_AI.py",
+              
+              "Video_Generator/Fetching/Background/Music/API_fallback/freesound.py",
+              "Video_Generator/Fetching/Background/Music/URL_fallback/pixabay_music.py",
+              
+              "Video_Generator/Fetching/AI/API_fallback/ai_fallback.py",
+              "Video_Generator/Fetching/AI/API_fallback/openrouter_AI.py",
+              "Video_Generator/Fetching/AI/API_fallback/gemini_AI.py",
+              "Video_Generator/Fetching/AI/API_fallback/groq_AI.py",
+              "Video_Generator/Fetching/AI/API_fallback/cohere_AI.py",
+              "Video_Generator/Fetching/AI/API_fallback/nvidia_AI.py",
+              "Video_Generator/Fetching/AI/API_fallback/cloudflare_AI.py",
+              "Video_Generator/Fetching/AI/API_fallback/magic_AI.py",
+              "Video_Generator/Fetching/AI/API_fallback/anges_AI.py",
+              "Video_Generator/Fetching/AI/API_fallback/tanvo_AI.py",
+              
+              "Video_Generator/Fetching/audio_TTS/API_fallback/elevenlabs.py",
+              "Video_Generator/Fetching/audio_TTS/URL_fallback/edge_tts.py",
+              
+              "Video_Generator/Fetching/Translator/URL_fallback/mymemory.py",
+              
+              "Video_Generator/Fetching/Islamic/Hadis/URL_fallback/fawaz.py",
+              
+              "Video_Generator/Fetching/Islamic/Quran/API_fallback/quran_foundation.py",
+              "Video_Generator/Fetching/Islamic/Quran/URL_fallback/quran.py",
+              "Video_Generator/Fetching/Islamic/Quran/URL_fallback/quran_audio.py",
+              "Video_Generator/Fetching/Islamic/Quran/URL_fallback/quran_tafsir.py",
+              
+              "Video_Generator/Fetching/Islamic/Dua/API_fallback/ummah.py",
+              
+              "Video_Generator/Fetching/Islamic/Hijri_date/URL_fallback/hijri_date.py",
+              
+              "Video_Generator/Fetching/Intro_Outro_CTA/API_fallback/intro_AI.py",
+              "Video_Generator/Fetching/Intro_Outro_CTA/API_fallback/outro_AI.py",
+              "Video_Generator/Fetching/Intro_Outro_CTA/API_fallback/cta_AI.py",
+              
+              "Video_Generator/Story_Generator/main.py",
+              "Video_Generator/Story_Generator/Story_Render.py",
+              "Video_Generator/Story_Generator/requirements.txt",
+              
+              "Video_Generator/Short_Generator/main.py",
+              "Video_Generator/Short_Generator/Short_Render.py",
+              "Video_Generator/Short_Generator/requirements.txt",
+              
+              "Video_Generator/Long_Generator/main.py",
+              "Video_Generator/Long_Generator/Long_Render.py",
+              "Video_Generator/Long_Generator/requirements.txt"
+          ]
+
+          # फोल्डर्स बनाओ और .gitkeep डालो
+          for folder in folders:
+              os.makedirs(folder, exist_ok=True)
+              open(os.path.join(folder, ".gitkeep"), "a").close()
+              
+          # फाइलें बनाओ
+          for file in files:
+              os.makedirs(os.path.dirname(file), exist_ok=True)
+              open(file, "a").close()
+              
+          print("✅ सारा फोल्डर स्ट्रक्चर और खाली फाइलें तैयार हो गईं भाई!")
+          PYEOF
+
+      - name: 📤 Commit & Push to Backend
+        run: |
+          git config --global user.name "SawajStudio Bot"
+          git config --global user.email "bot@sawajstudio.com"
+          git add .
+          git commit -m "🚀 One-time Setup: Created full folder structure for Video_Generator" || echo "No changes to commit"
+          git push
