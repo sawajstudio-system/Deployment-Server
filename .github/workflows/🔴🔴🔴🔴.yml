@@ -9,6 +9,10 @@ jobs:
     timeout-minutes: 60
 
     env:
+      # 🟢 यहाँ Telegram की Keys जोड़ दी गई हैं (असली गड़बड़ यहीं थी)
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+
       # --- GitHub Token (For fetching files) ---
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
       
