@@ -1,4 +1,8 @@
-name: 🎯Test_Runner
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 FILE: .github/workflows/Test_Runner.yml
+# 🎯 PURPOSE: Master Test Runner (All-in-One with Exact UI)
+# ══════════════════════════════════════════════════════════════════════════════
+name: 🎯 Test_Runner
 
 on:
   workflow_dispatch:
@@ -9,6 +13,7 @@ on:
         type: choice
         default: '☁️ Cloudflare'
         options:
+          - '🚀 ALL Tests (Sab chalao)'
           - '☁️ Cloudflare'
           - '🅰️ Anges'
           - '🔑 Gemini'
@@ -43,7 +48,6 @@ on:
           - '📦 ZIP Generator'
           - '🧪 Test All GDrive'
           - '🔴 Story Video Generator'
-          - '🚀 ALL Tests (Sab chalao)'
 
       repo_target:
         description: 'TXT/ZIP ke liye (baaki tests ignore karte hain)'
@@ -71,9 +75,9 @@ on:
 jobs:
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 1: SINGLE TEST
+  # JOB 1: SINGLE TEST (Dropdown se koi ek)
   # ═══════════════════════════════════════════════════════════════════════════
-  run:
+  run_single:
     if: |
       inputs.test_name != '🔴 Story Video Generator' &&
       inputs.test_name != '🚀 ALL Tests (Sab chalao)'
@@ -124,15 +128,7 @@ jobs:
       - name: 2. 📦 Install requests
         run: pip install requests
 
-      - name: 3. 🔍 Validate secrets
-        run: |
-          if [ -z "$TOKEN_GITHUB" ]; then
-            echo "❌ TOKEN_GITHUB secret missing!"
-            exit 1
-          fi
-          echo "✅ TOKEN_GITHUB present"
-
-      - name: 4. 🚀 Fetch & Run
+      - name: 3. 🚀 Fetch & Run
         env:
           TEST_NAME: ${{ inputs.test_name }}
         run: |
@@ -190,19 +186,16 @@ jobs:
           content = None
           for attempt in range(1, 4):
               try:
-                  r = requests.get(url, headers={
-                      "Authorization": f"token {TOKEN}",
-                      "Accept": "application/vnd.github.raw",
-                  }, timeout=30)
+                  r = requests.get(url, headers={"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.raw"}, timeout=30)
                   if r.status_code == 200:
                       content = r.content
-                      print(f"✅ Downloaded: {len(content)} bytes (attempt {attempt})")
+                      print(f"✅ Downloaded: {len(content)} bytes")
                       break
                   elif r.status_code == 404:
-                      print(f"⏭️  File not found (404): System_room/{rel}")
-                      sys.exit(3)  # special SKIP code
+                      print(f"⏭️ File not found (404): {rel}")
+                      sys.exit(3) 
                   elif r.status_code == 403:
-                      print(f"⏳ Rate limited. Waiting 60s... (attempt {attempt})")
+                      print(f"⏳ Rate limited. Waiting 60s...")
                       time.sleep(60)
                   else:
                       print(f"⚠️ HTTP {r.status_code}, retrying...")
@@ -217,7 +210,7 @@ jobs:
 
           if len(content) < 10:
               print(f"⚠️ File too small ({len(content)} bytes) — likely empty")
-              sys.exit(3)  # SKIP
+              sys.exit(3)
 
           with open("/tmp/run_me.py", "wb") as f:
               f.write(content)
@@ -227,13 +220,13 @@ jobs:
           sys.exit(rc)
           PYEOF
 
-      - name: 5. 💨 Cleanup
+      - name: 4. 💨 Cleanup
         if: always()
         run: rm -f /tmp/run_me.py
 
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 2: ALL TESTS (sequential with upgrade)
+  # JOB 2: ALL TESTS (Sequential with Stop-on-Fail support)
   # ═══════════════════════════════════════════════════════════════════════════
   run_all:
     if: inputs.test_name == '🚀 ALL Tests (Sab chalao)'
@@ -285,18 +278,10 @@ jobs:
       - name: 2. 📦 Install requests
         run: pip install requests
 
-      - name: 3. 🔍 Validate secrets
-        run: |
-          if [ -z "$TOKEN_GITHUB" ]; then
-            echo "❌ TOKEN_GITHUB missing"
-            exit 1
-          fi
-          echo "✅ Secrets OK"
-
-      - name: 4. 🚀 Run all tests
+      - name: 3. 🚀 Run all 33 tests
         run: |
           python << 'PYEOF'
-          import os, sys, subprocess, requests, time, json
+          import os, sys, subprocess, requests, time
 
           TOKEN       = os.environ["TOKEN_GITHUB"]
           TG_TOKEN    = os.environ.get("TELEGRAM_API_REPORT_TOKEN")
@@ -341,54 +326,36 @@ jobs:
           }
 
           def tg(msg):
-              if not TG_TOKEN or not TG_CHAT:
-                  return
+              if not TG_TOKEN or not TG_CHAT: return
               try:
-                  requests.post(
-                      f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-                      json={"chat_id": TG_CHAT, "text": msg[:4000]},
-                      timeout=10,
-                  )
-              except Exception:
-                  pass
+                  requests.post(f"https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/{rel}", json={"chat_id": TG_CHAT, "text": msg[:4000]}, timeout=10)
+              except Exception: pass
 
           def fetch_file(rel, retries=3):
-              """Return (status, content): status in PASS_FETCH / SKIP_404 / FAIL_FETCH"""
               url = f"https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/{rel}"
               for attempt in range(1, retries + 1):
                   try:
-                      r = requests.get(url, headers={
-                          "Authorization": f"token {TOKEN}",
-                          "Accept": "application/vnd.github.raw",
-                      }, timeout=30)
-                      if r.status_code == 200:
-                          return ("OK", r.content)
-                      if r.status_code == 404:
-                          return ("SKIP_404", None)
+                      r = requests.get(url, headers={"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.raw"}, timeout=30)
+                      if r.status_code == 200: return ("OK", r.content)
+                      if r.status_code == 404: return ("SKIP_404", None)
                       if r.status_code == 403:
-                          print(f"   ⏳ Rate limit — waiting 60s")
                           time.sleep(60)
                           continue
-                  except Exception as e:
-                      print(f"   ⚠️ Attempt {attempt}: {e}")
+                  except Exception as e: print(f"   ⚠️ Retry {attempt}: {e}")
                   time.sleep(2 ** attempt)
               return ("FAIL_FETCH", None)
 
           total = len(MAP)
-          tg(f"🚀 <b>ALL Tests Started</b>\nTotal: {total} tests\nSequential mode")
+          tg(f"🚀 <b>ALL Tests Started</b>\nTotal: {total} tests")
           results = []
           start_all = time.time()
           aborted = False
 
           for idx, (name, rel) in enumerate(MAP.items(), 1):
-              print(f"\n{'='*60}")
-              print(f"[{idx}/{total}] {name}")
-              print(f"{'='*60}")
-
+              print(f"\n[{idx}/{total}] {name}")
               t0 = time.time()
               status, duration, reason = None, 0, ""
 
-              # ── Fetch ──
               fetch_status, content = fetch_file(rel)
               if fetch_status == "SKIP_404":
                   status, reason = "SKIP", "file not found (404)"
@@ -397,99 +364,68 @@ jobs:
               elif content and len(content) < 10:
                   status, reason = "SKIP", "empty file"
               else:
-                  # ── Write & run ──
                   with open("/tmp/run_me.py", "wb") as f:
                       f.write(content)
                   sys.stdout.flush()
                   try:
-                      rc = subprocess.run(
-                          [sys.executable, "/tmp/run_me.py"],
-                          timeout=180,
-                      ).returncode
+                      rc = subprocess.run([sys.executable, "/tmp/run_me.py"], timeout=180).returncode
                       status = "PASS" if rc == 0 else "FAIL"
                   except subprocess.TimeoutExpired:
                       status = "TIMEOUT"
                   except Exception as e:
                       status, reason = "FAIL", str(e)[:60]
                   finally:
-                      if os.path.exists("/tmp/run_me.py"):
-                          os.remove("/tmp/run_me.py")
+                      if os.path.exists("/tmp/run_me.py"): os.remove("/tmp/run_me.py")
 
               duration = time.time() - t0
               results.append((name, status, duration, reason))
-
               icon = {"PASS":"✅","FAIL":"❌","SKIP":"⏭️","TIMEOUT":"⏰"}.get(status,"❓")
-              line = f"{icon} {name}: {status} ({duration:.1f}s)"
-              if reason:
-                  line += f" — {reason}"
-              print(line)
+              print(f"{icon} {name}: {status} ({duration:.1f}s)")
 
-              # Every 5th test → Telegram progress
               if idx % 5 == 0 or idx == total:
-                  passed_so_far = sum(1 for _, s, *_ in results if s == "PASS")
-                  failed_so_far = sum(1 for _, s, *_ in results if s == "FAIL")
-                  tg(f"📊 Progress {idx}/{total}\n✅ {passed_so_far}  ❌ {failed_so_far}")
+                  p = sum(1 for _, s, *_ in results if s == "PASS")
+                  f = sum(1 for _, s, *_ in results if s == "FAIL")
+                  tg(f"📊 Progress {idx}/{total}\n✅ {p}  ❌ {f}")
 
-              # Stop-on-fail
               if STOP_ON_FAIL and status == "FAIL":
-                  print(f"\n⛔ STOP_ON_FAIL triggered at {name}")
+                  print(f"\n⛔ STOP_ON_FAIL at {name}")
                   aborted = True
                   break
 
-          # ── Totals ──
           passed  = sum(1 for _, s, *_ in results if s == "PASS")
           failed  = sum(1 for _, s, *_ in results if s == "FAIL")
           skipped = sum(1 for _, s, *_ in results if s == "SKIP")
           timeout = sum(1 for _, s, *_ in results if s == "TIMEOUT")
           total_time = time.time() - start_all
 
-          print(f"\n{'='*60}")
-          print(f"SUMMARY: ✅ {passed}  ❌ {failed}  ⏭️ {skipped}  ⏰ {timeout}  | {total_time:.0f}s")
-          print(f"{'='*60}")
+          print(f"\nSUMMARY: ✅ {passed}  ❌ {failed}  ⏭️ {skipped}  ⏰ {timeout} | {total_time:.0f}s")
 
-          # ── GitHub Step Summary (markdown) ──
           try:
               with open(SUMMARY_FILE, "w", encoding="utf-8") as sf:
-                  sf.write(f"# 🎯 All Tests Summary\n\n")
-                  sf.write(f"**Total time:** {total_time:.0f}s  \n")
-                  sf.write(f"**Total tests:** {len(results)}\n\n")
-                  sf.write(f"| ✅ Pass | ❌ Fail | ⏭️ Skip | ⏰ Timeout |\n")
-                  sf.write(f"|---------|---------|---------|-----------|\n")
-                  sf.write(f"| {passed} | {failed} | {skipped} | {timeout} |\n\n")
-                  sf.write(f"## Details\n\n")
-                  sf.write(f"| Test | Status | Duration | Reason |\n")
-                  sf.write(f"|------|--------|----------|--------|\n")
-                  for name, status, dur, reason in results:
-                      icon = {"PASS":"✅","FAIL":"❌","SKIP":"⏭️","TIMEOUT":"⏰"}.get(status,"❓")
-                      sf.write(f"| {name} | {icon} {status} | {dur:.0f}s | {reason or '—'} |\n")
-          except Exception as e:
-              print(f"⚠️ Could not write step summary: {e}")
+                  sf.write(f"# 🎯 Test Summary\n\n**Total time:** {total_time:.0f}s\n\n")
+                  sf.write(f"| ✅ Pass | ❌ Fail | ⏭️ Skip | ⏰ Timeout |\n|---|---|---|---|\n")
+                  sf.write(f"| {passed} | {failed} | {skipped} | {timeout} |\n\n## Details\n\n")
+                  sf.write(f"| Test | Status | Duration | Reason |\n|---|---|---|---|\n")
+                  for n, s, d, r in results:
+                      ic = {"PASS":"✅","FAIL":"❌","SKIP":"⏭️","TIMEOUT":"⏰"}.get(s,"❓")
+                      sf.write(f"| {n} | {ic} {s} | {d:.0f}s | {r or '—'} |\n")
+          except Exception: pass
 
-          # ── Telegram final ──
-          lines = [
-              f"🏁 <b>ALL Tests Done</b>",
-              f"✅ Pass: {passed}",
-              f"❌ Fail: {failed}",
-              f"⏭️ Skip: {skipped}",
-              f"⏰ Timeout: {timeout}",
-              f"⏱️ Total: {total_time:.0f}s",
-          ]
+          lines = [f"🏁 <b>ALL Tests Done</b>", f"✅ Pass: {passed}", f"❌ Fail: {failed}", f"⏭️ Skip: {skipped}", f"⏰ Timeout: {timeout}", f"⏱️ Total: {total_time:.0f}s"]
           if aborted:
               lines.append("\n⛔ Aborted (stop_on_first_fail)")
           tg("\n".join(lines))
 
-          # Exit code: only FAIL/TIMEOUT make it red
-          if failed + timeout > 0:
-              sys.exit(1)
+          if failed + timeout > 0: sys.exit(1)
           PYEOF
 
-      - name: 5. 💨 Cleanup
+      - name: 4. 💨 Cleanup
         if: always()
         run: rm -f /tmp/run_me.py
 
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 3: STORY VIDEO GENERATOR
+  # JOB 3: STORY VIDEO GENERATOR (Special Setup)
   # ═══════════════════════════════════════════════════════════════════════════
   story:
     if: inputs.test_name == '🔴 Story Video Generator'
