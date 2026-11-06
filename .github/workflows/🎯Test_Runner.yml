@@ -1,6 +1,6 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # 📁 FILE: .github/workflows/Test_Runner.yml
-# 🎯 3 Alag Dropdowns: API, ZIP Repo, TXT Repo
+# 🎯 3 Alag Dropdowns: API, ZIP Repo, TXT Repo (No Extra Checkboxes)
 # ══════════════════════════════════════════════════════════════════════════════
 name: Test_Runner
 
@@ -69,12 +69,6 @@ on:
           - 'Private Repo (Backend)'
           - 'Both Repos (Dono)'
 
-      # ─── 4. SETTINGS ───
-      dry_run:
-        description: 'TXT/ZIP Dry Run? (Bina content download kiye test)'
-        type: boolean
-        default: false
-
 # ══════════════════════════════════════════════════════════════════════════════
 jobs:
   run_tests:
@@ -115,8 +109,6 @@ jobs:
       GDRIVE_F_LONG_ID: ${{ secrets.GDRIVE_F_LONG_ID }}
       GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
 
-      DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
-
     steps:
       - name: 1. Setup Python
         uses: actions/setup-python@v5
@@ -138,8 +130,7 @@ jobs:
           TOKEN       = os.environ["TOKEN_GITHUB"]
           TG_TOKEN    = os.environ.get("TELEGRAM_API_REPORT_TOKEN")
           TG_CHAT     = os.environ.get("TELEGRAM_API_REPORT_CHAT_ID")
-          SUMMARY_FILE = os.environ.get("GITHUB_STEP_SUMMARY", "/tmp/summary.md")
-
+          
           API_TEST = os.environ.get("API_TEST", "None")
           ZIP_FILE = os.environ.get("ZIP_FILE", "None")
           TXT_FILE = os.environ.get("TXT_FILE", "None")
