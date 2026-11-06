@@ -1,52 +1,34 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # 📁 FILE: .github/workflows/Test_Runner.yml
-# 🎯 PURPOSE: Tick (ON/OFF) + Full List (Dropdown) System
+# 🎯 Separate Ticks for TXT & ZIP + List Box for Other Tests
 # ══════════════════════════════════════════════════════════════════════════════
 name: Test_Runner
 
 on:
   workflow_dispatch:
     inputs:
-      # ─── TICK KARNE KE OPTIONS (ON/OFF) ───
-      run_all:
-        description: 'ALL 33 Tests (Saare tests ek saath chalao)'
-        type: boolean
-        default: false
-        
-      run_gemini:
-        description: 'Google Gemini'
-        type: boolean
-        default: false
-        
-      run_txt:
-        description: 'TXT Generator'
-        type: boolean
-        default: false
-        
-      run_zip:
-        description: 'ZIP Generator'
-        type: boolean
-        default: false
-        
-      run_quran:
-        description: 'Quran'
-        type: boolean
-        default: false
-        
-      run_hadees:
-        description: 'Hadees'
+      # ─── 1. TXT AUR ZIP KE ALAG-ALAG TICK (ON/OFF) ───
+      make_txt:
+        description: 'Generate TXT File (Combined.txt)'
         type: boolean
         default: false
 
-      # ─── BAKI TESTS KI LIST (Dropdown) ───
+      make_zip:
+        description: 'Generate ZIP File (Output.zip)'
+        type: boolean
+        default: false
+
+      # ─── 2. BAAKI TESTS KI LIST (Dropdown) ───
       other_test:
-        description: 'Ya fir List se ek test chunein (Agar Tick nahi kiya hai)'
+        description: 'Baaki tests me se koi ek chunein (Agar TXT/ZIP nahi chahiye)'
         type: choice
         default: 'None'
         options:
           - 'None'
+          - 'ALL Tests (Sab 33 chalao)'
           - 'Cloudflare'
           - 'Anges'
+          - 'Gemini'
           - 'Groq'
           - 'UMMAH'
           - 'Cohere'
@@ -54,9 +36,11 @@ on:
           - 'OpenRouter'
           - 'Magic'
           - 'Tanvo'
+          - 'Quran'
           - 'Quran Audio'
           - 'Quran Tafsir'
           - 'Quran Foundation'
+          - 'Hadees'
           - 'Zesyn Hadees'
           - 'Hijri Date'
           - 'Pexels'
@@ -74,14 +58,20 @@ on:
           - 'History Cleaner'
           - 'Test All GDrive'
 
-      # ─── SETTINGS ───
-      dry_run:
-        description: 'TXT/ZIP ke liye Dry Run? (Bina download kiye test)'
+      # ─── 3. REPO SELECTION (TICK) ───
+      repo_public:
+        description: 'TXT/ZIP me PUBLIC repo (Firent) include karein?'
         type: boolean
-        default: false
+        default: true
 
-      stop_on_first_fail:
-        description: 'Pehli fail pe ruk jao?'
+      repo_private:
+        description: 'TXT/ZIP me PRIVATE repo (Backend) include karein?'
+        type: boolean
+        default: true
+
+      # ─── 4. SETTINGS ───
+      dry_run:
+        description: 'TXT/ZIP ke liye Dry Run? (Bina file download kiye test)'
         type: boolean
         default: false
 
@@ -95,8 +85,7 @@ jobs:
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
-      
-      # APIs
+
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
@@ -125,10 +114,8 @@ jobs:
       GDRIVE_F_SHORT_ID: ${{ secrets.GDRIVE_F_SHORT_ID }}
       GDRIVE_F_LONG_ID: ${{ secrets.GDRIVE_F_LONG_ID }}
       GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
-      
-      REPO_TARGET: 'Public + Private'
+
       DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
-      STOP_ON_FAIL: ${{ inputs.stop_on_first_fail && '1' || '0' }}
 
     steps:
       - name: 1. Setup Python
@@ -141,13 +128,11 @@ jobs:
 
       - name: 3. Execute Tests
         env:
-          RUN_ALL: ${{ inputs.run_all }}
-          RUN_GEMINI: ${{ inputs.run_gemini }}
-          RUN_TXT: ${{ inputs.run_txt }}
-          RUN_ZIP: ${{ inputs.run_zip }}
-          RUN_QURAN: ${{ inputs.run_quran }}
-          RUN_HADEES: ${{ inputs.run_hadees }}
+          MAKE_TXT: ${{ inputs.make_txt }}
+          MAKE_ZIP: ${{ inputs.make_zip }}
           OTHER_TEST: ${{ inputs.other_test }}
+          REPO_PUBLIC: ${{ inputs.repo_public }}
+          REPO_PRIVATE: ${{ inputs.repo_private }}
         run: |
           python << 'PYEOF'
           import os, sys, subprocess, requests, time
@@ -155,10 +140,20 @@ jobs:
           TOKEN       = os.environ["TOKEN_GITHUB"]
           TG_TOKEN    = os.environ.get("TELEGRAM_API_REPORT_TOKEN")
           TG_CHAT     = os.environ.get("TELEGRAM_API_REPORT_CHAT_ID")
-          STOP_ON_FAIL = os.environ.get("STOP_ON_FAIL", "0") == "1"
           SUMMARY_FILE = os.environ.get("GITHUB_STEP_SUMMARY", "/tmp/summary.md")
 
-          # Full MAP of all available tests
+          # ─── Repo Tick → REPO_TARGET ───
+          pub  = os.environ.get("REPO_PUBLIC") == "true"
+          priv = os.environ.get("REPO_PRIVATE") == "true"
+
+          if pub and priv:   REPO_TARGET = "Public + Private"
+          elif pub:          REPO_TARGET = "Public Only"
+          elif priv:         REPO_TARGET = "Private Only"
+          else:              REPO_TARGET = "Public + Private"
+
+          os.environ["REPO_TARGET"] = REPO_TARGET
+          print(f"📦 Repo Target: {REPO_TARGET}")
+
           ALL_MAP = {
               "Cloudflare":        "A_API_room/01_ai_models/cloudflare.py",
               "Anges":             "A_API_room/01_ai_models/anges.py",
@@ -197,34 +192,36 @@ jobs:
 
           # ─── SMART SELECTION LOGIC ───
           selected_tests = []
-          
-          if os.environ.get("RUN_ALL") == "true":
-              # Agar ALL tick kiya hai, toh saare tests chalao
-              selected_tests = list(ALL_MAP.keys())
-          else:
-              # Agar checkboxes tick kiye hain
-              if os.environ.get("RUN_GEMINI") == "true": selected_tests.append("Gemini")
-              if os.environ.get("RUN_TXT") == "true": selected_tests.append("TXT Generator")
-              if os.environ.get("RUN_ZIP") == "true": selected_tests.append("ZIP Generator")
-              if os.environ.get("RUN_QURAN") == "true": selected_tests.append("Quran")
-              if os.environ.get("RUN_HADEES") == "true": selected_tests.append("Hadees")
+
+          # 1. Agar TXT ka tick lagaya hai
+          if os.environ.get("MAKE_TXT") == "true":
+              selected_tests.append("TXT Generator")
               
-              # Agar List (Dropdown) se koi select kiya hai
-              other = os.environ.get("OTHER_TEST", "None")
-              if other != "None" and other in ALL_MAP:
+          # 2. Agar ZIP ka tick lagaya hai
+          if os.environ.get("MAKE_ZIP") == "true":
+              selected_tests.append("ZIP Generator")
+
+          # 3. Agar List se kuch select kiya hai
+          other = os.environ.get("OTHER_TEST", "None")
+          if other != "None":
+              if other == "ALL Tests (Sab 33 chalao)":
+                  for name in ALL_MAP.keys():
+                      selected_tests.append(name)
+              elif other in ALL_MAP:
                   selected_tests.append(other)
 
-          # Duplicate tests hatao (agar galti se same test 2 baar select ho jaye)
+          # Duplicate tests hatao
           selected_tests = list(dict.fromkeys(selected_tests))
 
           if not selected_tests:
-              print("⚠️ Koi test select nahi kiya gaya. Kripya kisi ek ko Tick karein ya List se chunein.")
+              print("⚠️ Koi test select nahi kiya. Kripya Tick karein ya List se chunein.")
               sys.exit(0)
 
           def tg(msg):
               if not TG_TOKEN or not TG_CHAT: return
               try:
-                  requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage", json={"chat_id": TG_CHAT, "text": msg[:4000]}, timeout=10)
+                  requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                                json={"chat_id": TG_CHAT, "text": msg[:4000]}, timeout=10)
               except Exception: pass
 
           def fetch_file(rel, retries=3):
@@ -235,17 +232,15 @@ jobs:
                       if r.status_code == 200: return ("OK", r.content)
                       if r.status_code == 404: return ("SKIP_404", None)
                       if r.status_code == 403:
-                          time.sleep(60)
-                          continue
+                          time.sleep(60); continue
                   except Exception as e: print(f"Retry {attempt}: {e}")
                   time.sleep(2 ** attempt)
               return ("FAIL_FETCH", None)
 
           total = len(selected_tests)
-          tg(f"🚀 Started\nTotal tests selected: {total}")
+          tg(f"🚀 Started\nSelected Tests: {total}\nRepo: {REPO_TARGET}")
           results = []
           start_all = time.time()
-          aborted = False
 
           for idx, name in enumerate(selected_tests, 1):
               rel = ALL_MAP[name]
@@ -278,11 +273,6 @@ jobs:
               results.append((name, status, duration, reason))
               print(f"{name}: {status} ({duration:.1f}s)")
 
-              if STOP_ON_FAIL and status == "FAIL":
-                  print(f"\n⛔ STOP_ON_FAIL at {name}")
-                  aborted = True
-                  break
-
           passed  = sum(1 for _, s, *_ in results if s == "PASS")
           failed  = sum(1 for _, s, *_ in results if s == "FAIL")
           skipped = sum(1 for _, s, *_ in results if s == "SKIP")
@@ -293,7 +283,7 @@ jobs:
 
           try:
               with open(SUMMARY_FILE, "w", encoding="utf-8") as sf:
-                  sf.write(f"# Test Summary\n\n**Total time:** {total_time:.0f}s\n\n")
+                  sf.write(f"# Test Summary\n\n**Repo:** {REPO_TARGET}\n**Total time:** {total_time:.0f}s\n\n")
                   sf.write(f"| Pass | Fail | Skip | Timeout |\n|---|---|---|---|\n")
                   sf.write(f"| {passed} | {failed} | {skipped} | {timeout} |\n\n## Details\n\n")
                   sf.write(f"| Test | Status | Duration | Reason |\n|---|---|---|---|\n")
@@ -301,7 +291,7 @@ jobs:
                       sf.write(f"| {n} | {s} | {d:.0f}s | {r or '-'} |\n")
           except Exception: pass
 
-          lines = [f"🏁 Done\nPass: {passed} | Fail: {failed} | Skip: {skipped} | Timeout: {timeout}"]
+          lines = [f"🏁 Done\nPass: {passed} | Fail: {failed} | Skip: {skipped} | Timeout: {timeout}\nRepo: {REPO_TARGET}"]
           tg("\n".join(lines))
 
           if failed + timeout > 0: sys.exit(1)
