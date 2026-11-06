@@ -1,7 +1,7 @@
 name: 🎬Story_Video-Generator
 
 on:
-  workflow_dispatch:        # सिर्फ मैन्युअली रन करने के लिए
+  workflow_dispatch:        # मैन्युअली रन करने के लिए
 
 jobs:
   story_pipeline:
@@ -65,8 +65,7 @@ jobs:
         run: |
           cd Video_Generator/Story_Generator
           
-          # 🟢 अब कोई PYTHONPATH सेट करने की ज़रूरत नहीं है। 
-          # जब आप Bug Fix YML चला चुके हैं, तो आपका कोड पूरी तरह तैयार है।
+          # सीधा रन करें, इम्पोर्ट्स अब बिल्कुल सही हैं
           python main.py
 
       - name: 6. 💨 Vanished (Cleanup)
