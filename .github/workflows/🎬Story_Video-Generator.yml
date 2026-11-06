@@ -64,6 +64,10 @@ jobs:
       - name: 5. 🧪 Run Story Pipeline
         run: |
           cd Video_Generator/Story_Generator
+          
+          # 🟢 यह है वो जादुई लाइन जो ModuleNotFoundError को खत्म करेगी
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/Story_Render
+          
           python main.py
 
       - name: 6. 💨 Vanished (Cleanup)
