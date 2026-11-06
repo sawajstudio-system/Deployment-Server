@@ -1,31 +1,20 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # 📁 FILE: .github/workflows/Test_Runner.yml
-# 🎯 Separate Ticks for TXT & ZIP + List Box for Other Tests
+# 🎯 3 Alag Dropdowns: API, ZIP Repo, TXT Repo
 # ══════════════════════════════════════════════════════════════════════════════
 name: Test_Runner
 
 on:
   workflow_dispatch:
     inputs:
-      # ─── 1. TXT AUR ZIP KE ALAG-ALAG TICK (ON/OFF) ───
-      make_txt:
-        description: 'Generate TXT File (Combined.txt)'
-        type: boolean
-        default: false
-
-      make_zip:
-        description: 'Generate ZIP File (Output.zip)'
-        type: boolean
-        default: false
-
-      # ─── 2. BAAKI TESTS KI LIST (Dropdown) ───
-      other_test:
-        description: 'Baaki tests me se koi ek chunein (Agar TXT/ZIP nahi chahiye)'
+      # ─── 1. API LIST ───
+      api_test:
+        description: 'API Test (Kaunsi API chalani hai?)'
         type: choice
         default: 'None'
         options:
           - 'None'
-          - 'ALL Tests (Sab 33 chalao)'
+          - 'ALL Tests (Sab 33)'
           - 'Cloudflare'
           - 'Anges'
           - 'Gemini'
@@ -58,20 +47,31 @@ on:
           - 'History Cleaner'
           - 'Test All GDrive'
 
-      # ─── 3. REPO SELECTION (TICK) ───
-      repo_public:
-        description: 'TXT/ZIP me PUBLIC repo (Firent) include karein?'
-        type: boolean
-        default: true
+      # ─── 2. ZIP FILE LIST ───
+      zip_file:
+        description: 'ZIP File (Kis repo ka ZIP chahiye?)'
+        type: choice
+        default: 'None'
+        options:
+          - 'None'
+          - 'Public Repo (Firent)'
+          - 'Private Repo (Backend)'
+          - 'Both Repos (Dono)'
 
-      repo_private:
-        description: 'TXT/ZIP me PRIVATE repo (Backend) include karein?'
-        type: boolean
-        default: true
+      # ─── 3. TXT FILE LIST ───
+      txt_file:
+        description: 'TXT File (Kis repo ka TXT chahiye?)'
+        type: choice
+        default: 'None'
+        options:
+          - 'None'
+          - 'Public Repo (Firent)'
+          - 'Private Repo (Backend)'
+          - 'Both Repos (Dono)'
 
       # ─── 4. SETTINGS ───
       dry_run:
-        description: 'TXT/ZIP ke liye Dry Run? (Bina file download kiye test)'
+        description: 'TXT/ZIP Dry Run? (Bina content download kiye test)'
         type: boolean
         default: false
 
@@ -128,11 +128,9 @@ jobs:
 
       - name: 3. Execute Tests
         env:
-          MAKE_TXT: ${{ inputs.make_txt }}
-          MAKE_ZIP: ${{ inputs.make_zip }}
-          OTHER_TEST: ${{ inputs.other_test }}
-          REPO_PUBLIC: ${{ inputs.repo_public }}
-          REPO_PRIVATE: ${{ inputs.repo_private }}
+          API_TEST: ${{ inputs.api_test }}
+          ZIP_FILE: ${{ inputs.zip_file }}
+          TXT_FILE: ${{ inputs.txt_file }}
         run: |
           python << 'PYEOF'
           import os, sys, subprocess, requests, time
@@ -142,17 +140,9 @@ jobs:
           TG_CHAT     = os.environ.get("TELEGRAM_API_REPORT_CHAT_ID")
           SUMMARY_FILE = os.environ.get("GITHUB_STEP_SUMMARY", "/tmp/summary.md")
 
-          # ─── Repo Tick → REPO_TARGET ───
-          pub  = os.environ.get("REPO_PUBLIC") == "true"
-          priv = os.environ.get("REPO_PRIVATE") == "true"
-
-          if pub and priv:   REPO_TARGET = "Public + Private"
-          elif pub:          REPO_TARGET = "Public Only"
-          elif priv:         REPO_TARGET = "Private Only"
-          else:              REPO_TARGET = "Public + Private"
-
-          os.environ["REPO_TARGET"] = REPO_TARGET
-          print(f"📦 Repo Target: {REPO_TARGET}")
+          API_TEST = os.environ.get("API_TEST", "None")
+          ZIP_FILE = os.environ.get("ZIP_FILE", "None")
+          TXT_FILE = os.environ.get("TXT_FILE", "None")
 
           ALL_MAP = {
               "Cloudflare":        "A_API_room/01_ai_models/cloudflare.py",
@@ -193,28 +183,28 @@ jobs:
           # ─── SMART SELECTION LOGIC ───
           selected_tests = []
 
-          # 1. Agar TXT ka tick lagaya hai
-          if os.environ.get("MAKE_TXT") == "true":
-              selected_tests.append("TXT Generator")
-              
-          # 2. Agar ZIP ka tick lagaya hai
-          if os.environ.get("MAKE_ZIP") == "true":
+          # 1. API Check
+          if API_TEST != "None":
+              if API_TEST == "ALL Tests (Sab 33)":
+                  for name in ALL_MAP.keys():
+                      if name not in ["TXT Generator", "ZIP Generator"]:
+                          selected_tests.append(name)
+              elif API_TEST in ALL_MAP:
+                  selected_tests.append(API_TEST)
+
+          # 2. ZIP Check
+          if ZIP_FILE != "None":
               selected_tests.append("ZIP Generator")
 
-          # 3. Agar List se kuch select kiya hai
-          other = os.environ.get("OTHER_TEST", "None")
-          if other != "None":
-              if other == "ALL Tests (Sab 33 chalao)":
-                  for name in ALL_MAP.keys():
-                      selected_tests.append(name)
-              elif other in ALL_MAP:
-                  selected_tests.append(other)
+          # 3. TXT Check
+          if TXT_FILE != "None":
+              selected_tests.append("TXT Generator")
 
-          # Duplicate tests hatao
+          # Duplicate hatao
           selected_tests = list(dict.fromkeys(selected_tests))
 
           if not selected_tests:
-              print("⚠️ Koi test select nahi kiya. Kripya Tick karein ya List se chunein.")
+              print("⚠️ Koi option select nahi kiya. Kripya kisi box me se option chunein.")
               sys.exit(0)
 
           def tg(msg):
@@ -238,13 +228,28 @@ jobs:
               return ("FAIL_FETCH", None)
 
           total = len(selected_tests)
-          tg(f"🚀 Started\nSelected Tests: {total}\nRepo: {REPO_TARGET}")
+          tg(f"🚀 Started\nSelected Tests: {total}")
           results = []
           start_all = time.time()
 
           for idx, name in enumerate(selected_tests, 1):
               rel = ALL_MAP[name]
               print(f"\n[{idx}/{total}] {name}")
+              
+              # REPO_TARGET Set karna (Har test ke liye alag)
+              if name == "ZIP Generator":
+                  if ZIP_FILE == "Both Repos (Dono)": os.environ["REPO_TARGET"] = "Public + Private"
+                  elif ZIP_FILE == "Public Repo (Firent)": os.environ["REPO_TARGET"] = "Public Only"
+                  elif ZIP_FILE == "Private Repo (Backend)": os.environ["REPO_TARGET"] = "Private Only"
+              elif name == "TXT Generator":
+                  if TXT_FILE == "Both Repos (Dono)": os.environ["REPO_TARGET"] = "Public + Private"
+                  elif TXT_FILE == "Public Repo (Firent)": os.environ["REPO_TARGET"] = "Public Only"
+                  elif TXT_FILE == "Private Repo (Backend)": os.environ["REPO_TARGET"] = "Private Only"
+              else:
+                  os.environ["REPO_TARGET"] = "Public + Private" # Default for API Tests
+                  
+              print(f"📦 Repo Target: {os.environ.get('REPO_TARGET')}")
+
               t0 = time.time()
               status, duration, reason = None, 0, ""
 
@@ -280,21 +285,7 @@ jobs:
           total_time = time.time() - start_all
 
           print(f"\nSUMMARY: Pass: {passed} | Fail: {failed} | Skip: {skipped} | Timeout: {timeout} | {total_time:.0f}s")
-
-          try:
-              with open(SUMMARY_FILE, "w", encoding="utf-8") as sf:
-                  sf.write(f"# Test Summary\n\n**Repo:** {REPO_TARGET}\n**Total time:** {total_time:.0f}s\n\n")
-                  sf.write(f"| Pass | Fail | Skip | Timeout |\n|---|---|---|---|\n")
-                  sf.write(f"| {passed} | {failed} | {skipped} | {timeout} |\n\n## Details\n\n")
-                  sf.write(f"| Test | Status | Duration | Reason |\n|---|---|---|---|\n")
-                  for n, s, d, r in results:
-                      sf.write(f"| {n} | {s} | {d:.0f}s | {r or '-'} |\n")
-          except Exception: pass
-
-          lines = [f"🏁 Done\nPass: {passed} | Fail: {failed} | Skip: {skipped} | Timeout: {timeout}\nRepo: {REPO_TARGET}"]
-          tg("\n".join(lines))
-
-          if failed + timeout > 0: sys.exit(1)
+          tg(f"🏁 Done\nPass: {passed} | Fail: {failed} | Skip: {skipped} | Timeout: {timeout}")
           PYEOF
 
       - name: 4. Cleanup
