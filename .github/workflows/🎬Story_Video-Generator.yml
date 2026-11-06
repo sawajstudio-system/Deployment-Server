@@ -9,11 +9,11 @@ jobs:
     timeout-minutes: 60
 
     env:
-      # 🟢 यहाँ Telegram की Keys जोड़ दी गई हैं
+      # --- Telegram Keys ---
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
 
-      # --- GitHub Token (For fetching files) ---
+      # --- GitHub Token ---
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
       
       # --- Google Drive Secrets ---
@@ -65,9 +65,8 @@ jobs:
         run: |
           cd Video_Generator/Story_Generator
           
-          # 🟢 यह है वो जादुई लाइन जो ModuleNotFoundError को खत्म करेगी
-          export PYTHONPATH=$PYTHONPATH:$(pwd)/Story_Render
-          
+          # 🟢 अब कोई PYTHONPATH सेट करने की ज़रूरत नहीं है। 
+          # जब आप Bug Fix YML चला चुके हैं, तो आपका कोड पूरी तरह तैयार है।
           python main.py
 
       - name: 6. 💨 Vanished (Cleanup)
