@@ -17,47 +17,38 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install Pillow requests
+          pip install opencv-python-headless numpy requests
 
-      - name: Process Logo (Remove All Green Shades & Textures)
+      - name: Process Logo (Clean Corner Flood Fill)
         run: |
           python -c "
-          from PIL import Image
+          import cv2
+          import numpy as np
 
-          img = Image.open('logo.png').convert('RGBA')
-          data = img.getdata()
+          # Load image with alpha channel
+          img = cv2.imread('logo.png', cv2.IMREAD_UNCHANGED)
+          if img.shape[2] == 3:
+              img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
 
-          new_data = []
-          for item in data:
-              r, g, b, a = item
-              
-              # Convert RGB to HSV to catch all green gradients and textures
-              rf, gf, bf = r/255.0, g/255.0, b/255.0
-              maxc = max(rf, gf, bf)
-              minc = min(rf, gf, bf)
-              diff = maxc - minc
-              
-              if diff == 0:
-                  h = 0
-              elif maxc == rf:
-                  h = (60 * ((gf - bf) / diff) + 360) % 360
-              elif maxc == gf:
-                  h = (60 * ((bf - rf) / diff) + 120) % 360
-              else:
-                  h = (60 * ((rf - gf) / diff) + 240) % 360
-                  
-              s = 0 if maxc == 0 else (diff / maxc)
-              v = maxc
-              
-              # Target all green hues, ignoring white/silver logo text
-              if 60 <= h <= 175 and s > 0.15:
-                  new_data.append((0, 0, 0, 0)) # Fully transparent
-              else:
-                  new_data.append(item)
+          bgr = img[:, :, :3]
+          h, w = bgr.shape[:2]
 
-          img.putdata(new_data)
-          img.save('transparent_logo.png', 'PNG')
-          print('All green background completely removed!')
+          # Create flood fill mask (2 pixels larger than image)
+          mask = np.zeros((h + 2, w + 2), np.uint8)
+
+          # Flood fill from all 4 corners to remove connected green background textures
+          corners = [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]
+          for corner in corners:
+              cv2.floodFill(bgr, mask, corner, (255, 255, 255), loDiff=(45, 45, 45), upDiff=(45, 45, 45), flags=cv2.FLOODFILL_FIXED_RANGE | cv2.FLOODFILL_MASK_ONLY)
+
+          # Extract background mask
+          bg_mask = mask[1:h+1, 1:w+1]
+
+          # Make background pixels fully transparent (Alpha = 0)
+          img[bg_mask == 1] = (0, 0, 0, 0)
+
+          cv2.imwrite('transparent_logo.png', img)
+          print('Green background completely removed and logo preserved!')
           "
 
       - name: Send Transparent PNG to Telegram
@@ -71,13 +62,13 @@ jobs:
 
           token = os.environ['TELEGRAM_BOT_TOKEN']
           chat_id = os.environ['TELEGRAM_CHAT_ID']
-          url = f'https://api.telegram.org/bot{token}/sendPhoto'
+          url = f'https://api.telegram.org/bot{token}/sendDocument'
 
-          with open('transparent_logo.png', 'rb') as photo:
+          with open('transparent_logo.png', 'rb') as doc:
               response = requests.post(
                   url,
-                  data={'chat_id': chat_id, 'caption': '✅ Background fully removed and transparent!'},
-                  files={'photo': photo}
+                  data={'chat_id': chat_id, 'caption': '✅ Here is your clean transparent logo (High Quality)!'},
+                  files={'document': doc}
               )
 
           print('Telegram Response:', response.text)
