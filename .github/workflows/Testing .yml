@@ -1,0 +1,50 @@
+name: Move Files and Delete Testing Folder
+
+on:
+  workflow_dispatch: # Actions tab se manually run karne ke liye
+
+jobs:
+  move-and-delete:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Git commit aur push karne ke liye permissions
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Move files and delete testing folder
+        run: |
+          SOURCE_FOLDER="test__yml"
+          TARGET_FOLDER=".github"
+          
+          # Target folder create karein agar nahi hai
+          mkdir -p "$TARGET_FOLDER"
+          
+          if [ -d "$SOURCE_FOLDER" ]; then
+            echo "Moving files from $SOURCE_FOLDER to $TARGET_FOLDER..."
+            # Testing folder ki saari files ko .github folder mein copy karein
+            cp -av "$SOURCE_FOLDER"/* "$TARGET_FOLDER"/ 2>/dev/null || echo "Koi file nahi mili!"
+            
+            # Ab testing folder ko poori tarah delete kar dein
+            echo "Deleting testing folder: $SOURCE_FOLDER"
+            rm -rf "$SOURCE_FOLDER"
+          else
+            echo "Folder '$SOURCE_FOLDER' nahi mila!"
+          fi
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Git mein add changes (delete aur move dono ke liye)
+          git add -A
+          
+          # Check karein agar koi change hai tabhi commit karein
+          if git diff --staged --quiet; then
+            echo "Koi change commit karne ke liye nahi hai."
+          else
+            git commit -m "Move files to .github and delete testing folder"
+            git push
+            echo "Files move ho gayi aur testing folder delete ho gaya!"
+          fi
