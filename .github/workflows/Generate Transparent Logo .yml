@@ -1,7 +1,7 @@
 name: Make Logo Transparent
 
 on:
-  workflow_dispatch: # Aap ise GitHub Actions tab se manually run kar sakte hain
+  workflow_dispatch:
 
 jobs:
   process-image:
@@ -27,32 +27,30 @@ jobs:
           python -c "
           from PIL import Image
 
-          # Image ka path jo photo mein dikh raha hai
-          img_path = 'Firent/logo.png'
+          # Logo seedhe root folder mein hai, isliye path sirf 'logo.png' rahega
+          img_path = 'logo.png'
           
           img = Image.open(img_path).convert('RGBA')
           datas = img.getdata()
 
           new_data = []
           for item in datas:
-              # Green color detection threshold (Aap apne hisab se adjust kar sakte hain)
-              # Agar green component zyada hai aur red/blue kam hai, toh use transparent bana do
               r, g, b, a = item
+              # Green color detection aur transparent banane ke liye condition
               if g > 100 and r < 100 and b < 100:
                   new_data.append((255, 255, 255, 0)) # Transparent
               else:
                   new_data.append(item)
 
           img.putdata(new_data)
-          # Purani photo ki jagah nayi transparent photo overwrite ho jayegi
           img.save(img_path, 'PNG')
-          print('Image processed and background made transparent successfully!')
+          print('Logo background removed and saved successfully!')
           "
 
       - name: Commit and push changes
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add Firent/logo.png
+          git add logo.png
           git commit -m "Replace logo with transparent background version"
           git push
