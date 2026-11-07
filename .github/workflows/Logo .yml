@@ -1,4 +1,4 @@
-name: Make Logo Transparent and Send to Telegram
+name:  Logo.Transparent
 
 on:
   workflow_dispatch: # Manual button se run karne ke liye
