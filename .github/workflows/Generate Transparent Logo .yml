@@ -35,32 +35,28 @@ jobs:
 
           # 1. Detect all green background shades and textures
           hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-          lower_green = np.array([30, 30, 30])
+          lower_green = np.array([30, 20, 20])
           upper_green = np.array([90, 255, 255])
           green_mask = cv2.inRange(hsv, lower_green, upper_green)
 
           # Also catch dominant green channel areas
-          g_dominant = (g.astype(np.int16) - r.astype(np.int16) > 12) & (g.astype(np.int16) - b.astype(np.int16) > 12)
+          g_dominant = (g.astype(np.int16) - r.astype(np.int16) > 10) & (g.astype(np.int16) - b.astype(np.int16) > 10)
           bg_mask = cv2.bitwise_or(green_mask, g_dominant.astype(np.uint8) * 255)
 
           # 2. STRICT PROTECTION FOR WHITE/SILVER LOGO TEXT
-          # White/Silver pixels have high brightness and low color difference
           max_channel = np.maximum(np.maximum(r, g), b)
           min_channel = np.minimum(np.minimum(r, g), b)
           color_diff = max_channel.astype(np.int16) - min_channel.astype(np.int16)
           
-          # Protect any bright white/silver parts of the logo so they never get removed
-          is_logo = (max_channel > 130) & (color_diff < 35)
+          # Protect bright white/silver parts of the logo so they never get removed
+          is_logo = (max_channel > 120) & (color_diff < 40)
           bg_mask[is_logo] = 0
 
-          # 3. Apply transparency to background
+          # 3. Apply transparency only to the green background
           img[bg_mask == 255] = (0, 0, 0, 0)
 
-          # Ensure logo pixels remain fully opaque and clear
-          img[is_logo] = (b[is_logo], g[is_logo], r[is_logo], 255)
-
           cv2.imwrite('transparent_logo.png', img)
-          print('Green background removed, logo fully protected!')
+          print('Green background removed successfully, logo fully protected!')
           "
 
       - name: Send Transparent PNG to Telegram
@@ -79,7 +75,7 @@ jobs:
           with open('transparent_logo.png', 'rb') as doc:
               response = requests.post(
                   url,
-                  data={'chat_id': chat_id, 'caption': '✅ Perfect transparent logo (Logo text protected)!'},
+                  data={'chat_id': chat_id, 'caption': '✅ Perfect transparent logo (Error fixed)!'},
                   files={'document': doc}
               )
 
