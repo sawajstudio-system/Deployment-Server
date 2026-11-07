@@ -2,7 +2,7 @@
 # 📁 FILE: .github/workflows/Test_Runner.yml
 # 🎯 3 Alag Dropdowns: API, ZIP Repo, TXT Repo (No Extra Checkboxes)
 # ══════════════════════════════════════════════════════════════════════════════
-name: Test_Runner
+name: 🏁🏃
 
 on:
   workflow_dispatch:
