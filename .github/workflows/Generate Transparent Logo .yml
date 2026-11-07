@@ -1,4 +1,4 @@
-name: Make Logo TransparentTelegram
+name: Make Logo Transparent and Send to Telegram
 
 on:
   workflow_dispatch: # Aap ise GitHub Actions tab se manually run kar sakte hain
@@ -19,27 +19,45 @@ jobs:
         run: |
           pip install Pillow requests
 
-      - name: Process Logo (Remove Green Background)
+      - name: Process Logo (Remove All Green Shades & Textures)
         run: |
           python -c "
           from PIL import Image
 
-          # Open original logo
           img = Image.open('logo.png').convert('RGBA')
-          datas = img.getdata()
+          data = img.getdata()
 
           new_data = []
-          for item in datas:
+          for item in data:
               r, g, b, a = item
-              # Green background detection condition (Adjust threshold if needed)
-              if g > r + 30 and g > b + 30 and g > 40:
-                  new_data.append((255, 255, 255, 0)) # Transparent
+              
+              # Convert RGB to HSV to catch all green gradients and textures
+              rf, gf, bf = r/255.0, g/255.0, b/255.0
+              maxc = max(rf, gf, bf)
+              minc = min(rf, gf, bf)
+              diff = maxc - minc
+              
+              if diff == 0:
+                  h = 0
+              elif maxc == rf:
+                  h = (60 * ((gf - bf) / diff) + 360) % 360
+              elif maxc == gf:
+                  h = (60 * ((bf - rf) / diff) + 120) % 360
+              else:
+                  h = (60 * ((rf - gf) / diff) + 240) % 360
+                  
+              s = 0 if maxc == 0 else (diff / maxc)
+              v = maxc
+              
+              # Target all green hues, ignoring white/silver logo text
+              if 60 <= h <= 175 and s > 0.15:
+                  new_data.append((0, 0, 0, 0)) # Fully transparent
               else:
                   new_data.append(item)
 
           img.putdata(new_data)
           img.save('transparent_logo.png', 'PNG')
-          print('Logo background successfully made transparent!')
+          print('All green background completely removed!')
           "
 
       - name: Send Transparent PNG to Telegram
@@ -58,7 +76,7 @@ jobs:
           with open('transparent_logo.png', 'rb') as photo:
               response = requests.post(
                   url,
-                  data={'chat_id': chat_id, 'caption': '✅ Here is your transparent logo.png!'},
+                  data={'chat_id': chat_id, 'caption': '✅ Background fully removed and transparent!'},
                   files={'photo': photo}
               )
 
