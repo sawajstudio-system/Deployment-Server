@@ -1,13 +1,10 @@
-name:  Logo.Transparent
+name:  Logo_Transparent
 
 on:
-  workflow_dispatch: # Manual button se run karne ke liye
-  push:
-    paths:
-      - 'logo.png' # Jaise hi nayi logo.png upload/update hogi, ye khud-b-khud chal padega
+  workflow_dispatch: # Sirf tabhi chalega jab aap manually run karenge
 
 permissions:
-  contents: write # GitHub repo mein file auto-commit karne ki permission ke liye
+  contents: write
 
 jobs:
   process-and-send-logo:
@@ -25,15 +22,38 @@ jobs:
         run: |
           pip install opencv-python-headless numpy requests
 
-      - name: Process Logo (Ultra Clean, Smooth & Protected)
+      - name: Auto-Detect Image and Process
         run: |
           python -c "
           import cv2
           import numpy as np
+          import os
+          import glob
+
+          print('Current files in directory:', os.listdir('.'))
+
+          # Automatically find any image file if logo.png is not found
+          image_files = glob.glob('*.png') + glob.glob('*.jpg') + glob.glob('*.jpeg')
+          image_files = [f for f in image_files if f != 'transparent_logo.png']
+
+          input_path = 'logo.png'
+          if not os.path.exists(input_path):
+              if image_files:
+                  input_path = image_files[0]
+                  print(f'logo.png nahi mila, automatically yeh image mil gayi: {input_path}')
+              else:
+                  raise FileNotFoundError('Repository mein koi bhi image file nahi mili!')
+
+          print(f'Processing image: {input_path}')
 
           # Load image with alpha channel
-          img = cv2.imread('logo.png', cv2.IMREAD_UNCHANGED)
-          if img.shape[2] == 3:
+          img = cv2.imread(input_path, cv2.IMREAD_UNCHANGED)
+          if img is None:
+              raise ValueError(f'Failed to read {input_path}. The file might be corrupted.')
+
+          if len(img.shape) == 2:
+              img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+          elif img.shape[2] == 3:
               img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
 
           b, g, r, a = cv2.split(img)
@@ -57,7 +77,7 @@ jobs:
           is_logo = (max_channel > 110) & (color_diff < 45)
           bg_mask[is_logo] = 0
 
-          # 3. Morphological cleaning to smooth edges and remove stray dots
+          # 3. Morphological cleaning to smooth edges
           kernel = np.ones((2, 2), np.uint8)
           bg_mask = cv2.morphologyEx(bg_mask, cv2.MORPH_OPEN, kernel)
           bg_mask = cv2.morphologyEx(bg_mask, cv2.MORPH_CLOSE, kernel)
@@ -66,7 +86,7 @@ jobs:
           img[bg_mask == 255] = (0, 0, 0, 0)
 
           cv2.imwrite('transparent_logo.png', img)
-          print('Logo edges cleaned, smoothed, and fully protected!')
+          print('Image successfully processed and background removed!')
           "
 
       - name: Upload Artifact (Download from GitHub)
@@ -99,7 +119,7 @@ jobs:
           with open('transparent_logo.png', 'rb') as doc:
               response = requests.post(
                   url,
-                  data={'chat_id': chat_id, 'caption': '🚀 All-in-one: Ultra-clean transparent logo generated, saved & sent!'},
+                  data={'chat_id': chat_id, 'caption': '🚀 Manual Run: Transparent logo generated & sent!'},
                   files={'document': doc}
               )
 
