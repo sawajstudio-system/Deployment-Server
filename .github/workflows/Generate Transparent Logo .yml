@@ -1,7 +1,13 @@
 name: Make Logo Transparent and Send to Telegram
 
 on:
-  workflow_dispatch: # Aap ise GitHub Actions tab se manually run kar sakte hain
+  workflow_dispatch: # Manual button se run karne ke liye
+  push:
+    paths:
+      - 'logo.png' # Jaise hi nayi logo.png upload/update hogi, ye khud-b-khud chal padega
+
+permissions:
+  contents: write # GitHub repo mein file auto-commit karne ki permission ke liye
 
 jobs:
   process-and-send-logo:
@@ -19,7 +25,7 @@ jobs:
         run: |
           pip install opencv-python-headless numpy requests
 
-      - name: Process Logo (Remove Green, Protect White Logo)
+      - name: Process Logo (Ultra Clean, Smooth & Protected)
         run: |
           python -c "
           import cv2
@@ -33,31 +39,49 @@ jobs:
           b, g, r, a = cv2.split(img)
           bgr = cv2.merge([b, g, r])
 
-          # 1. Detect all green background shades and textures
+          # 1. Advanced green background detection
           hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-          lower_green = np.array([30, 20, 20])
-          upper_green = np.array([90, 255, 255])
+          lower_green = np.array([25, 15, 15])
+          upper_green = np.array([95, 255, 255])
           green_mask = cv2.inRange(hsv, lower_green, upper_green)
 
-          # Also catch dominant green channel areas
-          g_dominant = (g.astype(np.int16) - r.astype(np.int16) > 10) & (g.astype(np.int16) - b.astype(np.int16) > 10)
+          # Catch dominant green channel areas
+          g_dominant = (g.astype(np.int16) - r.astype(np.int16) > 8) & (g.astype(np.int16) - b.astype(np.int16) > 8)
           bg_mask = cv2.bitwise_or(green_mask, g_dominant.astype(np.uint8) * 255)
 
-          # 2. STRICT PROTECTION FOR WHITE/SILVER LOGO TEXT
+          # 2. Strict protection for white/silver logo text
           max_channel = np.maximum(np.maximum(r, g), b)
           min_channel = np.minimum(np.minimum(r, g), b)
           color_diff = max_channel.astype(np.int16) - min_channel.astype(np.int16)
           
-          # Protect bright white/silver parts of the logo so they never get removed
-          is_logo = (max_channel > 120) & (color_diff < 40)
+          is_logo = (max_channel > 110) & (color_diff < 45)
           bg_mask[is_logo] = 0
 
-          # 3. Apply transparency only to the green background
+          # 3. Morphological cleaning to smooth edges and remove stray dots
+          kernel = np.ones((2, 2), np.uint8)
+          bg_mask = cv2.morphologyEx(bg_mask, cv2.MORPH_OPEN, kernel)
+          bg_mask = cv2.morphologyEx(bg_mask, cv2.MORPH_CLOSE, kernel)
+
+          # Apply transparency
           img[bg_mask == 255] = (0, 0, 0, 0)
 
           cv2.imwrite('transparent_logo.png', img)
-          print('Green background removed successfully, logo fully protected!')
+          print('Logo edges cleaned, smoothed, and fully protected!')
           "
+
+      - name: Upload Artifact (Download from GitHub)
+        uses: actions/upload-artifact@v4
+        with:
+          name: transparent-logo-file
+          path: transparent_logo.png
+
+      - name: Commit Transparent Logo Back to Repo
+        run: |
+          git config --global user.name 'GitHub Actions Bot'
+          git config --global user.email 'bot@users.noreply.github.com'
+          git add transparent_logo.png
+          git commit -m 'Auto-generate transparent logo [skip ci]' || echo "No changes to commit"
+          git push || echo "No changes to push"
 
       - name: Send Transparent PNG to Telegram
         env:
@@ -75,7 +99,7 @@ jobs:
           with open('transparent_logo.png', 'rb') as doc:
               response = requests.post(
                   url,
-                  data={'chat_id': chat_id, 'caption': '✅ Perfect transparent logo (Error fixed)!'},
+                  data={'chat_id': chat_id, 'caption': '🚀 All-in-one: Ultra-clean transparent logo generated, saved & sent!'},
                   files={'document': doc}
               )
 
