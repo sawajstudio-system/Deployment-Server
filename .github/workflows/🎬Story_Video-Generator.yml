@@ -1,28 +1,21 @@
 name: 🎬Story_Video-Generator
 
 on:
-  workflow_dispatch:        # मैन्युअली रन करने के लिए
+  workflow_dispatch:
 
 jobs:
   story_pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120 # 🟢 60 से बढ़ाकर 120 मिनट कर दिया गया है
 
     env:
-      # --- Telegram Keys ---
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
-
-      # --- GitHub Token ---
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
-      
-      # --- Google Drive Secrets ---
       GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
       GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
       GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
       GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
-      
-      # --- AI API Keys ---
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -33,8 +26,6 @@ jobs:
       MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
       ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
       TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
-
-      # --- Media & TTS API Keys ---
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
       FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
@@ -56,6 +47,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
+          sudo fc-cache -f -v
 
       - name: 4. 📥 Install Python Packages
         run: |
@@ -64,11 +56,8 @@ jobs:
       - name: 5. 🧪 Run Story Pipeline
         run: |
           cd Video_Generator/Story_Generator
-          
-          # सीधा रन करें, इम्पोर्ट्स अब बिल्कुल सही हैं
           python main.py
 
       - name: 6. 💨 Vanished (Cleanup)
         if: always()
-        run: |
-          echo "✅ Process complete. Hawa mein hi ud gaya!"
+        run: echo "✅ Process complete."
