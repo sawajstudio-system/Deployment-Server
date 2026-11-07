@@ -19,7 +19,7 @@ jobs:
         run: |
           pip install opencv-python-headless numpy requests
 
-      - name: Process Logo (Clean Corner Flood Fill)
+      - name: Process Logo (Remove Green, Protect White Logo)
         run: |
           python -c "
           import cv2
@@ -30,25 +30,37 @@ jobs:
           if img.shape[2] == 3:
               img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
 
-          bgr = img[:, :, :3]
-          h, w = bgr.shape[:2]
+          b, g, r, a = cv2.split(img)
+          bgr = cv2.merge([b, g, r])
 
-          # Create flood fill mask (2 pixels larger than image)
-          mask = np.zeros((h + 2, w + 2), np.uint8)
+          # 1. Detect all green background shades and textures
+          hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+          lower_green = np.array([30, 30, 30])
+          upper_green = np.array([90, 255, 255])
+          green_mask = cv2.inRange(hsv, lower_green, upper_green)
 
-          # Flood fill from all 4 corners to remove connected green background textures
-          corners = [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]
-          for corner in corners:
-              cv2.floodFill(bgr, mask, corner, (255, 255, 255), loDiff=(45, 45, 45), upDiff=(45, 45, 45), flags=cv2.FLOODFILL_FIXED_RANGE | cv2.FLOODFILL_MASK_ONLY)
+          # Also catch dominant green channel areas
+          g_dominant = (g.astype(np.int16) - r.astype(np.int16) > 12) & (g.astype(np.int16) - b.astype(np.int16) > 12)
+          bg_mask = cv2.bitwise_or(green_mask, g_dominant.astype(np.uint8) * 255)
 
-          # Extract background mask
-          bg_mask = mask[1:h+1, 1:w+1]
+          # 2. STRICT PROTECTION FOR WHITE/SILVER LOGO TEXT
+          # White/Silver pixels have high brightness and low color difference
+          max_channel = np.maximum(np.maximum(r, g), b)
+          min_channel = np.minimum(np.minimum(r, g), b)
+          color_diff = max_channel.astype(np.int16) - min_channel.astype(np.int16)
+          
+          # Protect any bright white/silver parts of the logo so they never get removed
+          is_logo = (max_channel > 130) & (color_diff < 35)
+          bg_mask[is_logo] = 0
 
-          # Make background pixels fully transparent (Alpha = 0)
-          img[bg_mask == 1] = (0, 0, 0, 0)
+          # 3. Apply transparency to background
+          img[bg_mask == 255] = (0, 0, 0, 0)
+
+          # Ensure logo pixels remain fully opaque and clear
+          img[is_logo] = (b[is_logo], g[is_logo], r[is_logo], 255)
 
           cv2.imwrite('transparent_logo.png', img)
-          print('Green background completely removed and logo preserved!')
+          print('Green background removed, logo fully protected!')
           "
 
       - name: Send Transparent PNG to Telegram
@@ -67,7 +79,7 @@ jobs:
           with open('transparent_logo.png', 'rb') as doc:
               response = requests.post(
                   url,
-                  data={'chat_id': chat_id, 'caption': '✅ Here is your clean transparent logo (High Quality)!'},
+                  data={'chat_id': chat_id, 'caption': '✅ Perfect transparent logo (Logo text protected)!'},
                   files={'document': doc}
               )
 
