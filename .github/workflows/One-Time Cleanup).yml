@@ -1,0 +1,133 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 📁 FILE: .github/workflows/🧹Delete_Old_Workflows.yml
+# 🎯 PURPOSE: 29 duplicate workflows delete करना + Logo_Transparent को move करना
+# ⚠️ यह workflow सिर्फ ONE TIME चलाना है — फिर इसे भी delete कर देना
+# ══════════════════════════════════════════════════════════════════════════════
+
+name: 🧹 Delete Old Workflows (One-Time Cleanup)
+
+on:
+  workflow_dispatch: # Manual trigger only
+
+permissions:
+  contents: write # Files delete/commit/push करने के लिए ज़रूरी
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 1. 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: 2. 🔧 Git Config
+        run: |
+          git config --global user.name "Sawaj Studio Bot"
+          git config --global user.email "bot@sawajstudio.com"
+
+      - name: 3. 📦 Move Logo_Transparent.yml to workflows folder
+        run: |
+          if [ -f ".github/Logo_Transparent.yml" ]; then
+            git mv ".github/Logo_Transparent.yml" ".github/workflows/Logo_Transparent.yml"
+            echo "✅ Logo_Transparent.yml moved to workflows/"
+          else
+            echo "⚠️ Logo_Transparent.yml not found at .github/ — skipping move"
+          fi
+
+      - name: 4. 🗑️ Delete 29 old workflow files
+        run: |
+          FILES=(
+            ".github/☁️Cloudflare.yml"
+            ".github/🅰️Anges.yml"
+            ".github/🌐AIImage.yml"
+            ".github/🌐Hadees.yml"
+            ".github/🌐HijriDate.yml"
+            ".github/🌐Jokes.yml"
+            ".github/🌐NaturalSound.yml"
+            ".github/🌐OpenRouter.yml"
+            ".github/🌐Quotes.yml"
+            ".github/🌐Quran.yml"
+            ".github/🌐QuranAudio.yml"
+            ".github/🌐QuranFoundation.yml"
+            ".github/🌐QuranTafsir.yml"
+            ".github/🌐Translator.yml"
+            ".github/🌐ZesynHadees.yml"
+            ".github/🎙️ElevenLabs.yml"
+            ".github/🎨Tanvo.yml"
+            ".github/🎬Coverr.yml"
+            ".github/🎬Pexels.yml"
+            ".github/🐙GitHub.yml"
+            ".github/📱Telegram.yml"
+            ".github/📸Cloudinary.yml"
+            ".github/🔑Gemini.yml"
+            ".github/🔑Groq.yml"
+            ".github/🔑UMMAH.yml"
+            ".github/🖼️Pixabay.yml"
+            ".github/🟢NVIDIA.yml"
+            ".github/🧠Cohere.yml"
+            ".github/🪄Magic.yml"
+          )
+
+          DELETED=0
+          SKIPPED=0
+
+          for FILE in "${FILES[@]}"; do
+            if [ -f "$FILE" ]; then
+              git rm "$FILE"
+              echo "🗑️  Deleted: $FILE"
+              DELETED=$((DELETED + 1))
+            else
+              echo "⚠️  Skipped (not found): $FILE"
+              SKIPPED=$((SKIPPED + 1))
+            fi
+          done
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "✅ Deleted: $DELETED files"
+          echo "⚠️  Skipped: $SKIPPED files"
+          echo "════════════════════════════════════════"
+
+      - name: 5. 📋 Show remaining files
+        run: |
+          echo "=== .github/ root ==="
+          ls -la .github/ || true
+          echo ""
+          echo "=== .github/workflows/ ==="
+          ls -la .github/workflows/ || true
+
+      - name: 6. 💾 Commit & Push Changes
+        run: |
+          git add -A
+
+          if git diff-index --quiet HEAD --; then
+            echo "⚠️ No changes to commit — already clean!"
+          else
+            git commit -m "🧹 Cleanup: Delete 29 duplicate workflows, move Logo_Transparent to workflows folder"
+            git push
+            echo "✅ Changes pushed successfully!"
+          fi
+
+      - name: 7. 📱 Telegram Report
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+            echo "⚠️ Telegram secrets not set — skipping report"
+            exit 0
+          fi
+
+          MSG="🧹 Workflow Cleanup Done!%0A"
+          MSG="${MSG}📦 Remaining workflows: $(ls .github/workflows/ | wc -l)%0A"
+          MSG="${MSG}✅ Repo is now clean & organized"
+
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT}" \
+            -d "text=${MSG}" \
+            -d "parse_mode=HTML" || true
