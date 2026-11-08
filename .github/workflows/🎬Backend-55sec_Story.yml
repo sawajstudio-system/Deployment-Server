@@ -1,0 +1,58 @@
+name: 🎬Backend-55sec_Story G
+
+on:
+  workflow_dispatch:
+
+jobs:
+  story_pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
+      ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
+      TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+
+    steps:
+      - name: 1. 📥 Checkout Backend Repo
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Backend' # 🟢 असली बैकएंड
+          token: ${{ secrets.TOKEN_GITHUB }}
+
+      - name: 2. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 3. 📦 Install FFmpeg & Fonts
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
+          sudo fc-cache -f -v
+
+      - name: 4. 📥 Install Python Packages
+        run: pip install -r Video_Generator/Story_Generator/requirements.txt
+
+      - name: 5. 🧪 Run Backend Story Pipeline
+        run: |
+          cd Video_Generator/Story_Generator
+          python main.py
