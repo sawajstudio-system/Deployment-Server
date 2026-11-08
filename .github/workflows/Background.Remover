@@ -1,4 +1,4 @@
-name: ⚡ Fast Background Remover
+name: ⚡Background.Remover
 
 on:
   workflow_dispatch: 
