@@ -1,4 +1,4 @@
-name: 🚀Update_Backend
+name: 🚀Update_Backend_ripo
 
 on:
   workflow_dispatch:
