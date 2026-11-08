@@ -1,4 +1,4 @@
-name: 🚀 Update Backend
+name: 🚀Update_Backend
 
 on:
   workflow_dispatch:
