@@ -25,7 +25,7 @@ jobs:
 
       - name: 4. 🪄 Remove Background (Super Fast)
         run: |
-          python -c "
+          python - << 'EOF'
           from PIL import Image
           import numpy as np
           import os
@@ -59,7 +59,7 @@ jobs:
           transparent_img = Image.fromarray(data)
           transparent_img.save(output_file)
           print('✅ Background removed instantly in 1 second!')
-          "
+          EOF
 
       - name: 5. 🚀 Send Transparent Logo to Telegram
         env:
@@ -83,4 +83,5 @@ jobs:
           git config --global user.email "bot@sawajstudio.com"
           git add transparent_logo.png
           git commit -m "⚡ Added fast transparent logo" || echo "No changes"
-          git push || echo "No changes"
+          git push origin HEAD:${{ github.ref_name }} || echo "No changes"
+          
