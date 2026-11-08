@@ -1,7 +1,10 @@
-name: ⚡ Fast Remove Background (AI Powered)
+name: ⚡ Direct Auto Background Remover
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch: # बिना किसी इनपुट ऑप्शन के सिर्फ एक क्लिक पर चलेगा
+  push:
+    paths:
+      - 'logo.png' # जब भी आप कोई नई logo.png अपलोड करेंगे, यह अपने आप चल जाएगा
 
 permissions:
   contents: write
@@ -17,73 +20,79 @@ jobs:
       - name: 2. 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
-      - name: 3. 📦 Install rembg (Fast CPU version)
+      - name: 3. 📦 Install Dependencies
         run: |
-          pip install rembg[cpu] pillow
+          python -m pip install --upgrade pip
+          pip install "rembg[cpu]" pillow onnxruntime
 
-      - name: 4. 💾 Cache Lightweight AI Model (u2netp - 4.7MB)
+      - name: 4. 💾 Cache AI Models Directory
         uses: actions/cache@v4
         id: model-cache
         with:
           path: ~/.u2net
-          key: ${{ runner.os }}-u2netp-model-v1
+          key: ${{ runner.os }}-ai-models-u2netp-v2
 
-      - name: 5. ⬇️ Download Fast Model (Only if not cached)
-        if: steps.model-cache.outputs.cache-hit != 'true'
-        run: |
-          echo "फास्ट मॉडल (4.7MB) डाउनलोड हो रहा है..."
-          mkdir -p ~/.u2net
-          # u2netp मॉडल डाउनलोड करने का लिंक
-          curl -L -s -o ~/.u2net/u2netp.onnx \
-            "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx"
-          echo "✅ फास्ट मॉडल डाउनलोड हो गया!"
-
-      - name: 6. 🪄 Remove Background (Super Fast)
+      - name: 5. ⚙️ Remove Background (Direct Mode)
         run: |
           python -c "
+          import os
           from rembg import remove, new_session
           from PIL import Image
-          import os
 
           input_file = 'logo.png'
           output_file = 'transparent_logo.png'
 
           if not os.path.exists(input_file):
-              raise FileNotFoundError('logo.png nahi mila!')
+              raise FileNotFoundError(f'❌ Error: {input_file} nahi mila! Please root directory me logo.png rakhein.')
 
-          print('AI model se background remove ho raha hai... (Fast Mode)')
-          input_image = Image.open(input_file)
-          
-          # u2netp (Portable) मॉडल का इस्तेमाल करना ताकि प्रोसेस फास्ट हो
+          print('🚀 Loading AI Model (u2netp)...')
           session = new_session('u2netp')
-          output_image = remove(input_image, session=session)
+
+          print(f'✨ Processing image: {input_file}...')
+          input_image = Image.open(input_file).convert('RGBA')
           
-          output_image.save(output_file)
-          print('✅ Background removed successfully in record time!')
+          output_image = remove(
+              input_image, 
+              session=session,
+              alpha_matting=True,
+              alpha_matting_foreground_threshold=240,
+              alpha_matting_background_threshold=10,
+              alpha_matting_erode_size=10
+          )
+          
+          output_image.save(output_file, 'PNG')
+          print(f'✅ Successfully saved as: {output_file}')
           "
 
-      - name: 7. 🚀 Send Transparent Logo to Telegram
+      - name: 6. 🚀 Send Result to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "⚠️ Telegram secrets not set. Skipping."
+            echo "⚠️ Telegram secrets not set. Skipping notification."
             exit 0
           fi
-          
+
+          if [ ! -f "transparent_logo.png" ]; then
+            echo "⚠️ Output file not found for Telegram upload."
+            exit 0
+          fi
+
+          echo "📤 Sending to Telegram..."
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
             -F "chat_id=${TELEGRAM_CHAT_ID}" \
             -F "document=@transparent_logo.png" \
-            -F "caption=⚡ AI ki speed! Yeh raha aapka ekdum clean aur professional Transparent Logo." \
+            -F "caption=⚡ **Direct AI Background Removed!**" \
             || true
 
-      - name: 8. 💾 Commit and Push to Repo
+      - name: 7. 💾 Commit and Push Result to Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
           git add transparent_logo.png
-          git commit -m "⚡ Added ultra-fast AI transparent logo" || echo "No changes"
-          git push || echo "No changes"
+          git commit -m "⚡ Direct Auto: Removed background for logo.png" || echo "No changes to commit"
+          git push || echo "No changes to push"
+          
