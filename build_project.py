@@ -1,83 +1,377 @@
 import os
 
-BASE_DIR = "Video_Generator/Story_Generator/Story_Render"
+# 🟢 मुख्य फोल्डर जहाँ सब कुछ बनेगा
+BASE = "Video_Generator/Story_Generator/Story_Render"
 
-# --- यहाँ हमने हर फाइल का कोड सेट किया है ---
-FILES = {
-    # CONFIG - FONTS
-    "config/fonts/arabic_fonts.py": """ARABIC_FONTS = ["Amiri", "Reem Kufi", "Scheherazade"]""",
-    "config/fonts/hindi_fonts.py": """HINDI_FONTS = ["Yatra One", "Rozha One", "Eczar"]""",
-    "config/fonts/english_fonts.py": """ENGLISH_FONTS = ["Playfair Display", "Cinzel", "Montserrat", "Lora"]""",
+FILES = {}
 
-    # CONFIG - SIZES
-    "config/sizes/font_sizes.py": """ARABIC_SIZE = 85\nHINDI_SIZE = 75\nENGLISH_SIZE = 60""",
-    "config/sizes/screen_size.py": """PLAY_RES_X = 1080\nPLAY_RES_Y = 1920""",
-    "config/sizes/margins.py": """ARABIC_MARGIN_V = 700\nHINDI_MARGIN_V = 550\nENGLISH_MARGIN_V = 400""",
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟢 1. CONFIG (सेटिंग्स - हर चीज़ की अलग फाइल)
+# ══════════════════════════════════════════════════════════════════════════════
 
-    # CONFIG - COLORS
-    "config/colors/hex_colors.py": """WHITE = "&H00FFFFFF&"\nGOLD = "&H0000D7FF&"\nBLACK = "&H00000000&"""" ,
-    "config/colors/base_color.py": """from .hex_colors import WHITE\nBASE_COLOR = WHITE""",
-    "config/colors/highlight_color.py": """from .hex_colors import GOLD\nHIGHLIGHT_COLOR = GOLD""",
+FILES["config/screen.py"] = '''PLAY_RES_X = 1080
+PLAY_RES_Y = 1920
+'''
 
-    # SUBTITLE - ASSEMBLER
-    "subtitle/assembler/ass_header.py": """def get_header():\n    return "[Script Info]\\nScriptType: v4.00+\\nPlayResX: 1080\\nPlayResY: 1920\\nWrapStyle: 2\\n" """,
-    "subtitle/assembler/ass_style.py": """def get_style():\n    return "[V4+ Styles]\\nFormat: Name, Fontname...\\n" """,
-    "subtitle/assembler/ass_saver.py": """import os\ndef save_ass(content, path):\n    os.makedirs(os.path.dirname(path), exist_ok=True)\n    with open(path, 'w', encoding='utf-8') as f:\n        f.write(content)""",
+FILES["config/colors.py"] = '''WHITE = "&H00FFFFFF&"
+GOLD = "&H0000D7FF&"
+BLACK = "&H00000000&"
 
-    # SUBTITLE - BUILDERS
-    "subtitle/builders/main_sub_builder.py": """def build_main_sub():\n    return "Main Subtitle Content" """,
-    "subtitle/builders/cta_sub_builder.py": """def build_cta_sub():\n    return "CTA Subtitle Content" """,
-    "subtitle/builders/intro_sub_builder.py": """def build_intro_sub():\n    return "Intro Subtitle Content" """,
-    "subtitle/builders/outro_sub_builder.py": """def build_outro_sub():\n    return "Outro Subtitle Content" """,
+DOT_COLORS = [
+    "&H00FFFF&", "&H00D7FF&", "&H507FFF&", "&H90EE90&", "&HD670DA&", "&HEBCE87&"
+]
+'''
 
-    # SUBTITLE - TIMING
-    "subtitle/timing/word_weight.py": """def get_weights(words):\n    return [1.0 for _ in words]""",
-    "subtitle/timing/time_format.py": """def format_time(seconds):\n    return f"0:00:{int(seconds):02d}.00" """,
+FILES["config/fonts.py"] = '''import random
+ARABIC_FONTS = ["Amiri", "Reem Kufi", "Scheherazade"]
+HINDI_FONTS = ["Yatra One", "Rozha One", "Eczar"]
+ENGLISH_FONTS = ["Playfair Display", "Cinzel", "Montserrat", "Lora"]
+SELECTED_ARABIC = random.choice(ARABIC_FONTS)
+SELECTED_HINDI = random.choice(HINDI_FONTS)
+SELECTED_ENGLISH = random.choice(ENGLISH_FONTS)
+'''
 
-    # SUBTITLE - LANGUAGES
-    "subtitle/languages/hindi_vendor.py": """def process_hindi(text):\n    return text""",
-    "subtitle/languages/english_vendor.py": """def process_english(text):\n    return text""",
-    "subtitle/languages/arabic_vendor.py": """def process_arabic(text):\n    return f'\\\\u202B{text}\\\\u202C'""",
+FILES["config/sizes.py"] = '''ARABIC_SIZE = 85
+HINDI_SIZE = 75
+ENGLISH_SIZE = 60
+ARABIC_MARGIN_V = 700
+HINDI_MARGIN_V = 550
+ENGLISH_MARGIN_V = 400
+'''
 
-    # TOOLS
-    "tools/duration_checker.py": """import subprocess\ndef get_duration(path):\n    cmd = f'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "{path}"'\n    return float(subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout.strip())""",
-    "tools/cta_img_drawer.py": """from PIL import Image\ndef draw_cta(path):\n    img = Image.new('RGB', (1080, 1920), (10, 10, 15))\n    img.save(path)""",
-    "tools/cta_text_placer.py": """def place_text(img_path, text):\n    pass""",
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟢 2. SUBTITLE (टेक्स्ट और सबटाइटल्स के लिए)
+# ══════════════════════════════════════════════════════════════════════════════
 
-    # VIDEO ENGINE
-    "video_engine/ffmpeg_builder.py": """def build_cmd(inputs, output):\n    return f"ffmpeg -y {inputs} {output}" """,
-    "video_engine/ffmpeg_runner.py": """import subprocess\ndef run_cmd(cmd):\n    return subprocess.run(cmd, shell=True, capture_output=True, text=True)""",
-    "video_engine/logo_processor.py": """def process_logo(path, w=420, h=150):\n    return path""",
-    "video_engine/logo_placer.py": """def place_logo(cmd, x, y):\n    return cmd""",
-    "video_engine/audio_mixer.py": """def mix_audio(voice, music):\n    return voice""",
-    "video_engine/video_filter.py": """def get_filters():\n    return "scale=1080:1920" """,
+FILES["subtitle/ass_header.py"] = '''from ..config.screen import PLAY_RES_X, PLAY_RES_Y
 
-    # MAIN RENDER FILES
-    "render_main.py": """from subtitle.builders.main_sub_builder import build_main_sub\nfrom subtitle.assembler.ass_saver import save_ass\ndef build_and_render_story(**kwargs):\n    print("Rendering Story...")\n    return True""",
-}
+def get_header():
+    return f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {PLAY_RES_X}
+PlayResY: {PLAY_RES_Y}
+WrapStyle: 2
+"""
+'''
 
-def create_files():
-    print("🏗️ Starting Project Generation...")
-    for rel_path, content in FILES.items():
-        file_path = os.path.join(BASE_DIR, rel_path)
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        print(f"✅ Created: {file_path}")
+FILES["subtitle/ass_style.py"] = '''from ..config.fonts import SELECTED_ARABIC, SELECTED_HINDI, SELECTED_ENGLISH
+from ..config.sizes import ARABIC_SIZE, HINDI_SIZE, ENGLISH_SIZE, ARABIC_MARGIN_V, HINDI_MARGIN_V, ENGLISH_MARGIN_V
+from ..config.colors import WHITE, BLACK
 
-    # Create empty __init__.py files for Python packages
-    init_dirs = [
-        "config", "config/fonts", "config/sizes", "config/colors",
-        "subtitle", "subtitle/assembler", "subtitle/builders", "subtitle/timing", "subtitle/languages",
-        "tools", "video_engine"
+def get_style():
+    # असली ASS स्टाइल फॉर्मेट (हर भाषा के लिए अलग)
+    styles = [
+        f"Style: Arabic,{SELECTED_ARABIC},{ARABIC_SIZE},&H00FFFFFF,&H000000FF,{BLACK},&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,{ARABIC_MARGIN_V},1",
+        f"Style: Hindi,{SELECTED_HINDI},{HINDI_SIZE},&H00FFFFFF,&H000000FF,{BLACK},&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,{HINDI_MARGIN_V},1",
+        f"Style: English,{SELECTED_ENGLISH},{ENGLISH_SIZE},&H00FFFFFF,&H000000FF,{BLACK},&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,{ENGLISH_MARGIN_V},1"
     ]
+    
+    return f"""[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+{chr(10).join(styles)}
+"""
+'''
+
+FILES["subtitle/ass_saver.py"] = '''import os
+
+def save_ass(content, output_path):
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)
+'''
+
+FILES["subtitle/timing.py"] = '''def format_time(seconds):
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    ms = int(round((seconds - int(seconds)) * 100))
+    if ms == 100: ms = 99
+    return f"{h}:{m:02d}:{s:02d}.{ms:02d}"
+
+def get_word_timings(text, start_time, total_duration):
+    words = text.split()
+    if not words: return []
+    
+    weights = []
+    for w in words:
+        if w[-1] in ['.', '!', '?', '।']: weights.append(2.0) 
+        elif w[-1] in [',', '،', ';', ':']: weights.append(1.5) 
+        else: weights.append(1.0) 
+
+    total_weight = sum(weights)
+    time_per_weight = total_duration / total_weight
+    
+    timings = []
+    current_time = start_time
+    for i, w in enumerate(words):
+        dur = weights[i] * time_per_weight
+        timings.append((w, current_time, current_time + dur))
+        current_time += dur
+        
+    return timings
+'''
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟢 3. VENDORS (हिंदी, इंग्लिश और अरबी टेक्स्ट बनाने के लिए)
+# ══════════════════════════════════════════════════════════════════════════════
+
+FILES["vendors/hindi_vendor.py"] = '''import re
+from ..config.colors import WHITE, DOT_COLORS
+from ..subtitle.timing import format_time, get_word_timings
+
+def build_hindi(text, start_t, end_t):
+    clean = re.sub(r'[\\n\\r"]', ' ', str(text)).strip()
+    if not clean: return ""
+    
+    timings = get_word_timings(clean, start_t, end_t - start_t)
+    lines = ""
+    
+    for i, (word, w_start, w_end) in enumerate(timings):
+        start_idx = max(0, i - 2) # एक बार में 3 शब्द दिखेंगे
+        visible = [t[0] for t in timings[start_idx:i+1]]
+        
+        dot = f"{{\\\\c{DOT_COLORS[1]}}}●  "
+        words_str = ""
+        for j, vw in enumerate(visible):
+            if j == len(visible) - 1:
+                cs = int((w_end - w_start) * 100)
+                words_str += f"{{\\\\c{WHITE}\\\\k{cs}}}{vw} "
+            else:
+                words_str += f"{{\\\\c{WHITE}}}{vw} "
+                
+        lines += f"Dialogue: 0,{format_time(w_start)},{format_time(w_end)},Hindi,,0,0,,{dot}{words_str.strip()}\\n"
+        
+    return lines
+'''
+
+FILES["vendors/english_vendor.py"] = '''import re
+from ..config.colors import WHITE, DOT_COLORS
+from ..subtitle.timing import format_time, get_word_timings
+
+def build_english(text, start_t, end_t):
+    clean = re.sub(r'[\\n\\r"]', ' ', str(text)).strip()
+    if not clean: return ""
+    
+    timings = get_word_timings(clean, start_t, end_t - start_t)
+    lines = ""
+    
+    for i, (word, w_start, w_end) in enumerate(timings):
+        start_idx = max(0, i - 2) 
+        visible = [t[0] for t in timings[start_idx:i+1]]
+        
+        dot = f"{{\\\\c{DOT_COLORS[2]}}}●  "
+        words_str = ""
+        for j, vw in enumerate(visible):
+            if j == len(visible) - 1:
+                cs = int((w_end - w_start) * 100)
+                words_str += f"{{\\\\c{WHITE}\\\\k{cs}}}{vw} "
+            else:
+                words_str += f"{{\\\\c{WHITE}}}{vw} "
+                
+        lines += f"Dialogue: 0,{format_time(w_start)},{format_time(w_end)},English,,0,0,,{dot}{words_str.strip()}\\n"
+        
+    return lines
+'''
+
+FILES["vendors/arabic_vendor.py"] = '''import re
+from ..config.colors import WHITE, DOT_COLORS
+from ..subtitle.timing import format_time, get_word_timings
+
+def build_arabic(text, start_t, end_t):
+    clean = re.sub(r'[\\n\\r"]', ' ', str(text)).strip()
+    if not clean: return ""
+    
+    timings = get_word_timings(clean, start_t, end_t - start_t)
+    lines = ""
+    
+    for i, (word, w_start, w_end) in enumerate(timings):
+        start_idx = max(0, i - 2) 
+        visible = [t[0] for t in timings[start_idx:i+1]]
+        
+        # अरबी के लिए RTL (दाएं से बाएं) टैग लगाना जरूरी है
+        dot = f"\\u202B{{\\\\c{DOT_COLORS[0]}}}●  "
+        words_str = ""
+        for j, vw in enumerate(visible):
+            if j == len(visible) - 1:
+                cs = int((w_end - w_start) * 100)
+                words_str += f"{{\\\\c{WHITE}\\\\k{cs}}}{vw} "
+            else:
+                words_str += f"{{\\\\c{WHITE}}}{vw} "
+                
+        lines += f"Dialogue: 0,{format_time(w_start)},{format_time(w_end)},Arabic,,0,0,,{dot}{words_str.strip()}\\u202C\\n"
+        
+    return lines
+'''
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟢 4. BUILDERS (इंट्रो, आउट्रो और CTA टेक्स्ट)
+# ══════════════════════════════════════════════════════════════════════════════
+
+FILES["builders/main_sub_builder.py"] = '''import os
+from ..subtitle.ass_header import get_header
+from ..subtitle.ass_style import get_style
+from ..subtitle.ass_saver import save_ass
+from ..vendors.arabic_vendor import build_arabic
+from ..vendors.hindi_vendor import build_hindi
+from ..vendors.english_vendor import build_english
+
+def build_main_subs(hadith, hindi_text, duration):
+    header = get_header()
+    style = get_style()
+    events = "\\n[Events]\\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\\n"
+    
+    # असली टाइमिंग (टेक्स्ट शुरू होने और खत्म होने का समय)
+    start_t = 4.0 
+    end_t = max(duration - 5.5, start_t + 1.0)
+    
+    lines = ""
+    if hadith.get("arabic"): lines += build_arabic(hadith["arabic"], start_t, end_t)
+    if hindi_text: lines += build_hindi(hindi_text, start_t, end_t)
+    if hadith.get("english"): lines += build_english(hadith["english"], start_t, end_t)
+    
+    content = header + "\\n" + style + "\\n" + events + lines
+    out_path = "temp/main_subs.ass"
+    save_ass(content, out_path)
+    return out_path
+'''
+
+FILES["builders/cta_builder.py"] = '''from ..subtitle.timing import format_time
+from ..config.colors import GOLD
+
+def build_cta_text(cta_text, duration):
+    if not cta_text: return ""
+    start_t = max(0.0, duration - 5.0)
+    return f"Dialogue: 0,{format_time(start_t)},{format_time(duration)},English,,0,0,,{{\\\\fad(500,500)\\\\c{GOLD}}}● {cta_text}\\n"
+'''
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟢 5. ENGINE (असली वीडियो रेंडरिंग)
+# ══════════════════════════════════════════════════════════════════════════════
+
+FILES["engine/logo_processor.py"] = '''def get_logo_filter(logo_width=420, logo_height=150):
+    return (
+        f"scale={logo_width}:{logo_height},format=rgba,"
+        f"split[logo_src][shadow_src];"
+        f"[shadow_src]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.6,boxblur=5:2[shadow_blur];"
+        f"[shadow_blur][logo_src]overlay=3:3"
+    )
+'''
+
+FILES["engine/ffmpeg_builder.py"] = '''import os
+import subprocess
+from .logo_processor import get_logo_filter
+
+def render_video(bg_video, music_path, voice_path, ass_path, cta_img, duration, output="temp/final.mp4"):
+    base_assets = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "assets"))
+    logo_path = os.path.join(base_assets, "logo.png")
+    fonts_dir = os.path.join(base_assets, "fonts")
+    has_logo = os.path.exists(logo_path)
+    
+    cmd = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", bg_video, "-i", voice_path]
+    
+    has_music = os.path.exists(music_path) and os.path.getsize(music_path) > 0
+    if has_music: cmd.extend(["-i", music_path])
+    
+    cmd.extend(["-loop", "1", "-i", cta_img])
+    cta_idx = 3 if has_music else 2
+    
+    if has_logo:
+        cmd.extend(["-i", logo_path])
+        logo_idx = 4 if has_music else 3
+
+    v_filters = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,vignette=PI/4[bg];"
+    current_out = "bg"
+    cta_start = max(0, duration - 5.0)
+    
+    if has_logo:
+        v_filters += f"[{logo_idx}:v]split[logo_mov][logo_fix];"
+        v_filters += f"[logo_mov]{get_logo_filter(420, 150)}[logo_mov_scaled];"
+        v_filters += f"[logo_fix]{get_logo_filter(600, 220)}[logo_fix_scaled];"
+        
+        v_filters += f"[{current_out}][logo_mov_scaled]overlay=x='W-w-40':y='40':enable='lt(t,{cta_start})'[bg_logo1];"
+        v_filters += f"[bg_logo1][logo_fix_scaled]overlay=x='(W-w)/2':y='800':enable='gte(t,{cta_start})'[bg_logo2];"
+        current_out = "bg_logo2"
+
+    abs_ass = os.path.abspath(ass_path)
+    
+    if os.path.isdir(fonts_dir):
+        v_filters += f"[{current_out}]subtitles='{abs_ass}':fontsdir='{fonts_dir}'[v_sub];"
+    else:
+        v_filters += f"[{current_out}]subtitles='{abs_ass}'[v_sub];"
+        
+    v_filters += f"[v_sub][{cta_idx}:v]overlay=0:0:enable='gte(t,{cta_start})'[v_out]"
+    
+    if has_music:
+        a_filters = "[2:a]volume=0.15[bgm];[bgm][1:a]sidechaincompress=threshold=0.05:ratio=8:attack=50:release=500[ducked_bgm];[1:a][ducked_bgm]amix=inputs=2:duration=first[a_out]"
+    else:
+        a_filters = "[1:a]volume=1.0[a_out]"
+        
+    cmd.extend([
+        "-filter_complex", f"{v_filters}; {a_filters}", 
+        "-map", "[v_out]", "-map", "[a_out]", 
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-threads", "0", "-r", "24",
+        "-c:a", "aac", "-b:a", "128k", 
+        "-t", f"{duration:.2f}", "-shortest", output
+    ])
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            print("❌ FFMPEG ERROR:", result.stderr[-1000:])
+            return None
+        return output
+    except Exception as e:
+        print("❌ EXCEPTION:", e)
+        return None
+'''
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟢 6. MAIN RENDER (सबको एक साथ जोड़ने वाला)
+# ══════════════════════════════════════════════════════════════════════════════
+
+FILES["main_render.py"] = '''import os
+from .builders.main_sub_builder import build_main_subs
+from .engine.ffmpeg_builder import render_video
+
+def build_and_render_story(bg_video, music_path, voice_path, hadith, hindi_text, intro_text, outro_text, cta_text, output_path="temp/Final_Story.mp4"):
+    print("🎬 [main_render] Building Story...")
+    # यहाँ हम असली फाइलों की लंबाई निकालेंगे (audio_helper से)
+    duration = 30.0 # फिलहाल के लिए डमी टाइम (इसे बाद में असली टाइम से जोड़ेंगे)
+    
+    # 1. टेक्स्ट (ASS) फाइल बनाना
+    ass_path = build_main_subs(hadith, hindi_text, duration)
+    
+    # 2. CTA इमेज बनाना (डमी)
+    cta_img = "temp/cta.png"
+    if not os.path.exists(cta_img):
+        from PIL import Image
+        img = Image.new('RGBA', (1080, 1920), (0,0,0,0))
+        img.save(cta_img)
+
+    # 3. वीडियो रेंडर करना
+    return render_video(bg_video, music_path, voice_path, ass_path, cta_img, duration, output_path)
+'''
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟢 फाइल जनरेट करने वाला फंक्शन
+# ══════════════════════════════════════════════════════════════════════════════
+def generate():
+    print("🚀 Generating Full Project Structure (Part 1 + Part 2)...")
+    for path, code in FILES.items():
+        full_path = os.path.join(BASE, path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(code)
+        print(f"✅ Created: {full_path}")
+        
+    # खाली __init__.py फाइलें बनाना ताकि Python इसे मॉड्यूल समझे
+    init_dirs = ["config", "subtitle", "vendors", "builders", "engine"]
     for d in init_dirs:
-        init_path = os.path.join(BASE_DIR, d, "__init__.py")
+        init_path = os.path.join(BASE, d, "__init__.py")
         with open(init_path, "w") as f:
             f.write("")
         print(f"✅ Created: {init_path}")
 
 if __name__ == "__main__":
-    create_files()
+    generate()
     print("🎉 All files generated successfully!")
