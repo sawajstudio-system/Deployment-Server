@@ -1,4 +1,4 @@
-name: 🧹 Remove Green Background & Send to Telegram
+name: 🧹 Remove Green Backgrounds
 
 on:
   workflow_dispatch: # इसे मैन्युअली रन करें
