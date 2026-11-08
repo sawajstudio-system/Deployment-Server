@@ -1,10 +1,7 @@
-name: ⚡ Direct Auto Background Remover
+name: ⚡ Fast Background Remover
 
 on:
-  workflow_dispatch: # बिना किसी इनपुट ऑप्शन के सिर्फ एक क्लिक पर चलेगा
-  push:
-    paths:
-      - 'logo.png' # जब भी आप कोई नई logo.png अपलोड करेंगे, यह अपने आप चल जाएगा
+  workflow_dispatch: 
 
 permissions:
   contents: write
@@ -20,79 +17,70 @@ jobs:
       - name: 2. 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      - name: 3. 📦 Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install "rembg[cpu]" pillow onnxruntime
+      # सिर्फ 2 छोटी लाइब्रेरी इंस्टॉल होंगी (5 सेकंड में)
+      - name: 3. 📦 Install Pillow & Numpy
+        run: pip install Pillow numpy
 
-      - name: 4. 💾 Cache AI Models Directory
-        uses: actions/cache@v4
-        id: model-cache
-        with:
-          path: ~/.u2net
-          key: ${{ runner.os }}-ai-models-u2netp-v2
-
-      - name: 5. ⚙️ Remove Background (Direct Mode)
+      - name: 4. 🪄 Remove Background (Super Fast)
         run: |
           python -c "
-          import os
-          from rembg import remove, new_session
           from PIL import Image
+          import numpy as np
+          import os
 
           input_file = 'logo.png'
           output_file = 'transparent_logo.png'
 
           if not os.path.exists(input_file):
-              raise FileNotFoundError(f'❌ Error: {input_file} nahi mila! Please root directory me logo.png rakhein.')
+              raise FileNotFoundError('logo.png nahi mila!')
 
-          print('🚀 Loading AI Model (u2netp)...')
-          session = new_session('u2netp')
+          img = Image.open(input_file).convert('RGBA')
+          data = np.array(img)
 
-          print(f'✨ Processing image: {input_file}...')
-          input_image = Image.open(input_file).convert('RGBA')
+          # RGB और Alpha चैनल्स अलग करें
+          r, g, b, a = data[:,:,0], data[:,:,1], data[:,:,2], data[:,:,3]
+
+          # ---------------------------------------------------------
+          # 🎯 यहाँ अपना बैकग्राउंड चुनें:
           
-          output_image = remove(
-              input_image, 
-              session=session,
-              alpha_matting=True,
-              alpha_matting_foreground_threshold=240,
-              alpha_matting_background_threshold=10,
-              alpha_matting_erode_size=10
-          )
+          # 1. आपके लोगो में सफ़ेद (White) बैकग्राउंड है, उसे हटाने के लिए:
+          mask = (r > 235) & (g > 235) & (b > 235) 
           
-          output_image.save(output_file, 'PNG')
-          print(f'✅ Successfully saved as: {output_file}')
+          # 2. अगर आप कभी हरा (Green Screen) बैकग्राउंड हटाना चाहें, तो ऊपर वाली लाइन हटाकर यह लाइन लगाएं:
+          # mask = (g > 100) & (g > r * 1.2) & (g > b * 1.2)
+          # ---------------------------------------------------------
+
+          # जहाँ-जहाँ बैकग्राउंड है, वहाँ का Alpha (पारदर्शिता) 0 कर दें
+          data[mask, 3] = 0
+
+          # नई ट्रांसपेरेंट इमेज सेव करें
+          transparent_img = Image.fromarray(data)
+          transparent_img.save(output_file)
+          print('✅ Background removed instantly in 1 second!')
           "
 
-      - name: 6. 🚀 Send Result to Telegram
+      - name: 5. 🚀 Send Transparent Logo to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "⚠️ Telegram secrets not set. Skipping notification."
+            echo "⚠️ Telegram secrets not set. Skipping."
             exit 0
           fi
-
-          if [ ! -f "transparent_logo.png" ]; then
-            echo "⚠️ Output file not found for Telegram upload."
-            exit 0
-          fi
-
-          echo "📤 Sending to Telegram..."
+          
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
             -F "chat_id=${TELEGRAM_CHAT_ID}" \
             -F "document=@transparent_logo.png" \
-            -F "caption=⚡ **Direct AI Background Removed!**" \
+            -F "caption=⚡ Super Fast! Yeh raha aapka saaf Transparent Logo." \
             || true
 
-      - name: 7. 💾 Commit and Push Result to Repo
+      - name: 6. 💾 Commit and Push to Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
           git add transparent_logo.png
-          git commit -m "⚡ Direct Auto: Removed background for logo.png" || echo "No changes to commit"
-          git push || echo "No changes to push"
-          
+          git commit -m "⚡ Added fast transparent logo" || echo "No changes"
+          git push || echo "No changes"
