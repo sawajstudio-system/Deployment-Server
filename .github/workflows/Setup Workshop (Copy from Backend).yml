@@ -1,0 +1,53 @@
+name: 🏗️ Setup Workshop (Copy from Backend)
+
+on:
+  workflow_dispatch:        # मैन्युअली रन करने के लिए
+
+jobs:
+  copy_to_workshop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 📥 Checkout Firent Repo (Public)
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Firent'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Firent'
+
+      - name: 2. 📥 Checkout Backend Repo (Private)
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Backend'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Backend'
+
+      - name: 3. 📦 Copy Video_Generator to Workshop
+        run: |
+          echo "📁 Creating Workshop folder in Firent..."
+          mkdir -p Firent/Workshop
+          
+          echo "📦 Copying Video_Generator from Backend to Workshop..."
+          # 🟢 यहाँ 'cp' का इस्तेमाल हुआ है, इसलिए Backend से कुछ भी डिलीट नहीं होगा
+          cp -r Backend/Video_Generator Firent/Workshop/
+          
+          echo "✅ Copy complete! Backend is safe and untouched."
+
+      - name: 4. 🚀 Commit & Push to Firent (Workshop)
+        run: |
+          cd Firent
+          git config --global user.name "Sawaj Studio Bot"
+          git config --global user.email "bot@sawajstudio.com"
+          git add .
+          
+          if git diff-index --quiet HEAD; then 
+            echo "⚠️ No changes needed (Workshop is already up to date)."
+          else 
+            git commit -m "🏗️ Setup: Copied Video_Generator from Backend to Workshop"
+            git push
+            echo "🎉 Workshop successfully created in Firent Repo!"
+          fi
