@@ -1,4 +1,4 @@
-name: 🎬Story_Video-Generator
+name: 🎬Backend-55sec_Story G
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
 jobs:
   story_pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 120 # 🟢 60 से बढ़ाकर 120 मिनट कर दिया गया है
+    timeout-minutes: 120
 
     env:
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
@@ -35,7 +35,7 @@ jobs:
       - name: 1. 📥 Checkout Backend Repo
         uses: actions/checkout@v4
         with:
-          repository: 'sawajstudio-system/Backend'
+          repository: 'sawajstudio-system/Backend' # 🟢 असली बैकएंड
           token: ${{ secrets.TOKEN_GITHUB }}
 
       - name: 2. 🐍 Setup Python
@@ -50,14 +50,9 @@ jobs:
           sudo fc-cache -f -v
 
       - name: 4. 📥 Install Python Packages
-        run: |
-          pip install -r Video_Generator/Story_Generator/requirements.txt
+        run: pip install -r Video_Generator/Story_Generator/requirements.txt
 
-      - name: 5. 🧪 Run Story Pipeline
+      - name: 5. 🧪 Run Backend Story Pipeline
         run: |
           cd Video_Generator/Story_Generator
           python main.py
-
-      - name: 6. 💨 Vanished (Cleanup)
-        if: always()
-        run: echo "✅ Process complete."
