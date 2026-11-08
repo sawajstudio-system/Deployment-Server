@@ -1,0 +1,79 @@
+name: 🧹 Remove Green Background & Send to Telegram
+
+on:
+  workflow_dispatch: # इसे मैन्युअली रन करें
+
+permissions:
+  contents: write
+
+jobs:
+  remove_green:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. 📥 Checkout Public Repo
+        uses: actions/checkout@v4
+
+      - name: 2. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 3. 📦 Install Pillow & Numpy
+        run: pip install Pillow numpy
+
+      - name: 4. 🪄 Remove Green Background
+        run: |
+          python -c "
+          from PIL import Image
+          import numpy as np
+          import os
+
+          input_file = 'logo.png'
+          output_file = 'transparent_logo.png'
+
+          if not os.path.exists(input_file):
+              raise FileNotFoundError('logo.png nahi mila!')
+
+          # इमेज को लोड करें और RGBA में बदलें
+          img = Image.open(input_file).convert('RGBA')
+          data = np.array(img)
+
+          # RGB चैनल्स अलग करें
+          r, g, b, a = data.T
+
+          # 🟢 हरे रंग को पहचानें: Green ज्यादा हो, Red और Blue कम हों
+          green_areas = (g > 150) & (r < 100) & (b < 100)
+
+          # जहाँ-जहाँ हरा रंग है, वहाँ का Alpha (पारदर्शिता) 0 कर दें
+          data.T[...][3][green_areas] = 0
+
+          # नई ट्रांसपेरेंट इमेज सेव करें
+          transparent_img = Image.fromarray(data)
+          transparent_img.save(output_file)
+          print('✅ Green background removed successfully!')
+          "
+
+      - name: 5. 🚀 Send Transparent Logo to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "⚠️ Telegram secrets not set. Skipping."
+            exit 0
+          fi
+          
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            -F "chat_id=${TELEGRAM_CHAT_ID}" \
+            -F "document=@transparent_logo.png" \
+            -F "caption=✨ Yeh raha aapka naya Transparent Logo! Green background 100% remove ho gaya hai." \
+            || true
+
+      - name: 6. 💾 Commit and Push to Repo
+        run: |
+          git config --global user.name "Sawaj Studio Bot"
+          git config --global user.email "bot@sawajstudio.com"
+          git add transparent_logo.png
+          git commit -m "✨ Added transparent logo (Green screen removed)" || echo "No changes"
+          git push || echo "No changes"
