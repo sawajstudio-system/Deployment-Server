@@ -1,7 +1,3 @@
-# ══════════════════════════════════════════════════════════════════════════════
-# 📁 FILE: .github/workflows/Test_Runner.yml
-# 🎯 3 Alag Dropdowns: API, ZIP Repo, TXT Repo (No Extra Checkboxes)
-# ══════════════════════════════════════════════════════════════════════════════
 name: 🏁🏃
 
 on:
@@ -47,27 +43,35 @@ on:
           - 'History Cleaner'
           - 'Test All GDrive'
 
-      # ─── 2. ZIP FILE LIST ───
+      # ─── 2. ZIP FILE LIST (UPDATED FOR 3 REPOS) ───
       zip_file:
         description: 'ZIP File (Kis repo ka ZIP chahiye?)'
         type: choice
         default: 'None'
         options:
           - 'None'
+          - 'All 3 Repos'
           - 'Public Repo (Firent)'
-          - 'Private Repo (Backend)'
-          - 'Both Repos (Dono)'
+          - 'Backend Repo'
+          - 'Workshop Repo'
+          - 'Public + Backend'
+          - 'Public + Workshop'
+          - 'Backend + Workshop'
 
-      # ─── 3. TXT FILE LIST ───
+      # ─── 3. TXT FILE LIST (UPDATED FOR 3 REPOS) ───
       txt_file:
         description: 'TXT File (Kis repo ka TXT chahiye?)'
         type: choice
         default: 'None'
         options:
           - 'None'
+          - 'All 3 Repos'
           - 'Public Repo (Firent)'
-          - 'Private Repo (Backend)'
-          - 'Both Repos (Dono)'
+          - 'Backend Repo'
+          - 'Workshop Repo'
+          - 'Public + Backend'
+          - 'Public + Workshop'
+          - 'Backend + Workshop'
 
 # ══════════════════════════════════════════════════════════════════════════════
 jobs:
@@ -227,17 +231,26 @@ jobs:
               rel = ALL_MAP[name]
               print(f"\n[{idx}/{total}] {name}")
               
-              # REPO_TARGET Set karna (Har test ke liye alag)
+              # 🟢 REPO_TARGET Set karna (Har test ke liye alag)
               if name == "ZIP Generator":
-                  if ZIP_FILE == "Both Repos (Dono)": os.environ["REPO_TARGET"] = "Public + Private"
+                  if ZIP_FILE == "All 3 Repos": os.environ["REPO_TARGET"] = "All 3 Repos"
                   elif ZIP_FILE == "Public Repo (Firent)": os.environ["REPO_TARGET"] = "Public Only"
-                  elif ZIP_FILE == "Private Repo (Backend)": os.environ["REPO_TARGET"] = "Private Only"
+                  elif ZIP_FILE == "Backend Repo": os.environ["REPO_TARGET"] = "Backend Only"
+                  elif ZIP_FILE == "Workshop Repo": os.environ["REPO_TARGET"] = "Workshop Only"
+                  elif ZIP_FILE == "Public + Backend": os.environ["REPO_TARGET"] = "Public + Backend"
+                  elif ZIP_FILE == "Public + Workshop": os.environ["REPO_TARGET"] = "Public + Workshop"
+                  elif ZIP_FILE == "Backend + Workshop": os.environ["REPO_TARGET"] = "Backend + Workshop"
+                  
               elif name == "TXT Generator":
-                  if TXT_FILE == "Both Repos (Dono)": os.environ["REPO_TARGET"] = "Public + Private"
+                  if TXT_FILE == "All 3 Repos": os.environ["REPO_TARGET"] = "All 3 Repos"
                   elif TXT_FILE == "Public Repo (Firent)": os.environ["REPO_TARGET"] = "Public Only"
-                  elif TXT_FILE == "Private Repo (Backend)": os.environ["REPO_TARGET"] = "Private Only"
+                  elif TXT_FILE == "Backend Repo": os.environ["REPO_TARGET"] = "Backend Only"
+                  elif TXT_FILE == "Workshop Repo": os.environ["REPO_TARGET"] = "Workshop Only"
+                  elif TXT_FILE == "Public + Backend": os.environ["REPO_TARGET"] = "Public + Backend"
+                  elif TXT_FILE == "Public + Workshop": os.environ["REPO_TARGET"] = "Public + Workshop"
+                  elif TXT_FILE == "Backend + Workshop": os.environ["REPO_TARGET"] = "Backend + Workshop"
               else:
-                  os.environ["REPO_TARGET"] = "Public + Private" # Default for API Tests
+                  os.environ["REPO_TARGET"] = "All 3 Repos" # Default for API Tests
                   
               print(f"📦 Repo Target: {os.environ.get('REPO_TARGET')}")
 
