@@ -28,6 +28,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 2b. Install Pillow (verify ke liye zaroori)
+        run: pip install Pillow
+
       - name: 3. Fix ffmpeg_builder.py (fonts_dir)
         run: |
           cd Video_Generator/Story_Generator
@@ -84,7 +87,7 @@ jobs:
           p = "Fetching/Translator/URL_fallback/mymemory.py"
           src = open(p, encoding="utf-8").read()
 
-          if 'Returning empty string' in src:
+          if 'Returning empty' in src:
               print("ALREADY FIXED — skipping")
           else:
               idx = src.rfind("    return text")
@@ -141,7 +144,7 @@ jobs:
           p = "main.py"
           src = open(p, encoding="utf-8").read()
 
-          if 'Devanagari script' in src:
+          if 'Devanagari script check' in src:
               print("ALREADY FIXED — skipping")
           else:
               OLD = (
@@ -163,7 +166,7 @@ jobs:
                   print("✅ main.py fixed")
           PYEOF
 
-      - name: 9. Verify (compile + import)
+      - name: 9. Verify (compile + import + values)
         run: |
           cd Video_Generator/Story_Generator
           find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
