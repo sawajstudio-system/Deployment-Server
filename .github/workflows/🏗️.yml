@@ -1,4 +1,4 @@
-name: 🎬 Update main.py to use Management
+name: 🔧 Fix intro_sub_builder.py
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  update:
+  fix:
     runs-on: ubuntu-latest
     steps:
       - name: 1. 📥 Checkout Workshop
@@ -17,394 +17,267 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           path: 'Workshop'
 
-      - name: 2. 💾 पुराना main.py बैकअप करो
+      - name: 2. 🔍 पहले — पुरानी फाइल दिखाओ
         run: |
-          cd Workshop/Video_Generator/Story_Generator
-          if [ -f "main.py" ]; then
-            cp main.py main_backup.py
-            echo "✅ पुराना main.py → main_backup.py"
-            echo ""
-            echo "पुराने main.py के पहले 40 lines:"
-            head -40 main.py
-          else
-            echo "❌ main.py नहीं मिला"
-            exit 1
-          fi
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/builders
+          echo "════════════════════════════════════════"
+          echo "🔍 intro_sub_builder.py (पुराना):"
+          echo "════════════════════════════════════════"
+          cat intro_sub_builder.py
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "🔍 outro_sub_builder.py (पुराना):"
+          echo "════════════════════════════════════════"
+          cat outro_sub_builder.py
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "🔍 main_sub_builder.py (पुराना):"
+          echo "════════════════════════════════════════"
+          cat main_sub_builder.py
 
-      - name: 3. 🎬 नया main.py लिखो (Management का इस्तेमाल करेगा)
+      - name: 3. 🔍 create_intro_subtitle का signature जाँचो
         run: |
-          cd Workshop/Video_Generator/Story_Generator
-          cat > main.py << 'PYEOF'
-          #!/usr/bin/env python3
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/builders
+          echo "════════════════════════════════════════"
+          echo "🔍 जो function मिला:"
+          echo "════════════════════════════════════════"
+          grep -A 2 "def create_intro_subtitle" intro_sub_builder.py
+          echo ""
+          grep -A 2 "def create_outro_subtitle" outro_sub_builder.py
+          echo ""
+          grep -A 2 "def create_main_subtitles" main_sub_builder.py
+
+      - name: 4. 🔧 intro_sub_builder.py को fix करो
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/builders
+          cat > intro_sub_builder.py << 'EOF'
           # ══════════════════════════════════════════════════════════════════════════════
-          # 📁 FOLDER: Story_Generator/
-          # 📄 FILE  : main.py
-          # 🎯 PURPOSE: यह पूरे वीडियो का मैनेजर है।
-          #            पहले सब कुछ इनलाइन था — अब Management/ से आता है।
-          #            असली काम पुरानी फाइलें ही करती हैं (fallback/ उन्हें लपेटता है)।
+          # 📁 FILE: Story_Render/subtitle/builders/intro_sub_builder.py
+          # 🎯 PURPOSE: इंट्रो (Intro) सबटाइटल बनाना — शुरुआत में धीमा फेड-इन
+          # ✅ FIX: duration parameter जोड़ा गया (जो पहले missing था)
           # ══════════════════════════════════════════════════════════════════════════════
-          import os, sys, requests, subprocess, random, shutil, traceback
-          from concurrent.futures import ThreadPoolExecutor
-
-          BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-          sys.path.insert(0, BASE_DIR)
-
-          # ── Management से सारे managers ──────────────────────────────────────
-          from Management import (
-              Settings, Chains, Logger, Telegram, ErrorHandler,
-              StateTracker, Cleaner,
-              AIFallback, VideoFallback, MusicFallback, TTSFallback,
-              UploadManager,
-          )
-
-          # ── पुरानी फाइलें (जो अब Management/fetching/ में हैं) ───────────────
-          from Management.fetching.Islamic.Hadis.URL_fallback import fawaz
-          from Management.fetching.Translator.URL_fallback import mymemory
-          from Management.fetching.Intro_Outro_CTA.API_fallback import intro_AI, outro_AI, cta_AI
-          from Management.fetching.Background.Video.API_fallback import pexels, pixabay, coverr
-          from Management.fetching.Background.Video.URL_fallback import gradient
-          from Management.fetching.Background.Music.API_fallback import freesound
-          from Management.fetching.Background.Music.URL_fallback import pixabay_music
-          from Management.fetching.audio_TTS.API_fallback import elevenlabs
-          from Management.fetching.audio_TTS.URL_fallback import edge_tts
-
-          # ── Story_Render (जैसा था) ───────────────────────────────────────────
-          from Story_Render import build_and_render_story
+          from ..assembler import get_ass_header, get_all_styles, save_ass
+          from ..timing import ts
+          from ...config.colors import get_color_tag
 
 
+          def create_intro_subtitle(intro_text, duration=3.5, output_path="temp/intro_sub.ass"):
+              """
+              शुरुआत के लिए इंट्रो सबटाइटल बनाता है।
+
+              Args:
+                  intro_text (str): इंट्रो का टेक्स्ट
+                  duration (float): इंट्रो कितनी देर दिखे (सेकंड में)
+                  output_path (str): कहाँ सेव करना है
+
+              Returns:
+                  str: बनी हुई ASS फाइल का path (या None)
+              """
+              if not intro_text:
+                  return None
+
+              clean_text = str(intro_text).strip()
+
+              # ── ASS फाइल हेडर ─────────────────────────────────────────────────
+              content = get_ass_header()
+              content += "\n[V4+ Styles]\n"
+              content += get_all_styles()
+              content += "\n[Events]\n"
+              content += "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+
+              # ── गोल्डन कलर + ग्लो + धीमा फेड-इन ─────────────────────────────
+              formatted_text = f"{{\\fad(1000,1000)\\blur5\\c&H00D7FF&\\3c&H000000&}}{clean_text}"
+
+              content += f"Dialogue: 0,{ts(0.0)},{ts(duration)},Intro,,0,0,0,,{formatted_text}\n"
+
+              return save_ass(content, output_path)
+          EOF
+          echo "✅ intro_sub_builder.py fix हो गई"
+
+      - name: 5. 🔧 outro_sub_builder.py को भी fix करो (सुरक्षित)
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/builders
+          cat > outro_sub_builder.py << 'EOF'
           # ══════════════════════════════════════════════════════════════════════════════
-          # 🎬 MAIN PIPELINE
+          # 📁 FILE: Story_Render/subtitle/builders/outro_sub_builder.py
+          # 🎯 PURPOSE: आउट्रो (Outro) सबटाइटल बनाना — आखिर में धन्यवाद
+          # ✅ FIX: parameters जोड़े गए
           # ══════════════════════════════════════════════════════════════════════════════
-          def run_pipeline():
-              print("═" * 60)
-              print("🎬 STARTING PREMIUM STORY PIPELINE (with Management)")
-              print("═" * 60)
+          from ..assembler import get_ass_header, get_all_styles, save_ass
+          from ..timing import ts
+          from ...config.colors import get_color_tag
 
-              # ── Managers तैयार ─────────────────────────────────────────────────
-              settings = Settings()
-              logger = Logger(settings.LOG_FILE)
-              tg = Telegram()
-              state = StateTracker(settings.STEPS)
-              cleaner = Cleaner(settings.TEMP_DIR)
-              errors = ErrorHandler(logger, tg, state)
-              ai_fb = AIFallback()
-              video_fb = VideoFallback()
-              music_fb = MusicFallback()
-              tts_fb = TTSFallback()
-              uploader = UploadManager()
 
-              tg.send("🚀 <b>Video Generation Started!</b>")
-              os.makedirs("temp", exist_ok=True)
+          def create_outro_subtitle(outro_text, total_duration, outro_duration=3.5, output_path="temp/outro_sub.ass"):
+              """
+              आखिर में दिखने वाला आउट्रो सबटाइटल बनाता है।
+              """
+              if not outro_text:
+                  return None
 
-              try:
-                  # ── Step 1: हदीस ─────────────────────────────────────────────
-                  state.start("hadith")
-                  logger.info("1. 📖 हदीस ला रहे हैं...")
-                  tg.send("1. 📖 हदीस ला रहे हैं...")
+              clean_text = str(outro_text).strip()
 
-                  hadith = fawaz.fetch()
-                  if not hadith:
-                      raise RuntimeError("Hadith fetch failed")
-                  english_text = hadith.get("english", "")
-                  state.done("hadith")
+              content = get_ass_header()
+              content += "\n[V4+ Styles]\n"
+              content += get_all_styles()
+              content += "\n[Events]\n"
+              content += "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
 
-                  # ── Step 2: AI से स्क्रिप्ट ─────────────────────────────────
-                  state.start("script")
-                  logger.info("2. 🧠 AI स्क्रिप्ट बना रहा है...")
-                  tg.send("2. 🧠 AI स्क्रिप्ट बना रहा है...")
+              start_t = max(0.0, total_duration - outro_duration)
+              formatted_text = f"{{\\fad(500,500)\\c{get_color_tag(1)}}}{clean_text}"
 
-                  prompt = f"Translate to Hindi and add a short moral lesson. Total 70-80 words. Only Hindi text.\n\nHadith: {english_text}"
-                  hindi_text = ai_fb.generate(prompt, max_tokens=250)
+              content += f"Dialogue: 0,{ts(start_t)},{ts(total_duration)},Outro,,0,0,0,,{formatted_text}\n"
 
-                  if hindi_text:
-                      ai_used = ai_fb.used
-                  else:
-                      logger.warning("AI fail — MyMemory fallback")
-                      hindi_text = mymemory.translate(english_text)
-                      ai_used = "MyMemory (AI failed)"
+              return save_ass(content, output_path)
+          EOF
+          echo "✅ outro_sub_builder.py fix हो गई"
 
-                  # Devanagari check
-                  if not hindi_text or not any('\u0900' <= ch <= '\u097F' for ch in hindi_text):
-                      raise RuntimeError(f"Hindi failed: {(hindi_text or '')[:60]!r}")
+      - name: 6. 🔧 main_sub_builder.py को भी fix करो (सुरक्षित)
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/builders
+          cat > main_sub_builder.py << 'EOF'
+          # ══════════════════════════════════════════════════════════════════════════════
+          # 📁 FILE: Story_Render/subtitle/builders/main_sub_builder.py
+          # 🎯 PURPOSE: मुख्य कराओके सबटाइटल बनाना (अरबी + हिंदी + इंग्लिश)
+          # ✅ FIX: parameters जोड़े गए
+          # ══════════════════════════════════════════════════════════════════════════════
+          import re
+          from ..assembler import get_ass_header, get_all_styles, save_ass
+          from ..timing import ts, compute_word_timings
+          from ...config.colors import get_color_tag
 
-                  ai_failed = ", ".join(ai_fb.failed) if ai_fb.failed else "None"
-                  state.done("script")
 
-                  # ── Step 3: Intro / Outro / CTA ─────────────────────────────
-                  state.start("intro_outro_cta")
-                  logger.info("3. ✨ Intro/Outro/CTA बन रहे हैं...")
-                  tg.send("3. ✨ Intro/Outro/CTA बन रहे हैं...")
+          def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main_subtitles.ass"):
+              """
+              मुख्य कराओके सबटाइटल फाइल बनाता है।
+              """
+              print("✍️ [main_sub_builder] Building Left-Aligned Smooth Subtitles...")
 
-                  base_intro = intro_AI.generate_intro()
-                  book_name = hadith.get("collection", "Hadith")
-                  hadith_num = hadith.get("number", "")
-                  intro_text = f"{base_intro}\\N{book_name} - Hadith #{hadith_num}"
-                  outro_text = outro_AI.generate_outro()
-                  cta_text = cta_AI.generate_cta()
-                  state.done("intro_outro_cta")
+              ara_text = re.sub(r'[\n\r"]', ' ', str(hadith.get("arabic", ""))).strip()
+              hin_text = re.sub(r'[\n\r"]', ' ', str(hindi_text)).strip()
+              eng_text = re.sub(r'[\n\r"]', ' ', str(hadith.get("english", ""))).strip()
 
-                  # ── Step 4: TTS (आवाज़) ─────────────────────────────────────
-                  state.start("tts")
-                  logger.info("4. 🎙️ आवाज़ बन रही है...")
-                  tg.send("4. 🎙️ आवाज़ बन रही है...")
+              content = get_ass_header()
+              content += "\n[V4+ Styles]\n"
+              content += get_all_styles()
+              content += "\n[Events]\n"
+              content += "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
 
-                  voice_path = "temp/voice.mp3"
-                  tts_text = f"हदीस शरीफ। {hindi_text}"
-                  voice = tts_fb.generate(tts_text, voice_path)
-                  if not voice:
-                      raise RuntimeError("Voice generation failed")
-                  state.done("tts")
+              start_t = 4.0
+              end_t = max(duration - 5.5, start_t + 1.0)
+              total_dur = end_t - start_t
 
-                  # ── Step 5: Background वीडियो ───────────────────────────────
-                  state.start("background")
-                  logger.info("5. 🎥 वीडियो डाउनलोड हो रहे हैं...")
-                  tg.send("5. 🎥 वीडियो डाउनलोड हो रहे हैं...")
-
-                  final_bg_video = "temp/bg_video.mp4"
-                  concat_list = "temp/concat_list.txt"
-
-                  all_queries = [
-                      "islamic mosque architecture", "holy quran book pages", "islamic calligraphy nature",
-                      "stars night sky", "ocean waves sunset", "desert sand dunes", "green mountains waterfall",
-                      "candle light warm", "rain on window", "clouds moving sky", "forest trees sunlight",
-                      "peaceful garden flowers", "old mosque minaret", "kaaba mecca", "madina green dome",
-                      "birds flying sky", "river flowing rocks", "snow falling winter", "lightning storm clouds",
-                      "lantern light dark", "prayer beads tasbih", "dates fruit bowl", "arabic tea coffee",
-                      "sunrise golden hour", "moon crescent night", "beautiful sunset landscape", "foggy morning forest"
-                  ]
-                  random.shuffle(all_queries)
-                  queries = all_queries[:3]
-                  clip_duration = 20.0
-
-                  def download_and_normalize(args):
-                      i, query, dur, clip_path = args
-                      temp_raw = f"temp/raw_clip_{i}.mp4"
-                      api_used = "Failed"
-                      try:
-                          if pexels.fetch(query=query, duration=dur, output_path=temp_raw):
-                              api_used = "Pexels"
-                          elif pixabay.fetch(query=query, duration=dur, output_path=temp_raw):
-                              api_used = "Pixabay"
-                          elif coverr.fetch(query=query, duration=dur, output_path=temp_raw):
-                              api_used = "Coverr"
-                          elif gradient.fetch(duration=dur, output_path=temp_raw):
-                              api_used = "Gradient"
-                      except Exception:
-                          pass
-
-                      if not os.path.exists(temp_raw):
-                          return (False, "Failed")
-
-                      norm_cmd = (
-                          f'ffmpeg -y -i "{temp_raw}" '
-                          f'-vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=24,setsar=1" '
-                          f'-an -c:v libx264 -preset ultrafast -crf 30 -threads 0 "{clip_path}"'
-                      )
-                      try:
-                          subprocess.run(norm_cmd, shell=True, capture_output=True, timeout=180)
-                      except Exception:
-                          pass
-                      if os.path.exists(temp_raw):
-                          os.remove(temp_raw)
-                      ok = os.path.exists(clip_path) and os.path.getsize(clip_path) > 10000
-                      return (ok, api_used)
-
-                  download_tasks = [(i, q, clip_duration, f"temp/clip_{i}.mp4") for i, q in enumerate(queries)]
-                  with ThreadPoolExecutor(max_workers=3) as ex:
-                      results = list(ex.map(download_and_normalize, download_tasks))
-
-                  valid_clips = []
-                  video_apis_used = set()
-                  with open(concat_list, "w") as f:
-                      for i, (res, api) in enumerate(results):
-                          clip_path = f"temp/clip_{i}.mp4"
-                          if res and os.path.exists(clip_path):
-                              valid_clips.append(clip_path)
-                              video_apis_used.add(api)
-                              f.write(f"file '{os.path.abspath(clip_path)}'\n")
-
-                  video_api_str = ", ".join(video_apis_used) if video_apis_used else "None"
-
-                  if valid_clips:
-                      merge_cmd = f'ffmpeg -y -f concat -safe 0 -i "{concat_list}" -c copy "{final_bg_video}"'
-                      try:
-                          subprocess.run(merge_cmd, shell=True, capture_output=True, timeout=60)
-                      except Exception:
-                          pass
-
-                  if not os.path.exists(final_bg_video) or os.path.getsize(final_bg_video) < 10000:
-                      if valid_clips:
-                          final_bg_video = valid_clips[0]
+              def process_language(text, style_name, lang_idx):
+                  words = text.split()
+                  if not words:
+                      return ""
+                  timings = compute_word_timings(words, total_dur)
+                  window_size = 3
+                  lines = ""
+                  for i in range(len(words)):
+                      w_start = start_t + timings[i][0]
+                      w_end = start_t + timings[i][1]
+                      start_idx = max(0, i - window_size + 1)
+                      visible_words = words[start_idx:i + 1]
+                      dot_color = get_color_tag(i // 3 + (lang_idx * 3))
+                      if lang_idx == 0:
+                          karaoke_text = f"\u202B{{\\c{dot_color}}}●  "
                       else:
-                          raise RuntimeError("All background video sources failed")
-                  state.done("background")
+                          karaoke_text = f"{{\\c{dot_color}}}●  "
+                      for j, word in enumerate(visible_words):
+                          global_idx = start_idx + j
+                          color = get_color_tag(global_idx)
+                          if global_idx == i:
+                              cs = int((w_end - w_start) * 100)
+                              karaoke_text += f"{{\\c{color}\\k{cs}}}{word} "
+                          else:
+                              karaoke_text += f"{{\\c{color}}}{word} "
+                      if lang_idx == 0:
+                          karaoke_text += "\u202C"
+                      lines += f"Dialogue: 0,{ts(w_start)},{ts(w_end)},{style_name},,,0,0,,{karaoke_text.strip()}\n"
+                  return lines
 
-                  # ── Step 6: म्यूजिक + Nature ─────────────────────────────────
-                  state.start("music")
-                  logger.info("6. 🎵 म्यूजिक मिक्स हो रहा है...")
-                  tg.send("6. 🎵 म्यूजिक मिक्स हो रहा है...")
+              if ara_text:
+                  content += process_language(ara_text, "Arabic", 0)
+              if hin_text:
+                  content += process_language(hin_text, "Hindi", 1)
+              if eng_text:
+                  content += process_language(eng_text, "English", 2)
 
-                  music_path = "temp/music.mp3"
-                  nature_path = "temp/nature.mp3"
-                  final_audio_path = "temp/final_bg_audio.mp3"
+              return save_ass(content, output_path)
+          EOF
+          echo "✅ main_sub_builder.py fix हो गई"
 
-                  if freesound.fetch(query="soft ambient meditation islamic peaceful", duration=60, output_path=music_path):
-                      music_used = "Freesound"
-                  elif pixabay_music.fetch(duration=60, output_path=music_path):
-                      music_used = "Pixabay"
-                  else:
-                      music_used = "None (silent)"
-                      music_path = ""
-
-                  success_nature = freesound.fetch(query="rain soft ambience", duration=60, output_path=nature_path)
-
-                  if music_path and success_nature:
-                      mix_cmd = (
-                          f'ffmpeg -y -i "{music_path}" -i "{nature_path}" '
-                          f'-filter_complex "[0:a]volume=0.15[m];[1:a]volume=0.10[n];[m][n]amix=inputs=2:duration=first[out]" '
-                          f'-map "[out]" "{final_audio_path}"'
-                      )
-                      try:
-                          subprocess.run(mix_cmd, shell=True, capture_output=True, timeout=120)
-                          if not (os.path.exists(final_audio_path) and os.path.getsize(final_audio_path) > 1000):
-                              final_audio_path = music_path
-                      except Exception:
-                          final_audio_path = music_path
-                  elif music_path:
-                      final_audio_path = music_path
-                  else:
-                      final_audio_path = ""
-                  state.done("music")
-
-                  # ── Step 7: Final Render ────────────────────────────────────
-                  state.start("render")
-                  logger.info("7. 🎬 Final Render हो रहा है...")
-                  tg.send("7. 🎬 Final Video Render हो रही है...")
-
-                  final_video_path = "temp/Final_Story.mp4"
-                  try:
-                      import io, contextlib
-                      buf = io.StringIO()
-                      with contextlib.redirect_stdout(buf):
-                          render_success = build_and_render_story(
-                              bg_video=final_bg_video,
-                              music_path=final_audio_path,
-                              voice_path=voice_path,
-                              hadith=hadith,
-                              hindi_text=hindi_text,
-                              intro_text=intro_text,
-                              outro_text=outro_text,
-                              cta_text=cta_text,
-                              output_path=final_video_path,
-                          )
-                      log_out = buf.getvalue()
-                      if "❌ === FFMPEG ERROR START ===" in log_out:
-                          err = log_out.split("❌ === FFMPEG ERROR START ===")[1].split("❌ === FFMPEG ERROR END ===")[0]
-                          raise RuntimeError(f"FFmpeg: {err[:500]}")
-                  except Exception as e:
-                      raise RuntimeError(f"Render failed: {e}")
-
-                  if not render_success or not os.path.exists(final_video_path):
-                      raise RuntimeError("Render unknown failure")
-                  state.done("render")
-
-                  # ── Step 8: Google Drive Upload ─────────────────────────────
-                  state.start("upload")
-                  logger.info("8. ☁️ Drive पर Upload...")
-                  tg.send("8. ☁️ Google Drive पर Upload हो रही है...")
-
-                  drive_link = uploader.upload(final_video_path)
-                  state.done("upload")
-
-                  # ── Step 9: Final Report ────────────────────────────────────
-                  report = "🎉 <b>Video Ready!</b>\n\n"
-                  report += f"📜 <b>Hadith:</b> {book_name} #{hadith_num}\n"
-                  report += f"🧠 <b>AI Script:</b> {ai_used} <i>(Failed: {ai_failed})</i>\n"
-                  report += f"🎙️ <b>Voice:</b> TTS Fallback\n"
-                  report += f"🎥 <b>Video:</b> {video_api_str}\n"
-                  report += f"🎵 <b>Music:</b> {music_used}\n"
-                  if drive_link:
-                      report += f"\n📥 <a href='{drive_link}'>Click here to view</a>"
-                  else:
-                      report += "\n❌ Google Drive Upload Failed."
-
-                  tg.send(report)
-                  logger.info("🎉 Pipeline complete")
-
-              except Exception as e:
-                  errors.catch("pipeline", e)
-                  logger.error(f"Pipeline crashed: {e}")
-              finally:
-                  cleaner.clean_all()
-                  logger.info("🧹 Cleanup done")
-
-
-          if __name__ == "__main__":
-              try:
-                  run_pipeline()
-              except Exception as e:
-                  tb = traceback.format_exc()
-                  print(tb)
-                  tg = Telegram()
-                  tg.send(f"💥 <b>Pipeline crashed!</b>\n<pre>{tb[-1500:]}</pre>")
-                  raise
-          PYEOF
-          echo "✅ नया main.py लिख दिया"
-
-      - name: 4. 🔍 Syntax जाँच
+      - name: 7. 🔧 cta_sub_builder.py को भी fix करो (सुरक्षित)
         run: |
-          cd Workshop/Video_Generator/Story_Generator
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/builders
+          cat > cta_sub_builder.py << 'EOF'
+          # ══════════════════════════════════════════════════════════════════════════════
+          # 📁 FILE: Story_Render/subtitle/builders/cta_sub_builder.py
+          # 🎯 PURPOSE: CTA (Call to Action) सबटाइटल
+          # ✅ FIX: parameters जोड़े गए
+          # ══════════════════════════════════════════════════════════════════════════════
+          import re
+          from ..assembler import get_ass_header, get_all_styles, save_ass
+          from ..timing import ts
+          from ...config.colors import get_color_tag
+
+
+          def create_cta_subtitle(cta_text, total_duration, cta_duration=3.5, output_path="temp/cta_sub.ass"):
+              """
+              CTA सबटाइटल बनाता है (Like/Share/Subscribe)।
+              """
+              if not cta_text:
+                  return None
+
+              clean_text = re.sub(r'[\n\r"]', ' ', str(cta_text)).strip()
+
+              content = get_ass_header()
+              content += "\n[V4+ Styles]\n"
+              content += get_all_styles(include_cta=True)
+              content += "\n[Events]\n"
+              content += "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+
+              start_t = max(0.0, total_duration - cta_duration)
+              formatted_text = f"{{\\fad(500,500)\\c{get_color_tag(2)}}}● {clean_text}"
+
+              content += f"Dialogue: 0,{ts(start_t)},{ts(total_duration)},CTA,,0,0,0,,{formatted_text}\n"
+
+              return save_ass(content, output_path)
+          EOF
+          echo "✅ cta_sub_builder.py fix हो गई"
+
+      - name: 8. 🔍 Syntax जाँच
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/builders
           pip install requests -q
           echo "════════════════════════════════════════"
-          echo "🔍 main.py syntax check:"
+          echo "🔍 Syntax check:"
           echo "════════════════════════════════════════"
-          if python -c "import ast; ast.parse(open('main.py').read())"; then
-            echo "✅ main.py का syntax ठीक है"
-          else
-            echo "❌ main.py में syntax error है"
-            exit 1
-          fi
-
-      - name: 5. 🔍 imports जाँच (जो फाइलें मौजूद होनी चाहिए)
-        run: |
-          cd Workshop/Video_Generator
-          echo "════════════════════════════════════════"
-          echo "🔍 ज़रूरी फाइलें मौजूद हैं?"
-          echo "════════════════════════════════════════"
-          MISSING=0
-          for f in \
-            "Management/__init__.py" \
-            "Management/config/settings.py" \
-            "Management/auth/api_keys.py" \
-            "Management/fallback/ai.py" \
-            "Management/reporting/telegram.py" \
-            "Management/errors/handler.py" \
-            "Management/state/tracker.py" \
-            "Management/cleanup/cleaner.py" \
-            "Management/uploader/upload_manager.py" \
-            "Management/fetching/AI/API_fallback/ai_fallback.py" \
-            "Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py" \
-            "Story_Generator/Story_Render/__init__.py" \
-          ; do
-            if [ -f "$f" ]; then
+          for f in intro_sub_builder.py outro_sub_builder.py main_sub_builder.py cta_sub_builder.py; do
+            if python -c "import ast; ast.parse(open('$f').read())"; then
               echo "✅ $f"
             else
-              echo "❌ $f — मौजूद नहीं"
-              MISSING=$((MISSING+1))
+              echo "❌ $f"
             fi
           done
-          echo ""
-          if [ $MISSING -eq 0 ]; then
-            echo "🎉 सब कुछ जगह पर है"
-          else
-            echo "⚠️ $MISSING फाइलें missing हैं"
-          fi
 
-      - name: 6. 💾 Commit & Push
+      - name: 9. 🔍 Function signatures जाँच
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/builders
+          echo "════════════════════════════════════════"
+          echo "🔍 नए function signatures:"
+          echo "════════════════════════════════════════"
+          grep "def create_intro_subtitle" intro_sub_builder.py
+          grep "def create_outro_subtitle" outro_sub_builder.py
+          grep "def create_main_subtitles" main_sub_builder.py
+          grep "def create_cta_subtitle" cta_sub_builder.py
+
+      - name: 10. 💾 Commit & Push
         run: |
           cd Workshop
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
           git add -A
-          git commit -m "🎬 Update main.py to use Management + keep main_backup.py" || echo "No changes"
+          git commit -m "🔧 Fix create_*_subtitle() signatures (duration parameter)" || echo "No changes"
           git push origin main || echo "Push failed"
