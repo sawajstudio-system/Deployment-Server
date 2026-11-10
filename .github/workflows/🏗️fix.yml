@@ -1,283 +1,346 @@
-name: 🔧 Fix All Tools (CTA + Duration)
+name: 🩺 Video_Generator Health Report (Final)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Video_Generator/**'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  fix:
+  health:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
     steps:
       - name: 1. 📥 Checkout Workshop
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Workshop'
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'Workshop'
 
-      - name: 2. 🔧 cta_img_drawer.py fix करो
+      - name: 2. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 3. 📦 Install
+        run: pip install requests Pillow
+
+      - name: 4. 🩺 Health Check + Auto Split Telegram
         run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
-          cat > cta_img_drawer.py << 'EOF'
-          # ══════════════════════════════════════════════════════════════════════════════
-          # 📁 FILE: Story_Render/tools/cta_img_drawer.py
-          # 🎯 PURPOSE: CTA का ग्लास बेस बनाना (बिना टेक्स्ट)
-          # ✅ FIX: output_path parameter नाम standardized
-          # ══════════════════════════════════════════════════════════════════════════════
-          import os
-          from PIL import Image, ImageDraw
+          python << 'PYEOF'
+          import os, sys, ast, requests
+          from datetime import datetime
+          from pathlib import Path
 
+          ROOT = Path("Video_Generator")
+          TG_TOKEN = os.getenv("TELEGRAM_API_REPORT_TOKEN")
+          TG_CHAT = os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
 
-          def draw_cta_base(output_path="temp/cta_base.png"):
-              """
-              CTA का ट्रांसपेरेंट ग्लास बेस बनाता है।
-              """
-              img = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
-              draw = ImageDraw.Draw(img)
+          if not ROOT.exists():
+              print("❌ Video_Generator नहीं मिला")
+              sys.exit(1)
 
-              glass_fill = (15, 15, 15, 150)
-              glass_border = (255, 255, 255, 80)
+          # ═══════════════════════════════════════════════════════════
+          # FULL EXPECTED STRUCTURE — जिसमें Error Guard + Reporting अलग
+          # ═══════════════════════════════════════════════════════════
+          EXPECTED = {
+              "Management": {
+                  "root": ["__init__.py", "README.md"],
+                  "config/": ["__init__.py", "settings.py", "paths.py", "chains.py"],
+                  "auth/": ["__init__.py", "api_keys.py", "env_loader.py"],
+                  "fallback/": ["__init__.py", "ai.py", "video.py", "music.py", "photo.py", "tts.py"],
+                  "reporting/": ["__init__.py", "telegram.py", "logger.py"],
+                  "errors/": ["__init__.py", "handler.py"],
+                  "state/": ["__init__.py", "tracker.py"],
+                  "cleanup/": ["__init__.py", "cleaner.py"],
+                  "uploader/": ["__init__.py", "drive.py", "upload_manager.py"],
+                  "fetching/AI/API_fallback/": [
+                      "ai_fallback.py", "gemini_AI.py", "openrouter_AI.py", "groq_AI.py",
+                      "cohere_AI.py", "nvidia_AI.py", "cloudflare_AI.py", "anges_AI.py",
+                      "magic_AI.py", "tanvo_AI.py",
+                  ],
+                  "fetching/Background/Music/": [
+                      "API_fallback/freesound.py", "URL_fallback/pixabay_music.py",
+                  ],
+                  "fetching/Background/Photo/": [
+                      "API_fallback/pexels.py", "API_fallback/pixabay.py",
+                      "URL_fallback/pollinations_AI.py",
+                  ],
+                  "fetching/Background/Video/": [
+                      "API_fallback/pexels.py", "API_fallback/pixabay.py",
+                      "API_fallback/coverr.py", "URL_fallback/gradient.py",
+                  ],
+                  "fetching/Intro_Outro_CTA/": [
+                      "API_fallback/intro_AI.py", "API_fallback/outro_AI.py",
+                      "API_fallback/cta_AI.py",
+                  ],
+                  "fetching/Islamic/": [
+                      "Dua/API_fallback/ummah.py",
+                      "Hadis/URL_fallback/fawaz.py",
+                      "Hijri_date/URL_fallback/hijri_date.py",
+                      "Quran/API_fallback/quran_foundation.py",
+                      "Quran/URL_fallback/quran.py",
+                      "Quran/URL_fallback/quran_audio.py",
+                      "Quran/URL_fallback/quran_tafsir.py",
+                  ],
+                  "fetching/Translator/": ["URL_fallback/mymemory.py"],
+                  "fetching/audio_TTS/": [
+                      "API_fallback/elevenlabs.py", "URL_fallback/edge_tts.py",
+                  ],
+              },
+              "Story_Generator": {
+                  "root": ["main.py", "main_backup.py", "requirements.txt"],
+                  "Story_Render/": ["__init__.py", "main_render.py", "render_main.py"],
+                  "Story_Render/config/": ["__init__.py", "colors.py", "screen.py", "styles.py"],
+                  "Story_Render/config/colors/": [
+                      "__init__.py", "hex_colors.py", "base_color.py",
+                      "arabic_text_color.py", "cta_text_color.py",
+                      "english_text_color.py", "highlight_color.py",
+                      "hindi_text_color.py", "intro_text_color.py", "outro_text_color.py",
+                  ],
+                  "Story_Render/config/fonts/": [
+                      "__init__.py", "arabic_fonts.py", "hindi_fonts.py",
+                      "english_fonts.py", "font_sizes.py", "margins.py",
+                  ],
+                  "Story_Render/config/sizes/": [
+                      "__init__.py", "font_sizes.py", "margins.py", "screen_size.py",
+                  ],
+                  "Story_Render/subtitle/": [
+                      "__init__.py", "ass_builder.py", "intro_builder.py",
+                      "outro_builder.py", "cta_builder.py",
+                  ],
+                  "Story_Render/subtitle/assembler/": [
+                      "__init__.py", "ass_header.py", "ass_style.py", "ass_saver.py",
+                  ],
+                  "Story_Render/subtitle/builders/": [
+                      "__init__.py", "main_sub_builder.py", "intro_sub_builder.py",
+                      "outro_sub_builder.py", "cta_sub_builder.py",
+                  ],
+                  "Story_Render/subtitle/languages/": [
+                      "__init__.py", "arabic.py", "arabic_render.py",
+                      "hindi.py", "hindi_render.py",
+                      "english.py", "english_render.py",
+                  ],
+                  "Story_Render/subtitle/timing/": [
+                      "__init__.py", "time_format.py", "word_weight.py",
+                  ],
+                  "Story_Render/tools/": [
+                      "__init__.py", "duration_checker.py", "audio_helper.py",
+                      "cta_img_drawer.py", "cta_text_placer.py", "cta_generator.py",
+                  ],
+                  "Story_Render/video_engine/": [
+                      "__init__.py", "ffmpeg_builder.py", "ffmpeg_runner.py",
+                      "ffmpeg_render.py", "video_filter.py", "audio_mixer.py",
+                      "logo_processor.py", "logo_placer.py", "logo_watermark.py",
+                  ],
+              },
+              "assets": {
+                  "root": ["logo.png"],
+                  "fonts/": [
+                      "Amiri-Regular.ttf", "Cinzel.ttf", "Eczar.ttf", "Lora.ttf",
+                      "Montserrat.ttf", "PlayfairDisplay.ttf", "ReemKufi.ttf",
+                      "RozhaOne.ttf", "Scheherazade.ttf", "YatraOne.ttf",
+                  ],
+              },
+          }
 
-              draw.rounded_rectangle(
-                  [230, 1150, 850, 1750],
-                  radius=30,
-                  fill=glass_fill,
-                  outline=glass_border,
-                  width=3
-              )
+          # ═══════════════════════════════════════════════════════════
+          # CHECK FUNCTION
+          # ═══════════════════════════════════════════════════════════
+          def check_file(full_path, rel):
+              if not full_path.exists():
+                  return (False, "missing")
+              if full_path.stat().st_size == 0:
+                  return (False, "empty")
+              if rel.endswith(".py"):
+                  try:
+                      code = full_path.read_text(encoding="utf-8")
+                      ast.parse(code)
+                  except SyntaxError as e:
+                      return (False, f"syntax: {e.msg}")
+                  except Exception as e:
+                      return (False, f"read: {str(e)[:30]}")
+              return (True, "ok")
 
-              directory = os.path.dirname(output_path)
-              if directory:
-                  os.makedirs(directory, exist_ok=True)
+          # ═══════════════════════════════════════════════════════════
+          # SCAN
+          # ═══════════════════════════════════════════════════════════
+          results = {}
+          total_ok = 0
+          total_fail = 0
+          broken = []
 
-              img.save(output_path, "PNG")
-              return output_path
-          EOF
-          echo "✅ cta_img_drawer.py fix"
+          for top, sections in EXPECTED.items():
+              results[top] = {}
+              for section, files in sections.items():
+                  results[top][section] = []
+                  for f in files:
+                      if section == "root":
+                          full = ROOT / top / f
+                      else:
+                          full = ROOT / top / section / f
+                      ok, reason = check_file(full, f)
+                      results[top][section].append({"name": f, "ok": ok, "reason": reason})
+                      if ok:
+                          total_ok += 1
+                      else:
+                          total_fail += 1
+                          broken.append(f"{top}/{section}{f} — {reason}")
 
-      - name: 3. 🔧 cta_text_placer.py fix करो
-        run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
-          cat > cta_text_placer.py << 'EOF'
-          # ══════════════════════════════════════════════════════════════════════════════
-          # 📁 FILE: Story_Render/tools/cta_text_placer.py
-          # 🎯 PURPOSE: CTA इमेज पर हेडर, बटन और स्टूडियो का नाम लिखना
-          # ✅ FIX: output_path parameter नाम standardized
-          # ══════════════════════════════════════════════════════════════════════════════
-          import os
-          import random
-          from PIL import Image, ImageDraw, ImageFont
+          # ═══════════════════════════════════════════════════════════
+          # TREE BUILDER — पूरा स्ट्रक्चर, Error Guard + Reporting अलग
+          # ═══════════════════════════════════════════════════════════
+          def tree_for(top):
+              lines = []
+              data = results[top]
+              lines.append(f"├── {top}/")
 
+              root_files = data.get("root", [])
+              if root_files:
+                  lines.append("│   │")
+                  for f in root_files:
+                      icon = "🟢" if f["ok"] else "🔴"
+                      tail = "" if f["ok"] else f"  ← {f['reason']}"
+                      lines.append(f"│   ├── {f['name']}    {icon}{tail}")
+                  lines.append("│   │")
 
-          def place_cta_text(base_png, output_path="temp/cta_image.png"):
-              """
-              CTA बेस इमेज पर टेक्स्ट और बटन लिखता है।
-              """
-              img = Image.open(base_png).convert("RGBA")
-              draw = ImageDraw.Draw(img)
+              sections = [k for k in data.keys() if k != "root"]
+              for si, section in enumerate(sections):
+                  files_list = data[section]
+                  ok_c = sum(1 for f in files_list if f["ok"])
+                  tot_c = len(files_list)
+                  icon = "🟢" if ok_c == tot_c else "🔴"
 
-              try:
-                  font_top = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf", 60)
-                  font_btn = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf", 75)
-                  font_bottom = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 45)
-              except IOError:
-                  font_top = font_btn = font_bottom = ImageFont.load_default()
+                  # section header — अगर "reporting/" या "errors/" है तो खास
+                  if "reporting" in section:
+                      label = f"│   ├── {section}    {icon} {tot_c}   📊"
+                  elif "errors" in section:
+                      label = f"│   ├── {section}    {icon} {tot_c}   🛡️"
+                  elif section.startswith("Story_Render/"):
+                      label = f"│   │   ├── {section.replace('Story_Render/', '')}    {icon} {tot_c}"
+                  else:
+                      label = f"│   ├── {section}    {icon} {tot_c}"
+                  lines.append(label)
 
-              colors = ["#FFD700", "#00FFFF", "#FF007F", "#39FF14",
-                        "#FFBF00", "#9D00FF", "#00FF7F", "#FF4500"]
-              random.shuffle(colors)
+                  for i, f in enumerate(files_list):
+                      ficon = "🟢" if f["ok"] else "🔴"
+                      tail = "" if f["ok"] else f"  ← {f['reason']}"
+                      prefix = "│   │   └──" if i == len(files_list) - 1 else "│   │   ├──"
+                      lines.append(f"{prefix} {f['name']}    {ficon}{tail}")
 
-              # 1. हेडर
-              header_texts = [
-                  "Like • Share • Follow",
-                  "Support the Channel",
-                  "Join Our Community",
-                  "Spread the Knowledge"
-              ]
-              draw.text(
-                  (540, 1250),
-                  random.choice(header_texts),
-                  font=font_top,
-                  fill=colors[0],
-                  anchor="mm",
-                  stroke_width=4,
-                  stroke_fill="black"
-              )
+                  if si < len(sections) - 1:
+                      lines.append("│   │")
+              return lines
 
-              # 2. बटन्स
-              btn_texts = [
-                  ["LIKE", "SUBSCRIBE", "COMMENT", "SHARE"],
-                  ["FOLLOW", "SHARE", "LIKE", "SUBSCRIBE"],
-                  ["SUBSCRIBE", "LIKE", "FOLLOW", "COMMENT"]
-              ]
-              texts = random.choice(btn_texts)
-              ys = [1340, 1445, 1550, 1655]
+          # ═══════════════════════════════════════════════════════════
+          # TELEGRAM SENDER — auto split
+          # ═══════════════════════════════════════════════════════════
+          MAX_CHARS = 3800
 
-              for i, (text, y) in enumerate(zip(texts, ys)):
-                  draw.rounded_rectangle(
-                      [300, y, 780, y + 90],
-                      radius=15,
-                      outline=colors[i + 1],
-                      width=6
-                  )
-                  draw.text(
-                      (540, y + 45),
-                      text,
-                      font=font_btn,
-                      fill=colors[i + 1],
-                      anchor="mm",
-                      stroke_width=4,
-                      stroke_fill="black"
-                  )
+          def send_chunks(text, title):
+              if not TG_TOKEN or not TG_CHAT:
+                  print("⚠️ Telegram secrets missing")
+                  print(text)
+                  return
 
-              # 3. स्टूडियो का नाम
-              draw.text(
-                  (540, 1820),
-                  "Sawajstudio",
-                  font=font_bottom,
-                  fill=colors[5],
-                  anchor="mm",
-                  stroke_width=3,
-                  stroke_fill="black"
-              )
+              lines = text.split("\n")
+              chunks = []
+              current = ""
+              for line in lines:
+                  add = ("\n" if current else "") + line
+                  if len(current) + len(add) > MAX_CHARS:
+                      chunks.append(current)
+                      current = line
+                  else:
+                      current += add
+              if current:
+                  chunks.append(current)
 
-              directory = os.path.dirname(output_path)
-              if directory:
-                  os.makedirs(directory, exist_ok=True)
+              total = len(chunks)
+              print(f"📤 Telegram: {total} हिस्से")
 
-              img.save(output_path, "PNG")
-              return output_path
-          EOF
-          echo "✅ cta_text_placer.py fix"
+              for i, chunk in enumerate(chunks, 1):
+                  header = f"<b>{title} ({i}/{total})</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n"
+                  body = header + chunk
+                  try:
+                      r = requests.post(
+                          f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                          json={
+                              "chat_id": TG_CHAT,
+                              "text": body,
+                              "parse_mode": "HTML",
+                              "disable_web_page_preview": True,
+                          },
+                          timeout=15,
+                      )
+                      print(f"  ✅ Part {i}/{total}: HTTP {r.status_code}")
+                  except Exception as e:
+                      print(f"  ❌ Part {i}: {e}")
 
-      - name: 4. 🔧 cta_generator.py fix करो (सिर्फ wrapper)
-        run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
-          cat > cta_generator.py << 'EOF'
-          # ══════════════════════════════════════════════════════════════════════════════
-          # 📁 FILE: Story_Render/tools/cta_generator.py
-          # 🎯 PURPOSE: CTA इमेज जनरेट करने का मुख्य entry point
-          # ✅ FIX: सिर्फ wrapper — असली काम drawer + placer करते हैं
-          # ══════════════════════════════════════════════════════════════════════════════
-          from .cta_img_drawer import draw_cta_base
-          from .cta_text_placer import place_cta_text
+          # ═══════════════════════════════════════════════════════════
+          # BUILD REPORT
+          # ═══════════════════════════════════════════════════════════
+          now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+          lines = []
+          lines.append("🎬 <b>Video_Generator — Health Report</b>")
+          lines.append(f"📅 {now}")
+          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+          lines.append("")
+          lines.append("Video_Generator/")
+          lines.append("│")
 
+          all_tops = list(results.keys())
+          for ti, top in enumerate(all_tops):
+              lines.extend(tree_for(top))
+              if ti < len(all_tops) - 1:
+                  lines.append("│")
+              else:
+                  lines.append("")
 
-          def generate_cta_image(output_path="temp/cta_image.png"):
-              """
-              CTA इमेज बनाता है — ग्लास बेस + टेक्स्ट + बटन्स।
+          # SUMMARY
+          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+          lines.append("📊 <b>Summary</b>")
+          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+          lines.append(f"कुल फाइलें: {total_ok + total_fail}")
+          lines.append(f"🟢 सही: {total_ok}")
+          lines.append(f"🔴 खराब: {total_fail}")
+          lines.append("")
 
-              Args:
-                  output_path (str): कहाँ सेव करना है
+          # 📊 REPORTING summary — खास
+          lines.append("📊 <b>Reporting फाइलें:</b>")
+          rep = results["Management"].get("reporting/", [])
+          rep_ok = sum(1 for f in rep if f["ok"])
+          lines.append(f"  • telegram.py — {'🟢' if rep[0]['ok'] else '🔴'}")
+          lines.append(f"  • logger.py — {'🟢' if rep[1]['ok'] else '🔴'}")
+          lines.append("")
 
-              Returns:
-                  str: बनी हुई PNG फाइल का path
-              """
-              print(f"🎨 [cta_generator] Generating CTA: {output_path}")
-              base = draw_cta_base("temp/cta_base.png")
-              return place_cta_text(base, output_path)
-          EOF
-          echo "✅ cta_generator.py fix"
+          # 🛡️ ERROR GUARD summary — खास
+          lines.append("🛡️ <b>Error Guard:</b>")
+          eg = results["Management"].get("errors/", [])
+          lines.append(f"  • handler.py — {'🟢' if eg[1]['ok'] else '🔴'}")
+          lines.append("")
 
-      - name: 5. 🔧 duration_checker.py fix करो (सुरक्षित)
-        run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
-          cat > duration_checker.py << 'EOF'
-          # ══════════════════════════════════════════════════════════════════════════════
-          # 📁 FILE: Story_Render/tools/duration_checker.py
-          # 🎯 PURPOSE: ऑडियो की लंबाई निकालना
-          # ══════════════════════════════════════════════════════════════════════════════
-          import subprocess
-          import os
+          if broken:
+              lines.append("🔴 <b>Fix चाहिए:</b>")
+              for b in broken[:15]:
+                  lines.append(f"  • {b}")
+          else:
+              lines.append("✅ सब कुछ ठीक है")
+          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+          lines.append("✅ Sawaj Studio Bot")
 
-
-          def get_audio_duration(audio_path):
-              """
-              किसी भी ऑडियो फाइल की लंबाई सेकंड में लौटाता है।
-              """
-              print(f"⏱️ [duration_checker] Checking: {audio_path}")
-
-              if not os.path.exists(audio_path):
-                  print(f"❌ File not found: {audio_path}")
-                  return 15.0
-
-              try:
-                  cmd = (
-                      f'ffprobe -v error -show_entries format=duration '
-                      f'-of default=noprint_wrappers=1:nokey=1 "{audio_path}"'
-                  )
-                  result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                  duration = float(result.stdout.strip())
-                  print(f"✅ Duration: {duration:.2f}s")
-                  return duration
-              except Exception as e:
-                  print(f"⚠️ Error: {e}. Using 15.0s default.")
-                  return 15.0
-          EOF
-          echo "✅ duration_checker.py fix"
-
-      - name: 6. 🔧 tools/__init__.py fix करो
-        run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
-          cat > __init__.py << 'EOF'
-          # tools/__init__.py
-          from .duration_checker import get_audio_duration
-          from .cta_img_drawer import draw_cta_base
-          from .cta_text_placer import place_cta_text
-          from .cta_generator import generate_cta_image
-
-          __all__ = [
-              "get_audio_duration",
-              "draw_cta_base",
-              "place_cta_text",
-              "generate_cta_image",
-          ]
-          EOF
-          echo "✅ tools/__init__.py fix"
-
-      - name: 7. 🔧 audio_helper.py fix करो (alias)
-        run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
-          cat > audio_helper.py << 'EOF'
-          # audio_helper.py — duration_checker का alias
-          from .duration_checker import get_audio_duration
-
-          __all__ = ["get_audio_duration"]
-          EOF
-          echo "✅ audio_helper.py fix"
-
-      - name: 8. 🔍 Syntax जाँच
-        run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
-          echo "════════════════════════════════════════"
-          echo "🔍 Syntax check:"
-          echo "════════════════════════════════════════"
-          for f in *.py; do
-            if python -c "import ast; ast.parse(open('$f').read())" 2>/dev/null; then
-              echo "✅ $f"
-            else
-              echo "❌ $f"
-            fi
-          done
-
-      - name: 9. 🔍 Signatures जाँच
-        run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
-          echo "════════════════════════════════════════"
-          echo "🔍 नए signatures:"
-          echo "════════════════════════════════════════"
-          grep "def generate_cta_image" cta_generator.py
-          grep "def place_cta_text" cta_text_placer.py
-          grep "def draw_cta_base" cta_img_drawer.py
-          grep "def get_audio_duration" duration_checker.py
-
-      - name: 10. 💾 Commit & Push
-        run: |
-          cd Workshop
-          git config user.name "Sawaj Studio Bot"
-          git config user.email "bot@sawajstudio.com"
-          git add -A
-          git commit -m "🔧 Fix all tools: cta_generator, cta_text_placer, cta_img_drawer, duration_checker" || echo "No changes"
-          git push origin main || echo "Push failed"
+          full_report = "\n".join(lines)
+          print(full_report)
+          print(f"\n🟢 {total_ok} | 🔴 {total_fail}")
+          send_chunks(full_report, "🩺 Health Report")
+          PYEOF
