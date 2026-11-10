@@ -1,0 +1,283 @@
+name: 🔧 Fix All Tools (CTA + Duration)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. 📥 Checkout Workshop
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Workshop'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Workshop'
+
+      - name: 2. 🔧 cta_img_drawer.py fix करो
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
+          cat > cta_img_drawer.py << 'EOF'
+          # ══════════════════════════════════════════════════════════════════════════════
+          # 📁 FILE: Story_Render/tools/cta_img_drawer.py
+          # 🎯 PURPOSE: CTA का ग्लास बेस बनाना (बिना टेक्स्ट)
+          # ✅ FIX: output_path parameter नाम standardized
+          # ══════════════════════════════════════════════════════════════════════════════
+          import os
+          from PIL import Image, ImageDraw
+
+
+          def draw_cta_base(output_path="temp/cta_base.png"):
+              """
+              CTA का ट्रांसपेरेंट ग्लास बेस बनाता है।
+              """
+              img = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
+              draw = ImageDraw.Draw(img)
+
+              glass_fill = (15, 15, 15, 150)
+              glass_border = (255, 255, 255, 80)
+
+              draw.rounded_rectangle(
+                  [230, 1150, 850, 1750],
+                  radius=30,
+                  fill=glass_fill,
+                  outline=glass_border,
+                  width=3
+              )
+
+              directory = os.path.dirname(output_path)
+              if directory:
+                  os.makedirs(directory, exist_ok=True)
+
+              img.save(output_path, "PNG")
+              return output_path
+          EOF
+          echo "✅ cta_img_drawer.py fix"
+
+      - name: 3. 🔧 cta_text_placer.py fix करो
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
+          cat > cta_text_placer.py << 'EOF'
+          # ══════════════════════════════════════════════════════════════════════════════
+          # 📁 FILE: Story_Render/tools/cta_text_placer.py
+          # 🎯 PURPOSE: CTA इमेज पर हेडर, बटन और स्टूडियो का नाम लिखना
+          # ✅ FIX: output_path parameter नाम standardized
+          # ══════════════════════════════════════════════════════════════════════════════
+          import os
+          import random
+          from PIL import Image, ImageDraw, ImageFont
+
+
+          def place_cta_text(base_png, output_path="temp/cta_image.png"):
+              """
+              CTA बेस इमेज पर टेक्स्ट और बटन लिखता है।
+              """
+              img = Image.open(base_png).convert("RGBA")
+              draw = ImageDraw.Draw(img)
+
+              try:
+                  font_top = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf", 60)
+                  font_btn = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf", 75)
+                  font_bottom = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 45)
+              except IOError:
+                  font_top = font_btn = font_bottom = ImageFont.load_default()
+
+              colors = ["#FFD700", "#00FFFF", "#FF007F", "#39FF14",
+                        "#FFBF00", "#9D00FF", "#00FF7F", "#FF4500"]
+              random.shuffle(colors)
+
+              # 1. हेडर
+              header_texts = [
+                  "Like • Share • Follow",
+                  "Support the Channel",
+                  "Join Our Community",
+                  "Spread the Knowledge"
+              ]
+              draw.text(
+                  (540, 1250),
+                  random.choice(header_texts),
+                  font=font_top,
+                  fill=colors[0],
+                  anchor="mm",
+                  stroke_width=4,
+                  stroke_fill="black"
+              )
+
+              # 2. बटन्स
+              btn_texts = [
+                  ["LIKE", "SUBSCRIBE", "COMMENT", "SHARE"],
+                  ["FOLLOW", "SHARE", "LIKE", "SUBSCRIBE"],
+                  ["SUBSCRIBE", "LIKE", "FOLLOW", "COMMENT"]
+              ]
+              texts = random.choice(btn_texts)
+              ys = [1340, 1445, 1550, 1655]
+
+              for i, (text, y) in enumerate(zip(texts, ys)):
+                  draw.rounded_rectangle(
+                      [300, y, 780, y + 90],
+                      radius=15,
+                      outline=colors[i + 1],
+                      width=6
+                  )
+                  draw.text(
+                      (540, y + 45),
+                      text,
+                      font=font_btn,
+                      fill=colors[i + 1],
+                      anchor="mm",
+                      stroke_width=4,
+                      stroke_fill="black"
+                  )
+
+              # 3. स्टूडियो का नाम
+              draw.text(
+                  (540, 1820),
+                  "Sawajstudio",
+                  font=font_bottom,
+                  fill=colors[5],
+                  anchor="mm",
+                  stroke_width=3,
+                  stroke_fill="black"
+              )
+
+              directory = os.path.dirname(output_path)
+              if directory:
+                  os.makedirs(directory, exist_ok=True)
+
+              img.save(output_path, "PNG")
+              return output_path
+          EOF
+          echo "✅ cta_text_placer.py fix"
+
+      - name: 4. 🔧 cta_generator.py fix करो (सिर्फ wrapper)
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
+          cat > cta_generator.py << 'EOF'
+          # ══════════════════════════════════════════════════════════════════════════════
+          # 📁 FILE: Story_Render/tools/cta_generator.py
+          # 🎯 PURPOSE: CTA इमेज जनरेट करने का मुख्य entry point
+          # ✅ FIX: सिर्फ wrapper — असली काम drawer + placer करते हैं
+          # ══════════════════════════════════════════════════════════════════════════════
+          from .cta_img_drawer import draw_cta_base
+          from .cta_text_placer import place_cta_text
+
+
+          def generate_cta_image(output_path="temp/cta_image.png"):
+              """
+              CTA इमेज बनाता है — ग्लास बेस + टेक्स्ट + बटन्स।
+
+              Args:
+                  output_path (str): कहाँ सेव करना है
+
+              Returns:
+                  str: बनी हुई PNG फाइल का path
+              """
+              print(f"🎨 [cta_generator] Generating CTA: {output_path}")
+              base = draw_cta_base("temp/cta_base.png")
+              return place_cta_text(base, output_path)
+          EOF
+          echo "✅ cta_generator.py fix"
+
+      - name: 5. 🔧 duration_checker.py fix करो (सुरक्षित)
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
+          cat > duration_checker.py << 'EOF'
+          # ══════════════════════════════════════════════════════════════════════════════
+          # 📁 FILE: Story_Render/tools/duration_checker.py
+          # 🎯 PURPOSE: ऑडियो की लंबाई निकालना
+          # ══════════════════════════════════════════════════════════════════════════════
+          import subprocess
+          import os
+
+
+          def get_audio_duration(audio_path):
+              """
+              किसी भी ऑडियो फाइल की लंबाई सेकंड में लौटाता है।
+              """
+              print(f"⏱️ [duration_checker] Checking: {audio_path}")
+
+              if not os.path.exists(audio_path):
+                  print(f"❌ File not found: {audio_path}")
+                  return 15.0
+
+              try:
+                  cmd = (
+                      f'ffprobe -v error -show_entries format=duration '
+                      f'-of default=noprint_wrappers=1:nokey=1 "{audio_path}"'
+                  )
+                  result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                  duration = float(result.stdout.strip())
+                  print(f"✅ Duration: {duration:.2f}s")
+                  return duration
+              except Exception as e:
+                  print(f"⚠️ Error: {e}. Using 15.0s default.")
+                  return 15.0
+          EOF
+          echo "✅ duration_checker.py fix"
+
+      - name: 6. 🔧 tools/__init__.py fix करो
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
+          cat > __init__.py << 'EOF'
+          # tools/__init__.py
+          from .duration_checker import get_audio_duration
+          from .cta_img_drawer import draw_cta_base
+          from .cta_text_placer import place_cta_text
+          from .cta_generator import generate_cta_image
+
+          __all__ = [
+              "get_audio_duration",
+              "draw_cta_base",
+              "place_cta_text",
+              "generate_cta_image",
+          ]
+          EOF
+          echo "✅ tools/__init__.py fix"
+
+      - name: 7. 🔧 audio_helper.py fix करो (alias)
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
+          cat > audio_helper.py << 'EOF'
+          # audio_helper.py — duration_checker का alias
+          from .duration_checker import get_audio_duration
+
+          __all__ = ["get_audio_duration"]
+          EOF
+          echo "✅ audio_helper.py fix"
+
+      - name: 8. 🔍 Syntax जाँच
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
+          echo "════════════════════════════════════════"
+          echo "🔍 Syntax check:"
+          echo "════════════════════════════════════════"
+          for f in *.py; do
+            if python -c "import ast; ast.parse(open('$f').read())" 2>/dev/null; then
+              echo "✅ $f"
+            else
+              echo "❌ $f"
+            fi
+          done
+
+      - name: 9. 🔍 Signatures जाँच
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/tools
+          echo "════════════════════════════════════════"
+          echo "🔍 नए signatures:"
+          echo "════════════════════════════════════════"
+          grep "def generate_cta_image" cta_generator.py
+          grep "def place_cta_text" cta_text_placer.py
+          grep "def draw_cta_base" cta_img_drawer.py
+          grep "def get_audio_duration" duration_checker.py
+
+      - name: 10. 💾 Commit & Push
+        run: |
+          cd Workshop
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          git add -A
+          git commit -m "🔧 Fix all tools: cta_generator, cta_text_placer, cta_img_drawer, duration_checker" || echo "No changes"
+          git push origin main || echo "Push failed"
