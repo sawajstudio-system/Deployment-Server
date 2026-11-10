@@ -1,4 +1,4 @@
-name: 🔄 Move & Fix Imports (Workshop)
+name: 🏗️ Build Management Core (Workshop)
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  move:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: 1. 📥 Checkout Workshop
@@ -17,113 +17,507 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           path: 'Workshop'
 
-      - name: 2. 📂 पहले से क्या है — जाँचो
+      - name: 2. 🔧 config/ फाइलें बनाओ
         run: |
-          cd Workshop
+          cd Workshop/Video_Generator/Management/config
+          cat > __init__.py << 'EOF'
+          from .settings import Settings
+          from .paths import Paths
+          from .chains import Chains
+          __all__ = ["Settings", "Paths", "Chains"]
+          EOF
+
+          cat > settings.py << 'EOF'
+          # Management/config/settings.py
+          # 🎯 सिर्फ सेटिंग्स — कोई लॉजिक नहीं
+          class Settings:
+              MAX_PIPELINE_TIME = 120 * 60
+              MAX_FFMPEG_TIME = 300
+              MAX_DOWNLOAD_TIME = 180
+              MIN_VIDEO_SIZE = 10000
+              MIN_AUDIO_SIZE = 1000
+              MIN_IMAGE_SIZE = 5000
+              TEMP_DIR = "temp"
+              OUTPUT_FILE = "temp/Final_Story.mp4"
+              LOG_FILE = "logs/pipeline.log"
+              STEPS = ["hadith", "script", "intro_outro_cta", "tts",
+                       "background", "music", "render", "upload"]
+          EOF
+
+          cat > paths.py << 'EOF'
+          # Management/config/paths.py
+          # 🎯 सिर्फ पाथ — कोई कोड नहीं
+          import os
+
+          class Paths:
+              ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+              ASSETS = os.path.join(ROOT, "assets")
+              FONTS = os.path.join(ASSETS, "fonts")
+              LOGO = os.path.join(ASSETS, "logo.png")
+              TEMP = os.path.join(ROOT, "temp")
+              OUTPUT = os.path.join(TEMP, "Final_Story.mp4")
+          EOF
+
+          cat > chains.py << 'EOF'
+          # Management/config/chains.py
+          # 🎯 सिर्फ fallback चेन का ऑर्डर
+          # (असली API कॉल पुराने fetching/ में ही होती है)
+          class Chains:
+              AI = ["gemini", "openrouter", "groq", "cohere", "nvidia", "cloudflare", "anges"]
+              VIDEO = ["pexels", "pixabay", "coverr", "gradient"]
+              MUSIC = ["freesound", "pixabay_music"]
+              PHOTO = ["pexels", "pixabay", "pollinations_AI"]
+              TTS = ["elevenlabs", "edge_tts"]
+              TRANSLATE = ["mymemory", "ai"]
+          EOF
+          echo "✅ config/ बन गया"
+
+      - name: 3. 🔧 auth/ फाइलें बनाओ
+        run: |
+          cd Workshop/Video_Generator/Management/auth
+          cat > __init__.py << 'EOF'
+          from .api_keys import APIKeys
+          from .env_loader import EnvLoader
+          __all__ = ["APIKeys", "EnvLoader"]
+          EOF
+
+          cat > api_keys.py << 'EOF'
+          # Management/auth/api_keys.py
+          # 🎯 सिर्फ जाँचता है — कौन सी Key मौजूद है
+          import os
+
+          class APIKeys:
+              KEYS = {
+                  "gemini": "GEMINI_API_KEY",
+                  "groq": "GROQ_API_KEY",
+                  "cohere": "COHERE_API_KEY",
+                  "nvidia": "NVIDIA_API_KEY",
+                  "cloudflare_id": "CLOUDFLARE_ACCOUNT_ID",
+                  "cloudflare_token": "CLOUDFLARE_API_TOKEN",
+                  "anges": "ANGES_API_KEY",
+                  "openrouter": "OPENROUTER_API_KEY",
+                  "elevenlabs": "ELEVENLABS_API_KEY",
+                  "pexels": "PEXELS_API_KEY",
+                  "pixabay": "PIXABAY_API_KEY",
+                  "coverr": "COVERR_API_KEY",
+                  "freesound": "FREESOUND_API_KEY",
+                  "ummah": "UMMAH_API_KEY",
+              }
+
+              @classmethod
+              def is_available(cls, name):
+                  env = cls.KEYS.get(name)
+                  return bool(env and os.getenv(env))
+
+              @classmethod
+              def get(cls, name):
+                  env = cls.KEYS.get(name)
+                  return os.getenv(env) if env else None
+
+              @classmethod
+              def get_available(cls):
+                  return [k for k in cls.KEYS if cls.is_available(k)]
+          EOF
+
+          cat > env_loader.py << 'EOF'
+          # Management/auth/env_loader.py
+          import os
+
+          class EnvLoader:
+              @staticmethod
+              def get(key, default=None):
+                  return os.getenv(key, default)
+
+              @staticmethod
+              def require(key):
+                  v = os.getenv(key)
+                  if not v:
+                      raise EnvironmentError(f"Missing env: {key}")
+                  return v
+          EOF
+          echo "✅ auth/ बन गया"
+
+      - name: 4. 🔧 fallback/ फाइलें बनाओ (पुराने कोड को लपेटो)
+        run: |
+          cd Workshop/Video_Generator/Management/fallback
+          cat > __init__.py << 'EOF'
+          from .ai import AIFallback
+          from .video import VideoFallback
+          from .music import MusicFallback
+          from .photo import PhotoFallback
+          from .tts import TTSFallback
+          __all__ = ["AIFallback", "VideoFallback", "MusicFallback", "PhotoFallback", "TTSFallback"]
+          EOF
+
+          cat > ai.py << 'EOF'
+          # Management/fallback/ai.py
+          # 🎯 पुराने ai_fallback.py को लपेटता है — नया कोड नहीं
+          import sys, os
+          _B = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+          _P = os.path.join(_B, "Management", "fetching", "AI", "API_fallback")
+          if _P not in sys.path:
+              sys.path.insert(0, _P)
+
+          class AIFallback:
+              def __init__(self):
+                  self.used = None
+                  self.failed = []
+
+              def generate(self, prompt, max_tokens=500):
+                  try:
+                      import ai_fallback
+                      r = ai_fallback.generate_text(prompt, max_tokens)
+                      if r:
+                          self.used = ai_fallback.LAST_USED_AI
+                      self.failed = ai_fallback.FAILED_AIS
+                      return r
+                  except Exception as e:
+                      print(f"[AIFallback] {e}")
+                      return None
+          EOF
+
+          cat > video.py << 'EOF'
+          # Management/fallback/video.py
+          # 🎯 पुराने Pexels → Pixabay → Coverr → Gradient चेन को लपेटता है
+          class VideoFallback:
+              def fetch(self, query="islamic mosque", duration=60):
+                  out = "temp/bg_video.mp4"
+                  try:
+                      from Management.fetching.Background.Video.API_fallback import pexels, pixabay, coverr
+                      from Management.fetching.Background.Video.URL_fallback import gradient
+                      for fn in [pexels.fetch, pixabay.fetch, coverr.fetch]:
+                          try:
+                              if fn(query=query, duration=duration, output_path=out):
+                                  return out
+                          except Exception:
+                              pass
+                      if gradient.fetch(duration=duration, output_path=out):
+                          return out
+                  except Exception as e:
+                      print(f"[VideoFallback] {e}")
+                  return None
+          EOF
+
+          cat > music.py << 'EOF'
+          # Management/fallback/music.py
+          class MusicFallback:
+              def fetch(self, query="islamic peaceful", duration=60):
+                  out = "temp/music.mp3"
+                  try:
+                      from Management.fetching.Background.Music.API_fallback import freesound
+                      from Management.fetching.Background.Music.URL_fallback import pixabay_music
+                      if freesound.fetch(query=query, duration=duration, output_path=out):
+                          return out
+                      if pixabay_music.fetch(duration=duration, output_path=out):
+                          return out
+                  except Exception as e:
+                      print(f"[MusicFallback] {e}")
+                  return None
+          EOF
+
+          cat > photo.py << 'EOF'
+          # Management/fallback/photo.py
+          class PhotoFallback:
+              def fetch(self, query="islamic", output_path="temp/bg_photo.jpg"):
+                  try:
+                      from Management.fetching.Background.Photo.API_fallback import pexels, pixabay
+                      from Management.fetching.Background.Photo.URL_fallback import pollinations_AI
+                      for fn in [pexels.fetch, pixabay.fetch]:
+                          try:
+                              if fn(query=query, output_path=output_path):
+                                  return output_path
+                          except Exception:
+                              pass
+                      if pollinations_AI.fetch(prompt=query, output_path=output_path):
+                          return output_path
+                  except Exception as e:
+                      print(f"[PhotoFallback] {e}")
+                  return None
+          EOF
+
+          cat > tts.py << 'EOF'
+          # Management/fallback/tts.py
+          # 🎯 ElevenLabs → Edge-TTS चेन
+          class TTSFallback:
+              def generate(self, text, output_path="temp/voice.mp3"):
+                  try:
+                      from Management.fetching.audio_TTS.API_fallback import elevenlabs
+                      if elevenlabs.generate(text, output_path):
+                          return output_path
+                  except Exception as e:
+                      print(f"[TTS ElevenLabs] {e}")
+                  try:
+                      from Management.fetching.audio_TTS.URL_fallback import edge_tts
+                      if edge_tts.generate(text, output_path):
+                          return output_path
+                  except Exception as e:
+                      print(f"[TTS Edge] {e}")
+                  return None
+          EOF
+          echo "✅ fallback/ बन गया"
+
+      - name: 5. 🔧 reporting/ फाइलें बनाओ
+        run: |
+          cd Workshop/Video_Generator/Management/reporting
+          cat > __init__.py << 'EOF'
+          from .telegram import Telegram
+          from .logger import Logger
+          __all__ = ["Telegram", "Logger"]
+          EOF
+
+          cat > telegram.py << 'EOF'
+          # Management/reporting/telegram.py
+          # 🎯 पहले हर फाइल में send_telegram() था, अब एक जगह
+          import os
+          import requests
+
+          class Telegram:
+              def __init__(self):
+                  self.token = os.getenv("TELEGRAM_API_REPORT_TOKEN")
+                  self.chat = os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
+
+              def send(self, text, parse_mode="HTML"):
+                  if not self.token or not self.chat:
+                      return
+                  try:
+                      requests.post(
+                          f"https://api.telegram.org/bot{self.token}/sendMessage",
+                          json={"chat_id": self.chat, "text": text[:4000], "parse_mode": parse_mode},
+                          timeout=10,
+                      )
+                  except Exception:
+                      pass
+
+              def document(self, path, caption=""):
+                  if not self.token or not self.chat or not os.path.exists(path):
+                      return
+                  try:
+                      with open(path, "rb") as f:
+                          requests.post(
+                              f"https://api.telegram.org/bot{self.token}/sendDocument",
+                              data={"chat_id": self.chat, "caption": caption[:1024]},
+                              files={"document": f},
+                              timeout=300,
+                          )
+                  except Exception:
+                      pass
+
+              def error(self, step, error):
+                  self.send(f"❌ <b>Error in {step}</b>\n<pre>{str(error)[:1500]}</pre>")
+          EOF
+
+          cat > logger.py << 'EOF'
+          # Management/reporting/logger.py
+          import os
+          import logging
+
+          class Logger:
+              def __init__(self, log_file="logs/pipeline.log"):
+                  os.makedirs(os.path.dirname(log_file), exist_ok=True)
+                  logging.basicConfig(
+                      filename=log_file,
+                      level=logging.INFO,
+                      format="%(asctime)s | %(levelname)s | %(message)s",
+                  )
+                  self.l = logging.getLogger("pipeline")
+
+              def info(self, m):
+                  self.l.info(m)
+                  print(f"ℹ️ {m}")
+
+              def warning(self, m):
+                  self.l.warning(m)
+                  print(f"⚠️ {m}")
+
+              def error(self, m):
+                  self.l.error(m)
+                  print(f"❌ {m}")
+          EOF
+          echo "✅ reporting/ बन गया"
+
+      - name: 6. 🔧 errors/ बनाओ
+        run: |
+          cd Workshop/Video_Generator/Management/errors
+          cat > __init__.py << 'EOF'
+          from .handler import ErrorHandler
+          __all__ = ["ErrorHandler"]
+          EOF
+
+          cat > handler.py << 'EOF'
+          # Management/errors/handler.py
+          # 🛡️ Error Guard — पकड़ो + लॉग + Telegram + State
+          class ErrorHandler:
+              def __init__(self, logger, telegram, state):
+                  self.logger = logger
+                  self.tg = telegram
+                  self.state = state
+
+              def catch(self, step, error):
+                  self.logger.error(f"[{step}] {error}")
+                  self.tg.error(step, error)
+                  try:
+                      self.state.fail(step, str(error))
+                  except Exception:
+                      pass
+          EOF
+          echo "✅ errors/ बन गया"
+
+      - name: 7. 🔧 state/ बनाओ
+        run: |
+          cd Workshop/Video_Generator/Management/state
+          cat > __init__.py << 'EOF'
+          from .tracker import StateTracker
+          __all__ = ["StateTracker"]
+          EOF
+
+          cat > tracker.py << 'EOF'
+          # Management/state/tracker.py
+          class StateTracker:
+              def __init__(self, steps):
+                  self.steps = {s: "pending" for s in steps}
+
+              def start(self, s):
+                  if s in self.steps:
+                      self.steps[s] = "running"
+
+              def done(self, s):
+                  if s in self.steps:
+                      self.steps[s] = "done"
+
+              def fail(self, s, error=""):
+                  if s in self.steps:
+                      self.steps[s] = f"failed: {error[:100]}"
+
+              def get_report(self):
+                  return "\n".join(f"{k}: {v}" for k, v in self.steps.items())
+          EOF
+          echo "✅ state/ बन गया"
+
+      - name: 8. 🔧 cleanup/ बनाओ
+        run: |
+          cd Workshop/Video_Generator/Management/cleanup
+          cat > __init__.py << 'EOF'
+          from .cleaner import Cleaner
+          __all__ = ["Cleaner"]
+          EOF
+
+          cat > cleaner.py << 'EOF'
+          # Management/cleanup/cleaner.py
+          import os
+          import shutil
+
+          class Cleaner:
+              def __init__(self, temp_dir="temp"):
+                  self.temp = temp_dir
+
+              def clean_all(self):
+                  if os.path.exists(self.temp):
+                      try:
+                          shutil.rmtree(self.temp, ignore_errors=True)
+                      except Exception:
+                          pass
+
+              def clean_file(self, path):
+                  if os.path.exists(path):
+                      try:
+                          os.remove(path)
+                      except Exception:
+                          pass
+          EOF
+          echo "✅ cleanup/ बन गया"
+
+      - name: 9. 🔧 uploader/upload_manager.py बनाओ
+        run: |
+          cd Workshop/Video_Generator/Management/uploader
+          cat > __init__.py << 'EOF'
+          from .drive import upload_to_drive
+          from .upload_manager import UploadManager
+          __all__ = ["upload_to_drive", "UploadManager"]
+          EOF
+
+          cat > upload_manager.py << 'EOF'
+          # Management/uploader/upload_manager.py
+          # 🎯 पुराने drive.py (story_upload) को लपेटता है
+          from .drive import upload_to_drive
+
+          class UploadManager:
+              def upload(self, file_path, custom_name=None):
+                  return upload_to_drive(file_path, custom_name)
+          EOF
+          echo "✅ uploader/upload_manager.py बन गया"
+
+      - name: 10. 🔧 Management/__init__.py बनाओ (सारे exports)
+        run: |
+          cd Workshop/Video_Generator/Management
+          cat > __init__.py << 'EOF'
+          # Management/__init__.py
+          # 🎯 सारे managers एक जगह से export
+          from .config.settings import Settings
+          from .config.paths import Paths
+          from .config.chains import Chains
+          from .auth.api_keys import APIKeys
+          from .auth.env_loader import EnvLoader
+          from .fallback.ai import AIFallback
+          from .fallback.video import VideoFallback
+          from .fallback.music import MusicFallback
+          from .fallback.photo import PhotoFallback
+          from .fallback.tts import TTSFallback
+          from .reporting.telegram import Telegram
+          from .reporting.logger import Logger
+          from .errors.handler import ErrorHandler
+          from .state.tracker import StateTracker
+          from .cleanup.cleaner import Cleaner
+          from .uploader.upload_manager import UploadManager
+
+          __all__ = [
+              "Settings", "Paths", "Chains",
+              "APIKeys", "EnvLoader",
+              "AIFallback", "VideoFallback", "MusicFallback", "PhotoFallback", "TTSFallback",
+              "Telegram", "Logger", "ErrorHandler", "StateTracker", "Cleaner",
+              "UploadManager",
+          ]
+          EOF
+          echo "✅ Management/__init__.py बन गया"
+
+      - name: 11. 📋 नया स्ट्रक्चर दिखाओ
+        run: |
+          cd Workshop/Video_Generator/Management
           echo "════════════════════════════════════════"
-          echo "📁 Video_Generator का पुराना स्ट्रक्चर:"
+          echo "📁 Management/ का पूरा स्ट्रक्चर:"
           echo "════════════════════════════════════════"
-          find Video_Generator -maxdepth 2 -type d 2>/dev/null || echo "❌ Video_Generator नहीं है"
+          find . -type f -name "*.py" | sort
           echo ""
+          echo "कुल फाइलें:"
+          find . -type f -name "*.py" | wc -l
+
+      - name: 12. 🔍 Syntax जाँच
+        run: |
+          cd Workshop/Video_Generator
+          pip install requests -q
           echo "════════════════════════════════════════"
-          echo "📄 Fetching में कितनी फाइलें:"
-          find Video_Generator/Fetching -type f -name "*.py" 2>/dev/null | wc -l
-          echo ""
-          echo "📄 Story_Generator में कितनी फाइलें:"
-          find Video_Generator/Story_Generator -type f -name "*.py" 2>/dev/null | wc -l
-          echo ""
-          echo "📄 Uploader में कितनी फाइलें:"
-          find Video_Generator/Uploader -type f -name "*.py" 2>/dev/null | wc -l
-
-      - name: 3. 🏗️ नई जगह के फोल्डर बनाओ
-        run: |
-          cd Workshop/Video_Generator
-          mkdir -p Management/fetching
-          mkdir -p Management/uploader
-          mkdir -p Management/config
-          mkdir -p Management/auth
-          mkdir -p Management/fallback
-          mkdir -p Management/reporting
-          mkdir -p Management/errors
-          mkdir -p Management/state
-          mkdir -p Management/cleanup
-          echo "✅ नई जगह बनी"
-
-      - name: 4. 🚚 Fetching को Management/fetching में ले जाओ (कोड वैसा ही)
-        run: |
-          cd Workshop/Video_Generator
-          if [ -d "Fetching" ]; then
-            echo "📦 Fetching → Management/fetching"
-            cp -r Fetching/* Management/fetching/
-            rm -rf Fetching
-            echo "✅ Fetching move हो गया"
-          else
-            echo "⚠️ Fetching पहले से नहीं है"
-          fi
-          echo "अब Management/fetching में:"
-          find Management/fetching -type f -name "*.py" | wc -l
-
-      - name: 5. 🚚 Uploader/Drive को Management/uploader में ले जाओ
-        run: |
-          cd Workshop/Video_Generator
-          if [ -f "Uploader/Drive/story_upload.py" ]; then
-            echo "📦 Uploader/Drive/story_upload.py → Management/uploader/drive.py"
-            cp Uploader/Drive/story_upload.py Management/uploader/drive.py
-            rm -rf Uploader
-            echo "✅ Uploader move हो गया"
-          else
-            echo "⚠️ Uploader/Drive/story_upload.py नहीं मिला"
-          fi
-          ls -la Management/uploader/
-
-      - name: 6. 🔧 import में सिर्फ 'Fetching' → 'Management.fetching' बदलो
-        run: |
-          cd Workshop/Video_Generator
+          echo "🔍 हर फाइल syntax check:"
           echo "════════════════════════════════════════"
-          echo "🔧 सिर्फ import line बदल रहे हैं"
-          echo "════════════════════════════════════════"
-
-          # सारी Python फाइलों में जहाँ "from Fetching." है, उसे "from Management.fetching." कर दो
-          find Management/fetching -type f -name "*.py" -exec sed -i 's/from Fetching\./from Management.fetching./g' {} +
-          find Management/fetching -type f -name "*.py" -exec sed -i 's/import Fetching\./import Management.fetching./g' {} +
-          find Management/uploader -type f -name "*.py" -exec sed -i 's/from Uploader\./from Management.uploader./g' {} +
-
-          echo "✅ import बदल गए"
-          echo ""
-          echo "🔍 जाँच — कहीं 'from Fetching.' बचा है?"
-          grep -rn "from Fetching\." Management/ 2>/dev/null || echo "✅ कोई पुराना import नहीं बचा"
-
-      - name: 7. 🔧 Story_Generator के अंदर import में बदलाव
-        run: |
-          cd Workshop/Video_Generator
-          if [ -d "Story_Generator" ]; then
-            echo "📦 Story_Generator अंदर import बदल रहे हैं"
-            # main.py में जो 'from Fetching.' है
-            if [ -f "Story_Generator/main.py" ]; then
-              sed -i 's/from Fetching\./from Management.fetching./g' Story_Generator/main.py
-              sed -i 's/from Uploader\./from Management.uploader./g' Story_Generator/main.py
-              echo "✅ main.py में import बदल गए"
-              echo ""
-              echo "🔍 main.py के पहले 30 lines:"
-              head -30 Story_Generator/main.py
+          FAIL=0
+          for f in $(find Management -name "*.py"); do
+            if python -c "import ast; ast.parse(open('$f').read())" 2>/dev/null; then
+              echo "✅ $f"
+            else
+              echo "❌ $f"
+              FAIL=1
             fi
+          done
+          if [ $FAIL -eq 0 ]; then
+            echo ""
+            echo "🎉 सभी फाइलों का syntax ठीक है"
           else
-            echo "⚠️ Story_Generator नहीं है"
+            echo "⚠️ कुछ फाइलों में गड़बड़ है"
           fi
 
-      - name: 8. 📋 पूरा नया स्ट्रक्चर दिखाओ
-        run: |
-          cd Workshop/Video_Generator
-          echo "════════════════════════════════════════"
-          echo "📁 नया स्ट्रक्चर:"
-          echo "════════════════════════════════════════"
-          find . -type d | sort
-
-      - name: 9. 💾 Commit & Push
+      - name: 13. 💾 Commit & Push
         run: |
           cd Workshop
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
           git add -A
-          git commit -m "🔄 Move Fetching/Uploader to Management/ + fix imports (no code change)" || echo "No changes"
+          git commit -m "🏗️ Add Management core (config, auth, fallback, reporting, errors, state, cleanup)" || echo "No changes"
           git push origin main || echo "Push failed"
