@@ -1,0 +1,148 @@
+name: 🧪
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
+      ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
+      TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      UMMAH_API_KEY: ${{ secrets.UMMAH_API_KEY }}
+
+    steps:
+      - name: 1. 📥 Checkout Workshop
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Workshop'
+          token: ${{ secrets.TOKEN_GITHUB }}
+
+      - name: 2. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 3. 📦 FFmpeg + Fonts
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
+          sudo fc-cache -f -v
+          ffmpeg -version | head -1
+
+      - name: 4. 📥 Python पैकेज
+        run: pip install -r Video_Generator/Story_Generator/requirements.txt
+
+      - name: 5. 🔍 संरचना जाँच (सब कुछ मौजूद है?)
+        run: |
+          cd Video_Generator
+          echo "════════════════════════════════════════"
+          echo "🔍 ज़रूरी फाइलें:"
+          echo "════════════════════════════════════════"
+          FAIL=0
+          for f in \
+            "Management/__init__.py" \
+            "Management/config/settings.py" \
+            "Management/auth/api_keys.py" \
+            "Management/fallback/ai.py" \
+            "Management/reporting/telegram.py" \
+            "Management/errors/handler.py" \
+            "Management/state/tracker.py" \
+            "Management/cleanup/cleaner.py" \
+            "Management/uploader/upload_manager.py" \
+            "Management/fetching/AI/API_fallback/ai_fallback.py" \
+            "Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py" \
+            "Story_Generator/main.py" \
+            "Story_Generator/Story_Render/__init__.py" \
+            "assets/logo.png" \
+          ; do
+            if [ -e "$f" ]; then echo "✅ $f"
+            else echo "❌ $f"; FAIL=$((FAIL+1))
+            fi
+          done
+          if [ $FAIL -gt 0 ]; then echo ""; echo "❌ $FAIL फाइलें missing"; exit 1; fi
+          echo ""
+          echo "🎉 सब कुछ जगह पर है"
+
+      - name: 6. 🔍 imports जाँच (Python में)
+        run: |
+          cd Video_Generator
+          echo "════════════════════════════════════════"
+          echo "🔍 Management import test:"
+          echo "════════════════════════════════════════"
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          try:
+              from Management import Settings, Chains, Telegram, Logger, ErrorHandler, StateTracker, Cleaner, AIFallback, VideoFallback, MusicFallback, TTSFallback, UploadManager
+              print('✅ Management/ से सारे imports सफल')
+          except Exception as e:
+              print(f'❌ Import error: {e}')
+              sys.exit(1)
+          "
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "🔍 पुरानी फाइलें import test:"
+          echo "════════════════════════════════════════"
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          try:
+              from Management.fetching.Islamic.Hadis.URL_fallback import fawaz
+              from Management.fetching.Translator.URL_fallback import mymemory
+              from Management.fetching.Intro_Outro_CTA.API_fallback import intro_AI, outro_AI, cta_AI
+              from Management.fetching.Background.Video.API_fallback import pexels, pixabay, coverr
+              from Management.fetching.Background.Video.URL_fallback import gradient
+              from Management.fetching.Background.Music.API_fallback import freesound
+              from Management.fetching.audio_TTS.API_fallback import elevenlabs
+              print('✅ सारी पुरानी फाइलें import हो गईं')
+          except Exception as e:
+              print(f'❌ Import error: {e}')
+              sys.exit(1)
+          "
+
+      - name: 7. 🎬 असली पाइपलाइन चलाओ
+        run: |
+          cd Video_Generator/Story_Generator
+          echo "════════════════════════════════════════"
+          echo "🎬 Pipeline शुरू"
+          echo "════════════════════════════════════════"
+          python main.py
+
+      - name: 8. 📤 अगर वीडियो बना — Telegram पर भेजो
+        if: always()
+        run: |
+          if [ -f "Video_Generator/Story_Generator/temp/Final_Story.mp4" ]; then
+            echo "✅ वीडियो बन गया"
+            SIZE=$(du -h Video_Generator/Story_Generator/temp/Final_Story.mp4 | cut -f1)
+            echo "📦 Size: $SIZE"
+          else
+            echo "❌ वीडियो नहीं बना"
+          fi
+
+      - name: 9. 🧹 Cleanup
+        if: always()
+        run: |
+          rm -rf Video_Generator/Story_Generator/temp 2>/dev/null || true
+          echo "🧹 साफ"
