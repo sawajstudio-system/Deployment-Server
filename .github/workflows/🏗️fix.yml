@@ -1,346 +1,87 @@
-name: 🩺 Video_Generator Health Report (Final)
+name: 🔧 Fix arabic_render.py
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'Video_Generator/**'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  health:
+  fix:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    env:
-      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
-      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
-      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
-
     steps:
       - name: 1. 📥 Checkout Workshop
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Workshop'
           token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Workshop'
 
-      - name: 2. 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: 3. 📦 Install
-        run: pip install requests Pillow
-
-      - name: 4. 🩺 Health Check + Auto Split Telegram
+      - name: 2. 🔍 पहले देखो
         run: |
-          python << 'PYEOF'
-          import os, sys, ast, requests
-          from datetime import datetime
-          from pathlib import Path
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/languages
+          echo "════════════════════════════════════════"
+          echo "🔍 पुरानी फाइल:"
+          echo "════════════════════════════════════════"
+          cat arabic_render.py
 
-          ROOT = Path("Video_Generator")
-          TG_TOKEN = os.getenv("TELEGRAM_API_REPORT_TOKEN")
-          TG_CHAT = os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
+      - name: 3. 🔧 fix करो
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/languages
+          cat > arabic_render.py << 'EOF'
+          # ══════════════════════════════════════════════════════════════════════════════
+          # 📁 FILE: Story_Render/subtitle/languages/arabic_render.py
+          # 🎯 PURPOSE: अरबी टेक्स्ट को RTL (Right-to-Left) फॉर्मेट में तैयार करना
+          # ✅ FIX: f-string में backslash वाला error हटाया गया
+          # ══════════════════════════════════════════════════════════════════════════════
+          import re
 
-          if not ROOT.exists():
-              print("❌ Video_Generator नहीं मिला")
-              sys.exit(1)
 
-          # ═══════════════════════════════════════════════════════════
-          # FULL EXPECTED STRUCTURE — जिसमें Error Guard + Reporting अलग
-          # ═══════════════════════════════════════════════════════════
-          EXPECTED = {
-              "Management": {
-                  "root": ["__init__.py", "README.md"],
-                  "config/": ["__init__.py", "settings.py", "paths.py", "chains.py"],
-                  "auth/": ["__init__.py", "api_keys.py", "env_loader.py"],
-                  "fallback/": ["__init__.py", "ai.py", "video.py", "music.py", "photo.py", "tts.py"],
-                  "reporting/": ["__init__.py", "telegram.py", "logger.py"],
-                  "errors/": ["__init__.py", "handler.py"],
-                  "state/": ["__init__.py", "tracker.py"],
-                  "cleanup/": ["__init__.py", "cleaner.py"],
-                  "uploader/": ["__init__.py", "drive.py", "upload_manager.py"],
-                  "fetching/AI/API_fallback/": [
-                      "ai_fallback.py", "gemini_AI.py", "openrouter_AI.py", "groq_AI.py",
-                      "cohere_AI.py", "nvidia_AI.py", "cloudflare_AI.py", "anges_AI.py",
-                      "magic_AI.py", "tanvo_AI.py",
-                  ],
-                  "fetching/Background/Music/": [
-                      "API_fallback/freesound.py", "URL_fallback/pixabay_music.py",
-                  ],
-                  "fetching/Background/Photo/": [
-                      "API_fallback/pexels.py", "API_fallback/pixabay.py",
-                      "URL_fallback/pollinations_AI.py",
-                  ],
-                  "fetching/Background/Video/": [
-                      "API_fallback/pexels.py", "API_fallback/pixabay.py",
-                      "API_fallback/coverr.py", "URL_fallback/gradient.py",
-                  ],
-                  "fetching/Intro_Outro_CTA/": [
-                      "API_fallback/intro_AI.py", "API_fallback/outro_AI.py",
-                      "API_fallback/cta_AI.py",
-                  ],
-                  "fetching/Islamic/": [
-                      "Dua/API_fallback/ummah.py",
-                      "Hadis/URL_fallback/fawaz.py",
-                      "Hijri_date/URL_fallback/hijri_date.py",
-                      "Quran/API_fallback/quran_foundation.py",
-                      "Quran/URL_fallback/quran.py",
-                      "Quran/URL_fallback/quran_audio.py",
-                      "Quran/URL_fallback/quran_tafsir.py",
-                  ],
-                  "fetching/Translator/": ["URL_fallback/mymemory.py"],
-                  "fetching/audio_TTS/": [
-                      "API_fallback/elevenlabs.py", "URL_fallback/edge_tts.py",
-                  ],
-              },
-              "Story_Generator": {
-                  "root": ["main.py", "main_backup.py", "requirements.txt"],
-                  "Story_Render/": ["__init__.py", "main_render.py", "render_main.py"],
-                  "Story_Render/config/": ["__init__.py", "colors.py", "screen.py", "styles.py"],
-                  "Story_Render/config/colors/": [
-                      "__init__.py", "hex_colors.py", "base_color.py",
-                      "arabic_text_color.py", "cta_text_color.py",
-                      "english_text_color.py", "highlight_color.py",
-                      "hindi_text_color.py", "intro_text_color.py", "outro_text_color.py",
-                  ],
-                  "Story_Render/config/fonts/": [
-                      "__init__.py", "arabic_fonts.py", "hindi_fonts.py",
-                      "english_fonts.py", "font_sizes.py", "margins.py",
-                  ],
-                  "Story_Render/config/sizes/": [
-                      "__init__.py", "font_sizes.py", "margins.py", "screen_size.py",
-                  ],
-                  "Story_Render/subtitle/": [
-                      "__init__.py", "ass_builder.py", "intro_builder.py",
-                      "outro_builder.py", "cta_builder.py",
-                  ],
-                  "Story_Render/subtitle/assembler/": [
-                      "__init__.py", "ass_header.py", "ass_style.py", "ass_saver.py",
-                  ],
-                  "Story_Render/subtitle/builders/": [
-                      "__init__.py", "main_sub_builder.py", "intro_sub_builder.py",
-                      "outro_sub_builder.py", "cta_sub_builder.py",
-                  ],
-                  "Story_Render/subtitle/languages/": [
-                      "__init__.py", "arabic.py", "arabic_render.py",
-                      "hindi.py", "hindi_render.py",
-                      "english.py", "english_render.py",
-                  ],
-                  "Story_Render/subtitle/timing/": [
-                      "__init__.py", "time_format.py", "word_weight.py",
-                  ],
-                  "Story_Render/tools/": [
-                      "__init__.py", "duration_checker.py", "audio_helper.py",
-                      "cta_img_drawer.py", "cta_text_placer.py", "cta_generator.py",
-                  ],
-                  "Story_Render/video_engine/": [
-                      "__init__.py", "ffmpeg_builder.py", "ffmpeg_runner.py",
-                      "ffmpeg_render.py", "video_filter.py", "audio_mixer.py",
-                      "logo_processor.py", "logo_placer.py", "logo_watermark.py",
-                  ],
-              },
-              "assets": {
-                  "root": ["logo.png"],
-                  "fonts/": [
-                      "Amiri-Regular.ttf", "Cinzel.ttf", "Eczar.ttf", "Lora.ttf",
-                      "Montserrat.ttf", "PlayfairDisplay.ttf", "ReemKufi.ttf",
-                      "RozhaOne.ttf", "Scheherazade.ttf", "YatraOne.ttf",
-                  ],
-              },
-          }
+          def build_arabic_text(text):
+              """
+              अरबी टेक्स्ट को साफ करके RTL मार्क के साथ लौटाता है।
+              """
+              if not text:
+                  return ""
 
-          # ═══════════════════════════════════════════════════════════
-          # CHECK FUNCTION
-          # ═══════════════════════════════════════════════════════════
-          def check_file(full_path, rel):
-              if not full_path.exists():
-                  return (False, "missing")
-              if full_path.stat().st_size == 0:
-                  return (False, "empty")
-              if rel.endswith(".py"):
-                  try:
-                      code = full_path.read_text(encoding="utf-8")
-                      ast.parse(code)
-                  except SyntaxError as e:
-                      return (False, f"syntax: {e.msg}")
-                  except Exception as e:
-                      return (False, f"read: {str(e)[:30]}")
-              return (True, "ok")
+              # 1. साफ-सफाई (Extra spaces/newlines हटाना)
+              clean_text = re.sub(r'\s+', ' ', str(text)).strip()
 
-          # ═══════════════════════════════════════════════════════════
-          # SCAN
-          # ═══════════════════════════════════════════════════════════
-          results = {}
-          total_ok = 0
-          total_fail = 0
-          broken = []
+              # 2. RTL + PDF मार्क लगाना
+              # ⚠️ f-string के बाहर \u202B और \u202C रखे हैं
+              RTL_MARK = "\u202B"
+              PDF_MARK = "\u202C"
 
-          for top, sections in EXPECTED.items():
-              results[top] = {}
-              for section, files in sections.items():
-                  results[top][section] = []
-                  for f in files:
-                      if section == "root":
-                          full = ROOT / top / f
-                      else:
-                          full = ROOT / top / section / f
-                      ok, reason = check_file(full, f)
-                      results[top][section].append({"name": f, "ok": ok, "reason": reason})
-                      if ok:
-                          total_ok += 1
-                      else:
-                          total_fail += 1
-                          broken.append(f"{top}/{section}{f} — {reason}")
+              return RTL_MARK + clean_text + PDF_MARK
+          EOF
+          echo "✅ arabic_render.py fix"
 
-          # ═══════════════════════════════════════════════════════════
-          # TREE BUILDER — पूरा स्ट्रक्चर, Error Guard + Reporting अलग
-          # ═══════════════════════════════════════════════════════════
-          def tree_for(top):
-              lines = []
-              data = results[top]
-              lines.append(f"├── {top}/")
+      - name: 4. 🔍 Syntax जाँच
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/languages
+          echo "════════════════════════════════════════"
+          echo "🔍 Syntax check:"
+          echo "════════════════════════════════════════"
+          if python -c "import ast; ast.parse(open('arabic_render.py').read())" 2>/dev/null; then
+            echo "✅ arabic_render.py का syntax ठीक है"
+          else
+            echo "❌ अभी भी error है"
+            python -c "import ast; ast.parse(open('arabic_render.py').read())"
+          fi
 
-              root_files = data.get("root", [])
-              if root_files:
-                  lines.append("│   │")
-                  for f in root_files:
-                      icon = "🟢" if f["ok"] else "🔴"
-                      tail = "" if f["ok"] else f"  ← {f['reason']}"
-                      lines.append(f"│   ├── {f['name']}    {icon}{tail}")
-                  lines.append("│   │")
+      - name: 5. 🔍 नया content
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/languages
+          echo "════════════════════════════════════════"
+          echo "🔍 नई फाइल:"
+          echo "════════════════════════════════════════"
+          cat arabic_render.py
 
-              sections = [k for k in data.keys() if k != "root"]
-              for si, section in enumerate(sections):
-                  files_list = data[section]
-                  ok_c = sum(1 for f in files_list if f["ok"])
-                  tot_c = len(files_list)
-                  icon = "🟢" if ok_c == tot_c else "🔴"
-
-                  # section header — अगर "reporting/" या "errors/" है तो खास
-                  if "reporting" in section:
-                      label = f"│   ├── {section}    {icon} {tot_c}   📊"
-                  elif "errors" in section:
-                      label = f"│   ├── {section}    {icon} {tot_c}   🛡️"
-                  elif section.startswith("Story_Render/"):
-                      label = f"│   │   ├── {section.replace('Story_Render/', '')}    {icon} {tot_c}"
-                  else:
-                      label = f"│   ├── {section}    {icon} {tot_c}"
-                  lines.append(label)
-
-                  for i, f in enumerate(files_list):
-                      ficon = "🟢" if f["ok"] else "🔴"
-                      tail = "" if f["ok"] else f"  ← {f['reason']}"
-                      prefix = "│   │   └──" if i == len(files_list) - 1 else "│   │   ├──"
-                      lines.append(f"{prefix} {f['name']}    {ficon}{tail}")
-
-                  if si < len(sections) - 1:
-                      lines.append("│   │")
-              return lines
-
-          # ═══════════════════════════════════════════════════════════
-          # TELEGRAM SENDER — auto split
-          # ═══════════════════════════════════════════════════════════
-          MAX_CHARS = 3800
-
-          def send_chunks(text, title):
-              if not TG_TOKEN or not TG_CHAT:
-                  print("⚠️ Telegram secrets missing")
-                  print(text)
-                  return
-
-              lines = text.split("\n")
-              chunks = []
-              current = ""
-              for line in lines:
-                  add = ("\n" if current else "") + line
-                  if len(current) + len(add) > MAX_CHARS:
-                      chunks.append(current)
-                      current = line
-                  else:
-                      current += add
-              if current:
-                  chunks.append(current)
-
-              total = len(chunks)
-              print(f"📤 Telegram: {total} हिस्से")
-
-              for i, chunk in enumerate(chunks, 1):
-                  header = f"<b>{title} ({i}/{total})</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n"
-                  body = header + chunk
-                  try:
-                      r = requests.post(
-                          f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-                          json={
-                              "chat_id": TG_CHAT,
-                              "text": body,
-                              "parse_mode": "HTML",
-                              "disable_web_page_preview": True,
-                          },
-                          timeout=15,
-                      )
-                      print(f"  ✅ Part {i}/{total}: HTTP {r.status_code}")
-                  except Exception as e:
-                      print(f"  ❌ Part {i}: {e}")
-
-          # ═══════════════════════════════════════════════════════════
-          # BUILD REPORT
-          # ═══════════════════════════════════════════════════════════
-          now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-          lines = []
-          lines.append("🎬 <b>Video_Generator — Health Report</b>")
-          lines.append(f"📅 {now}")
-          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
-          lines.append("")
-          lines.append("Video_Generator/")
-          lines.append("│")
-
-          all_tops = list(results.keys())
-          for ti, top in enumerate(all_tops):
-              lines.extend(tree_for(top))
-              if ti < len(all_tops) - 1:
-                  lines.append("│")
-              else:
-                  lines.append("")
-
-          # SUMMARY
-          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
-          lines.append("📊 <b>Summary</b>")
-          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
-          lines.append(f"कुल फाइलें: {total_ok + total_fail}")
-          lines.append(f"🟢 सही: {total_ok}")
-          lines.append(f"🔴 खराब: {total_fail}")
-          lines.append("")
-
-          # 📊 REPORTING summary — खास
-          lines.append("📊 <b>Reporting फाइलें:</b>")
-          rep = results["Management"].get("reporting/", [])
-          rep_ok = sum(1 for f in rep if f["ok"])
-          lines.append(f"  • telegram.py — {'🟢' if rep[0]['ok'] else '🔴'}")
-          lines.append(f"  • logger.py — {'🟢' if rep[1]['ok'] else '🔴'}")
-          lines.append("")
-
-          # 🛡️ ERROR GUARD summary — खास
-          lines.append("🛡️ <b>Error Guard:</b>")
-          eg = results["Management"].get("errors/", [])
-          lines.append(f"  • handler.py — {'🟢' if eg[1]['ok'] else '🔴'}")
-          lines.append("")
-
-          if broken:
-              lines.append("🔴 <b>Fix चाहिए:</b>")
-              for b in broken[:15]:
-                  lines.append(f"  • {b}")
-          else:
-              lines.append("✅ सब कुछ ठीक है")
-          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
-          lines.append("✅ Sawaj Studio Bot")
-
-          full_report = "\n".join(lines)
-          print(full_report)
-          print(f"\n🟢 {total_ok} | 🔴 {total_fail}")
-          send_chunks(full_report, "🩺 Health Report")
-          PYEOF
+      - name: 6. 💾 Commit & Push
+        run: |
+          cd Workshop
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          git add -A
+          git commit -m "🔧 Fix arabic_render.py — f-string backslash error" || echo "No changes"
+          git push origin main || echo "Push failed"
