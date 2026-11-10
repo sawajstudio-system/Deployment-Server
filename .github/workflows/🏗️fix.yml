@@ -1,87 +1,511 @@
-name: 🔧 Fix arabic_render.py
+name: 🎬 Story Generator (Live Health + Pipeline)
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  fix:
+  live_pipeline:
+    name: 🎬 Live Pipeline
     runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
+      ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
+      TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      UMMAH_API_KEY: ${{ secrets.UMMAH_API_KEY }}
+
     steps:
       - name: 1. 📥 Checkout Workshop
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Workshop'
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'Workshop'
 
-      - name: 2. 🔍 पहले देखो
+      - name: 2. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 3. 📦 FFmpeg + Fonts
         run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/languages
-          echo "════════════════════════════════════════"
-          echo "🔍 पुरानी फाइल:"
-          echo "════════════════════════════════════════"
-          cat arabic_render.py
+          sudo apt-get update -q
+          sudo apt-get install -y -q ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
+          sudo fc-cache -f -v
 
-      - name: 3. 🔧 fix करो
+      - name: 4. 📥 Python पैकेज
+        run: pip install -r Video_Generator/Story_Generator/requirements.txt
+
+      - name: 5. 🎬 Live Pipeline (Health + Steps + Report)
         run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/languages
-          cat > arabic_render.py << 'EOF'
-          # ══════════════════════════════════════════════════════════════════════════════
-          # 📁 FILE: Story_Render/subtitle/languages/arabic_render.py
-          # 🎯 PURPOSE: अरबी टेक्स्ट को RTL (Right-to-Left) फॉर्मेट में तैयार करना
-          # ✅ FIX: f-string में backslash वाला error हटाया गया
-          # ══════════════════════════════════════════════════════════════════════════════
-          import re
+          python << 'PYEOF'
+          import os
+          import sys
+          import ast
+          import subprocess
+          import requests
+          import traceback
+          from datetime import datetime
+          from pathlib import Path
 
+          ROOT = Path("Video_Generator")
+          TG_TOKEN = os.getenv("TELEGRAM_API_REPORT_TOKEN")
+          TG_CHAT = os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
 
-          def build_arabic_text(text):
+          if not ROOT.exists():
+              print("❌ Video_Generator नहीं मिला")
+              sys.exit(1)
+
+          SKIP_DIRS = {".git", "__pycache__", ".github", "node_modules", ".venv", "venv", "env", "temp", "logs", ".pytest_cache", ".mypy_cache", ".idea", ".vscode", "dist", "build"}
+          SKIP_FILES = {".DS_Store", ".gitkeep", "Thumbs.db", ".env"}
+
+          # ══════════════════════════════════════════════════════════════════
+          # STATUS MAP — हर फाइल का स्टेटस
+          # ══════════════════════════════════════════════════════════════════
+          status_map = {}  # path -> {"ok": bool, "reason": str}
+
+          def set_status(rel_path, ok, reason=""):
+              """फाइल का स्टेटस सेट करो"""
+              status_map[rel_path] = {"ok": ok, "reason": reason}
+
+          def file_ok(rel_path):
+              """फाइल सही है"""
+              set_status(rel_path, True)
+
+          def file_fail(rel_path, reason):
+              """फाइल में error"""
+              set_status(rel_path, False, reason)
+
+          # ══════════════════════════════════════════════════════════════════
+          # CHECK FUNCTION
+          # ══════════════════════════════════════════════════════════════════
+          def check_syntax(full_path, rel):
+              if not full_path.exists():
+                  return (False, "missing")
+              if full_path.stat().st_size == 0:
+                  return (False, "empty")
+              if rel.endswith(".py"):
+                  try:
+                      code = full_path.read_text(encoding="utf-8")
+                      ast.parse(code)
+                  except SyntaxError as e:
+                      return (False, f"syntax: {e.msg}")
+                  except Exception as e:
+                      return (False, f"read: {str(e)[:30]}")
+              return (True, "ok")
+
+          # ══════════════════════════════════════════════════════════════════
+          # STEP 1: INITIAL SCAN (सब files)
+          # ══════════════════════════════════════════════════════════════════
+          print("🔍 Initial scan...")
+          all_paths = []
+          for root, dirs, files in os.walk(ROOT):
+              dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+              for file in files:
+                  if file in SKIP_FILES: continue
+                  full = Path(root) / file
+                  rel = full.relative_to(ROOT)
+                  rel_str = str(rel).replace("\\", "/")
+                  all_paths.append((full, rel_str))
+                  ok, reason = check_syntax(full, rel_str)
+                  set_status(rel_str, ok, reason)
+
+          all_paths.sort(key=lambda x: x[1])
+          print(f"✅ {len(all_paths)} फाइलें scan हो गईं")
+
+          # ══════════════════════════════════════════════════════════════════
+          # TREE BUILDER
+          # ══════════════════════════════════════════════════════════════════
+          def build_tree(paths_with_status):
+              tree = {}
+              for rel_path, status in paths_with_status:
+                  parts = rel_path.split("/")
+                  current = tree
+                  for i, part in enumerate(parts):
+                      if i == len(parts) - 1:
+                          if "_files" not in current:
+                              current["_files"] = []
+                          current["_files"].append({"name": part, "ok": status["ok"], "reason": status["reason"]})
+                      else:
+                          if part not in current:
+                              current[part] = {}
+                          current = current[part]
+              return tree
+
+          def render_tree(tree, prefix="", is_root=True):
+              lines = []
+              files = tree.get("_files", [])
+              folders = [(k, v) for k, v in tree.items() if k != "_files"]
+              folders.sort(key=lambda x: x[0])
+              files.sort(key=lambda x: x["name"])
+
+              total_items = len(files) + len(folders)
+              item_idx = 0
+
+              for folder_name, subtree in folders:
+                  item_idx += 1
+                  is_last_item = (item_idx == total_items)
+
+                  sub_files = []
+                  def count_files(t):
+                      for f in t.get("_files", []):
+                          sub_files.append(f)
+                      for k, v in t.items():
+                          if k != "_files":
+                              count_files(v)
+                  count_files(subtree)
+
+                  sub_ok = sum(1 for f in sub_files if f["ok"])
+                  sub_fail = len(sub_files) - sub_ok
+                  icon = "🟢" if sub_fail == 0 else "🔴"
+
+                  marker = ""
+                  if "reporting" in folder_name.lower(): marker = "   📊"
+                  elif "error" in folder_name.lower(): marker = "   🛡️"
+
+                  connector = "└──" if is_last_item else "├──"
+                  lines.append(f"{prefix}{connector} {folder_name}/    {icon} {len(sub_files)}{marker}")
+
+                  new_prefix = prefix + ("    " if is_last_item else "│   ")
+                  lines.extend(render_tree(subtree, new_prefix, is_root=False))
+
+              for f in files:
+                  item_idx += 1
+                  is_last_item = (item_idx == total_items)
+                  icon = "🟢" if f["ok"] else "🔴"
+                  tail = "" if f["ok"] else f"  ← {f['reason']}"
+                  connector = "└──" if is_last_item else "├──"
+                  lines.append(f"{prefix}{connector} {f['name']}    {icon}{tail}")
+
+              return lines
+
+          def get_tree_text():
+              paths_with_status = [(p, status_map[p]) for _, p in all_paths if p in status_map]
+              tree = build_tree(paths_with_status)
+              lines = ["Video_Generator/"]
+              lines.extend(render_tree(tree, prefix="│ "))
+              return lines
+
+          # ══════════════════════════════════════════════════════════════════
+          # TELEGRAM SENDER
+          # ══════════════════════════════════════════════════════════════════
+          MAX_CHARS = 3800
+
+          def send_chunks(text, title):
+              if not TG_TOKEN or not TG_CHAT:
+                  print(text)
+                  return
+              lines = text.split("\n")
+              chunks = []
+              current = ""
+              for line in lines:
+                  add = ("\n" if current else "") + line
+                  if len(current) + len(add) > MAX_CHARS:
+                      chunks.append(current)
+                      current = line
+                  else:
+                      current += add
+              if current:
+                  chunks.append(current)
+              total = len(chunks)
+              for i, chunk in enumerate(chunks, 1):
+                  header = f"<b>{title} ({i}/{total})</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n"
+                  try:
+                      requests.post(
+                          f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                          json={"chat_id": TG_CHAT, "text": header + chunk, "parse_mode": "HTML", "disable_web_page_preview": True},
+                          timeout=15,
+                      )
+                  except Exception:
+                      pass
+
+          # ══════════════════════════════════════════════════════════════════
+          # PIPELINE — हर step के बाद status update
+          # ══════════════════════════════════════════════════════════════════
+          from datetime import datetime
+          now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+
+          # Telegram को शुरुआती report
+          lines = []
+          lines.append("🎬 <b>Story Pipeline Started</b>")
+          lines.append(f"📅 {now}")
+          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+          lines.extend(get_tree_text())
+          total_ok = sum(1 for v in status_map.values() if v["ok"])
+          total_fail = sum(1 for v in status_map.values() if not v["ok"])
+          lines.append("")
+          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+          lines.append("📊 <b>Initial Summary</b>")
+          lines.append(f"कुल: {total_ok + total_fail} | 🟢 {total_ok} | 🔴 {total_fail}")
+          send_chunks("\n".join(lines), "📊 Initial")
+
+          # ══════════════════════════════════════════════════════════════════
+          # हर step चलाओ और सही-गलत mark करो
+          # ══════════════════════════════════════════════════════════════════
+          sys.path.insert(0, str(ROOT / "Story_Generator"))
+          sys.path.insert(0, str(ROOT))
+
+          import importlib
+
+          def run_step(step_name, rel_paths, func):
               """
-              अरबी टेक्स्ट को साफ करके RTL मार्क के साथ लौटाता है।
+              एक step चलाओ
+              rel_paths = [जो फाइलें इस step में इस्तेमाल होंगी]
               """
-              if not text:
-                  return ""
+              print(f"\n▶️ Step: {step_name}")
+              for rp in rel_paths:
+                  try:
+                      # सिर्फ जाँच — अगर फाइल syntax सही है
+                      full = ROOT / rp
+                      ok, reason = check_syntax(full, rp)
+                      if not ok:
+                          file_fail(rp, reason)
+                          print(f"  🔴 {rp} — {reason}")
+                          return (False, None)
+                  except Exception as e:
+                      file_fail(rp, str(e)[:60])
+                      print(f"  🔴 {rp} — {e}")
+                      return (False, None)
 
-              # 1. साफ-सफाई (Extra spaces/newlines हटाना)
-              clean_text = re.sub(r'\s+', ' ', str(text)).strip()
+              try:
+                  result = func()
+                  for rp in rel_paths:
+                      file_ok(rp)
+                  print(f"  🟢 {step_name} सफल")
+                  return (True, result)
+              except Exception as e:
+                  err_msg = f"{type(e).__name__}: {str(e)[:80]}"
+                  # पता करो कौन सी फाइल में error
+                  tb = traceback.format_exc()
+                  failed_file = None
+                  for rp in rel_paths:
+                      if rp.split("/")[-1] in tb:
+                          failed_file = rp
+                          break
+                  if failed_file:
+                      file_fail(failed_file, err_msg)
+                      print(f"  🔴 {failed_file} — {err_msg}")
+                  else:
+                      for rp in rel_paths:
+                          file_fail(rp, err_msg)
+                  return (False, None)
 
-              # 2. RTL + PDF मार्क लगाना
-              # ⚠️ f-string के बाहर \u202B और \u202C रखे हैं
-              RTL_MARK = "\u202B"
-              PDF_MARK = "\u202C"
+          # ══════════════════════════════════════════════════════════════════
+          # Step 1: हदीस
+          # ══════════════════════════════════════════════════════════════════
+          hadith = None
+          def step_hadith():
+              from Management.fetching.Islamic.Hadis.URL_fallback import fawaz
+              h = fawaz.fetch()
+              if not h: raise RuntimeError("No hadith")
+              return h
 
-              return RTL_MARK + clean_text + PDF_MARK
-          EOF
-          echo "✅ arabic_render.py fix"
+          ok, result = run_step(
+              "हदीस लाना",
+              ["Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py"],
+              step_hadith,
+          )
+          if ok: hadith = result
 
-      - name: 4. 🔍 Syntax जाँच
-        run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/languages
-          echo "════════════════════════════════════════"
-          echo "🔍 Syntax check:"
-          echo "════════════════════════════════════════"
-          if python -c "import ast; ast.parse(open('arabic_render.py').read())" 2>/dev/null; then
-            echo "✅ arabic_render.py का syntax ठीक है"
-          else
-            echo "❌ अभी भी error है"
-            python -c "import ast; ast.parse(open('arabic_render.py').read())"
-          fi
+          # अगर हदीस fail तो report भेज कर रुको
+          if not ok:
+              lines = []
+              lines.append("🔴 <b>Pipeline रुक गई</b>")
+              lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+              lines.append("")
+              lines.extend(get_tree_text())
+              lines.append("")
+              lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+              lines.append("📊 <b>Final Summary</b>")
+              total_ok = sum(1 for v in status_map.values() if v["ok"])
+              total_fail = sum(1 for v in status_map.values() if not v["ok"])
+              lines.append(f"कुल: {total_ok + total_fail} | 🟢 {total_ok} | 🔴 {total_fail}")
+              broken = [(p, v) for p, v in status_map.items() if not v["ok"]]
+              if broken:
+                  lines.append("")
+                  lines.append("🔴 <b>Problems:</b>")
+                  for p, v in broken[:15]:
+                      lines.append(f"  • {p} — {v['reason']}")
+              send_chunks("\n".join(lines), "🔴 Health Report")
+              sys.exit(1)
 
-      - name: 5. 🔍 नया content
-        run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/subtitle/languages
-          echo "════════════════════════════════════════"
-          echo "🔍 नई फाइल:"
-          echo "════════════════════════════════════════"
-          cat arabic_render.py
+          # ══════════════════════════════════════════════════════════════════
+          # Step 2: AI स्क्रिप्ट
+          # ══════════════════════════════════════════════════════════════════
+          hindi_text = None
+          def step_ai():
+              from Management.fallback.ai import AIFallback
+              fb = AIFallback()
+              prompt = f"Translate to Hindi, 70-80 words.\n\nHadith: {hadith['english']}"
+              return fb.generate(prompt, max_tokens=250)
 
-      - name: 6. 💾 Commit & Push
-        run: |
-          cd Workshop
-          git config user.name "Sawaj Studio Bot"
-          git config user.email "bot@sawajstudio.com"
-          git add -A
-          git commit -m "🔧 Fix arabic_render.py — f-string backslash error" || echo "No changes"
-          git push origin main || echo "Push failed"
+          ok, result = run_step(
+              "AI स्क्रिप्ट",
+              ["Management/fallback/ai.py"],
+              step_ai,
+          )
+          if ok: hindi_text = result
+
+          # ══════════════════════════════════════════════════════════════════
+          # Step 3: Intro/Outro/CTA
+          # ══════════════════════════════════════════════════════════════════
+          intro_text = outro_text = cta_text = None
+          def step_io():
+              from Management.fetching.Intro_Outro_CTA.API_fallback import intro_AI, outro_AI, cta_AI
+              return (intro_AI.generate_intro(), outro_AI.generate_outro(), cta_AI.generate_cta())
+
+          ok, result = run_step(
+              "Intro/Outro/CTA",
+              [
+                  "Management/fetching/Intro_Outro_CTA/API_fallback/intro_AI.py",
+                  "Management/fetching/Intro_Outro_CTA/API_fallback/outro_AI.py",
+                  "Management/fetching/Intro_Outro_CTA/API_fallback/cta_AI.py",
+              ],
+              step_io,
+          )
+          if ok:
+              intro_text, outro_text, cta_text = result
+
+          # ══════════════════════════════════════════════════════════════════
+          # Step 4: TTS
+          # ══════════════════════════════════════════════════════════════════
+          voice = None
+          def step_tts():
+              from Management.fallback.tts import TTSFallback
+              fb = TTSFallback()
+              return fb.generate(f"हदीस शरीफ। {hindi_text}", "temp/voice.mp3")
+
+          ok, result = run_step(
+              "TTS आवाज़",
+              ["Management/fallback/tts.py"],
+              step_tts,
+          )
+          if ok: voice = result
+
+          # ══════════════════════════════════════════════════════════════════
+          # Step 5: Background वीडियो
+          # ══════════════════════════════════════════════════════════════════
+          bg = None
+          def step_bg():
+              from Management.fallback.video import VideoFallback
+              fb = VideoFallback()
+              return fb.fetch("islamic mosque")
+
+          ok, result = run_step(
+              "Background वीडियो",
+              ["Management/fallback/video.py"],
+              step_bg,
+          )
+          if ok: bg = result
+
+          # ══════════════════════════════════════════════════════════════════
+          # Step 6: Music
+          # ══════════════════════════════════════════════════════════════════
+          music = None
+          def step_music():
+              from Management.fallback.music import MusicFallback
+              fb = MusicFallback()
+              return fb.fetch("islamic peaceful")
+
+          ok, result = run_step(
+              "Music",
+              ["Management/fallback/music.py"],
+              step_music,
+          )
+          if ok: music = result
+
+          # ══════════════════════════════════════════════════════════════════
+          # Step 7: Render
+          # ══════════════════════════════════════════════════════════════════
+          final_video = None
+          def step_render():
+              from Story_Render import build_and_render_story
+              return build_and_render_story(
+                  bg_video=bg, music_path=music, voice_path=voice,
+                  hadith=hadith, hindi_text=hindi_text,
+                  intro_text=intro_text, outro_text=outro_text, cta_text=cta_text,
+                  output_path="temp/Final_Story.mp4",
+              )
+
+          ok, result = run_step(
+              "Render",
+              [
+                  "Story_Generator/Story_Render/main_render.py",
+                  "Story_Generator/Story_Render/subtitle/builders/main_sub_builder.py",
+                  "Story_Generator/Story_Render/subtitle/builders/intro_sub_builder.py",
+                  "Story_Generator/Story_Render/subtitle/builders/outro_sub_builder.py",
+                  "Story_Generator/Story_Render/tools/cta_generator.py",
+                  "Story_Generator/Story_Render/video_engine/ffmpeg_builder.py",
+              ],
+              step_render,
+          )
+          if ok: final_video = result
+
+          # ══════════════════════════════════════════════════════════════════
+          # Step 8: Upload
+          # ══════════════════════════════════════════════════════════════════
+          drive_link = None
+          def step_upload():
+              from Management.uploader.upload_manager import UploadManager
+              up = UploadManager()
+              return up.upload(final_video)
+
+          ok, result = run_step(
+              "Google Drive Upload",
+              ["Management/uploader/upload_manager.py", "Management/uploader/drive.py"],
+              step_upload,
+          )
+          if ok: drive_link = result
+
+          # ══════════════════════════════════════════════════════════════════
+          # FINAL REPORT
+          # ══════════════════════════════════════════════════════════════════
+          lines = []
+          lines.append("🎉 <b>Pipeline Complete</b>")
+          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+          lines.append("")
+          lines.extend(get_tree_text())
+          lines.append("")
+          lines.append("━━━━━━━━━━━━━━━━━━━━━━━")
+          lines.append("📊 <b>Final Summary</b>")
+          total_ok = sum(1 for v in status_map.values() if v["ok"])
+          total_fail = sum(1 for v in status_map.values() if not v["ok"])
+          lines.append(f"कुल: {total_ok + total_fail} | 🟢 {total_ok} | 🔴 {total_fail}")
+
+          broken = [(p, v) for p, v in status_map.items() if not v["ok"]]
+          if broken:
+              lines.append("")
+              lines.append("🔴 <b>Problems:</b>")
+              for p, v in broken[:15]:
+                  lines.append(f"  • {p} — {v['reason']}")
+          else:
+              lines.append("")
+              lines.append("✅ सब कुछ ठीक है")
+
+          if drive_link:
+              lines.append(f"\n📥 <a href='{drive_link}'>Video देखो</a>")
+
+          send_chunks("\n".join(lines), "🎉 Final Report")
+          print("✅ Done")
+          PYEOF
