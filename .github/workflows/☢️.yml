@@ -1,4 +1,4 @@
-name: 🔄Backend_Update+Reverse
+name: ☢️🔄Backend_Update+Reverse
 
 on:
   workflow_dispatch:
