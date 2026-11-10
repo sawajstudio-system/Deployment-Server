@@ -1,4 +1,4 @@
-name: 🟢update_rivers
+name: 🟢sawajstudio_update_rivers
 
 on:
   workflow_dispatch:
