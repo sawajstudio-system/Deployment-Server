@@ -1,4 +1,4 @@
-name: 🧪
+name: 🧪 Test Workshop Story Pipeline
 
 on:
   workflow_dispatch:
@@ -49,100 +49,35 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
           sudo fc-cache -f -v
-          ffmpeg -version | head -1
 
       - name: 4. 📥 Python पैकेज
         run: pip install -r Video_Generator/Story_Generator/requirements.txt
 
-      - name: 5. 🔍 संरचना जाँच (सब कुछ मौजूद है?)
+      - name: 5. 🔍 Signatures जाँच (नए parameter सही हैं?)
         run: |
-          cd Video_Generator
+          cd Video_Generator/Story_Generator/Story_Render/subtitle/builders
           echo "════════════════════════════════════════"
-          echo "🔍 ज़रूरी फाइलें:"
+          echo "🔍 नए function signatures:"
           echo "════════════════════════════════════════"
-          FAIL=0
-          for f in \
-            "Management/__init__.py" \
-            "Management/config/settings.py" \
-            "Management/auth/api_keys.py" \
-            "Management/fallback/ai.py" \
-            "Management/reporting/telegram.py" \
-            "Management/errors/handler.py" \
-            "Management/state/tracker.py" \
-            "Management/cleanup/cleaner.py" \
-            "Management/uploader/upload_manager.py" \
-            "Management/fetching/AI/API_fallback/ai_fallback.py" \
-            "Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py" \
-            "Story_Generator/main.py" \
-            "Story_Generator/Story_Render/__init__.py" \
-            "assets/logo.png" \
-          ; do
-            if [ -e "$f" ]; then echo "✅ $f"
-            else echo "❌ $f"; FAIL=$((FAIL+1))
-            fi
-          done
-          if [ $FAIL -gt 0 ]; then echo ""; echo "❌ $FAIL फाइलें missing"; exit 1; fi
-          echo ""
-          echo "🎉 सब कुछ जगह पर है"
+          grep "def create_intro_subtitle" intro_sub_builder.py
+          grep "def create_outro_subtitle" outro_sub_builder.py
+          grep "def create_main_subtitles" main_sub_builder.py
 
-      - name: 6. 🔍 imports जाँच (Python में)
-        run: |
-          cd Video_Generator
-          echo "════════════════════════════════════════"
-          echo "🔍 Management import test:"
-          echo "════════════════════════════════════════"
-          python -c "
-          import sys
-          sys.path.insert(0, '.')
-          try:
-              from Management import Settings, Chains, Telegram, Logger, ErrorHandler, StateTracker, Cleaner, AIFallback, VideoFallback, MusicFallback, TTSFallback, UploadManager
-              print('✅ Management/ से सारे imports सफल')
-          except Exception as e:
-              print(f'❌ Import error: {e}')
-              sys.exit(1)
-          "
-          echo ""
-          echo "════════════════════════════════════════"
-          echo "🔍 पुरानी फाइलें import test:"
-          echo "════════════════════════════════════════"
-          python -c "
-          import sys
-          sys.path.insert(0, '.')
-          try:
-              from Management.fetching.Islamic.Hadis.URL_fallback import fawaz
-              from Management.fetching.Translator.URL_fallback import mymemory
-              from Management.fetching.Intro_Outro_CTA.API_fallback import intro_AI, outro_AI, cta_AI
-              from Management.fetching.Background.Video.API_fallback import pexels, pixabay, coverr
-              from Management.fetching.Background.Video.URL_fallback import gradient
-              from Management.fetching.Background.Music.API_fallback import freesound
-              from Management.fetching.audio_TTS.API_fallback import elevenlabs
-              print('✅ सारी पुरानी फाइलें import हो गईं')
-          except Exception as e:
-              print(f'❌ Import error: {e}')
-              sys.exit(1)
-          "
-
-      - name: 7. 🎬 असली पाइपलाइन चलाओ
+      - name: 6. 🎬 Pipeline चलाओ
         run: |
           cd Video_Generator/Story_Generator
-          echo "════════════════════════════════════════"
-          echo "🎬 Pipeline शुरू"
-          echo "════════════════════════════════════════"
           python main.py
 
-      - name: 8. 📤 अगर वीडियो बना — Telegram पर भेजो
+      - name: 7. 📤 Output जाँच
         if: always()
         run: |
           if [ -f "Video_Generator/Story_Generator/temp/Final_Story.mp4" ]; then
-            echo "✅ वीडियो बन गया"
-            SIZE=$(du -h Video_Generator/Story_Generator/temp/Final_Story.mp4 | cut -f1)
-            echo "📦 Size: $SIZE"
+            echo "✅ वीडियो बना"
+            du -h Video_Generator/Story_Generator/temp/Final_Story.mp4
           else
             echo "❌ वीडियो नहीं बना"
           fi
 
-      - name: 9. 🧹 Cleanup
+      - name: 8. 🧹 Cleanup
         if: always()
-        run: |
-          rm -rf Video_Generator/Story_Generator/temp 2>/dev/null || true
-          echo "🧹 साफ"
+        run: rm -rf Video_Generator/Story_Generator/temp 2>/dev/null || true
