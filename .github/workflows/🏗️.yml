@@ -1,0 +1,1782 @@
+name: 🏗️ Build Video_Generator Structure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 2. 🏗️ Create Folders
+        run: |
+          mkdir -p Video_Generator/Management/config
+          mkdir -p Video_Generator/Management/auth
+          mkdir -p Video_Generator/Management/fetching/AI/API_fallback
+          mkdir -p Video_Generator/Management/fetching/Background/Music/API_fallback
+          mkdir -p Video_Generator/Management/fetching/Background/Music/URL_fallback
+          mkdir -p Video_Generator/Management/fetching/Background/Photo/API_fallback
+          mkdir -p Video_Generator/Management/fetching/Background/Photo/URL_fallback
+          mkdir -p Video_Generator/Management/fetching/Background/Video/API_fallback
+          mkdir -p Video_Generator/Management/fetching/Background/Video/URL_fallback
+          mkdir -p Video_Generator/Management/fetching/Intro_Outro_CTA/API_fallback
+          mkdir -p Video_Generator/Management/fetching/Islamic/Dua/API_fallback
+          mkdir -p Video_Generator/Management/fetching/Islamic/Hadis/URL_fallback
+          mkdir -p Video_Generator/Management/fetching/Islamic/Hijri_date/URL_fallback
+          mkdir -p Video_Generator/Management/fetching/Islamic/Quran/API_fallback
+          mkdir -p Video_Generator/Management/fetching/Islamic/Quran/URL_fallback
+          mkdir -p Video_Generator/Management/fetching/Translator/URL_fallback
+          mkdir -p Video_Generator/Management/fetching/audio_TTS/API_fallback
+          mkdir -p Video_Generator/Management/fetching/audio_TTS/URL_fallback
+          mkdir -p Video_Generator/Management/fallback
+          mkdir -p Video_Generator/Management/reporting
+          mkdir -p Video_Generator/Management/errors
+          mkdir -p Video_Generator/Management/state
+          mkdir -p Video_Generator/Management/cleanup
+          mkdir -p Video_Generator/Management/uploader
+          mkdir -p Video_Generator/Story_Generator/Story_Render/config/colors
+          mkdir -p Video_Generator/Story_Generator/Story_Render/config/fonts
+          mkdir -p Video_Generator/Story_Generator/Story_Render/config/sizes
+          mkdir -p Video_Generator/Story_Generator/Story_Render/subtitle/assembler
+          mkdir -p Video_Generator/Story_Generator/Story_Render/subtitle/builders
+          mkdir -p Video_Generator/Story_Generator/Story_Render/subtitle/languages
+          mkdir -p Video_Generator/Story_Generator/Story_Render/subtitle/timing
+          mkdir -p Video_Generator/Story_Generator/Story_Render/tools
+          mkdir -p Video_Generator/Story_Generator/Story_Render/video_engine
+          mkdir -p Video_Generator/assets/fonts
+
+      - name: 3. 📝 Write Root Files
+        run: |
+          cd Video_Generator
+
+          # Management/__init__.py
+          cat > Management/__init__.py << 'EOF'
+          from .config.settings import Settings
+          from .config.paths import Paths
+          from .config.chains import Chains
+          from .auth.api_keys import APIKeys
+          from .auth.env_loader import EnvLoader
+          from .fallback.ai import AIFallback
+          from .fallback.video import VideoFallback
+          from .fallback.music import MusicFallback
+          from .fallback.photo import PhotoFallback
+          from .fallback.tts import TTSFallback
+          from .reporting.telegram import Telegram
+          from .reporting.logger import Logger
+          from .errors.handler import ErrorHandler
+          from .state.tracker import StateTracker
+          from .cleanup.cleaner import Cleaner
+          from .uploader.drive import DriveUploader
+          from .uploader.upload_manager import UploadManager
+
+          __all__ = [
+              "Settings", "Paths", "Chains",
+              "APIKeys", "EnvLoader",
+              "AIFallback", "VideoFallback", "MusicFallback",
+              "PhotoFallback", "TTSFallback",
+              "Telegram", "Logger",
+              "ErrorHandler", "StateTracker", "Cleaner",
+              "DriveUploader", "UploadManager",
+          ]
+          EOF
+
+          # Management/README.md
+          cat > Management/README.md << 'EOF'
+          # Management — Central Control
+
+          यह फोल्डर पूरे Video_Generator का मस्तिष्क है।
+
+          | फोल्डर | काम |
+          |--------|-----|
+          | config/ | सेटिंग्स, पाथ, fallback चेन |
+          | auth/ | API Keys |
+          | fetching/ | डेटा लाना (AI, Islamic, TTS...) |
+          | fallback/ | स्मार्ट fallback चेन |
+          | reporting/ | Telegram + Logger |
+          | errors/ | Error Guard |
+          | state/ | पाइपलाइन स्टेटस |
+          | cleanup/ | temp सफाई |
+          | uploader/ | Google Drive अपलोड |
+          EOF
+
+          # Story_Generator/main.py
+          cat > Story_Generator/main.py << 'EOF'
+          #!/usr/bin/env python3
+          import os, sys
+          BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+          sys.path.insert(0, BASE)
+
+          from Management import (
+              Settings, Chains, APIKeys, Logger, Telegram,
+              ErrorHandler, StateTracker, Cleaner,
+              AIFallback, VideoFallback, MusicFallback, TTSFallback,
+              UploadManager,
+          )
+          from Management.fetching.Islamic.Hadis.URL_fallback import fawaz
+          from Management.fetching.Intro_Outro_CTA.API_fallback import intro_AI, outro_AI, cta_AI
+          from Story_Generator.Story_Render import build_and_render_story
+
+          def run():
+              settings = Settings()
+              logger = Logger(settings.LOG_FILE)
+              tg = Telegram()
+              state = StateTracker(settings.STEPS)
+              cleaner = Cleaner(settings.TEMP_DIR)
+              errors = ErrorHandler(logger, tg, state)
+              ai_fb = AIFallback()
+              video_fb = VideoFallback()
+              music_fb = MusicFallback()
+              tts_fb = TTSFallback()
+              uploader = UploadManager()
+
+              try:
+                  tg.send("🚀 Pipeline Started")
+
+                  state.start("hadith")
+                  hadith = fawaz.fetch()
+                  if not hadith: raise RuntimeError("Hadith not found")
+                  state.done("hadith")
+
+                  state.start("script")
+                  prompt = f"Translate to Hindi and add moral lesson. 70-80 words.\n\n{hadith['english']}"
+                  hindi = ai_fb.generate(prompt)
+                  state.done("script")
+
+                  state.start("intro_outro_cta")
+                  intro = intro_AI.generate_intro()
+                  outro = outro_AI.generate_outro()
+                  cta = cta_AI.generate_cta()
+                  state.done("intro_outro_cta")
+
+                  state.start("tts")
+                  voice = tts_fb.generate(f"हदीस शरीफ। {hindi}")
+                  state.done("tts")
+
+                  state.start("background")
+                  bg = video_fb.fetch("islamic mosque")
+                  state.done("background")
+
+                  state.start("music")
+                  music = music_fb.fetch("islamic peaceful")
+                  state.done("music")
+
+                  state.start("render")
+                  final = build_and_render_story(
+                      bg_video=bg, music_path=music, voice_path=voice,
+                      hadith=hadith, hindi_text=hindi,
+                      intro_text=intro, outro_text=outro, cta_text=cta,
+                      output_path="temp/Final_Story.mp4"
+                  )
+                  state.done("render")
+
+                  state.start("upload")
+                  link = uploader.upload(final)
+                  state.done("upload")
+
+                  tg.send(f"✅ Done\n{link}")
+
+              except Exception as e:
+                  errors.catch("pipeline", e)
+              finally:
+                  cleaner.clean_all()
+
+          if __name__ == "__main__":
+              run()
+          EOF
+
+          # Story_Generator/main_backup.py
+          cat > Story_Generator/main_backup.py << 'EOF'
+          # Backup of original main.py — preserve old logic
+          EOF
+
+          # Story_Generator/requirements.txt
+          cat > Story_Generator/requirements.txt << 'EOF'
+          requests
+          edge-tts
+          google-api-python-client
+          google-auth-httplib2
+          google-auth-oauthlib
+          Pillow
+          mutagen
+          EOF
+
+      - name: 4. 📝 Write Management/config Files
+        run: |
+          cd Video_Generator/Management/config
+
+          cat > __init__.py << 'EOF'
+          from .settings import Settings
+          from .paths import Paths
+          from .chains import Chains
+          __all__ = ["Settings", "Paths", "Chains"]
+          EOF
+
+          cat > settings.py << 'EOF'
+          import os
+
+          class Settings:
+              MAX_PIPELINE_TIME = 120 * 60
+              MAX_FFMPEG_TIME = 300
+              MAX_DOWNLOAD_TIME = 180
+              MIN_VIDEO_SIZE = 10000
+              MIN_AUDIO_SIZE = 1000
+              MIN_IMAGE_SIZE = 5000
+              TEMP_DIR = "temp"
+              OUTPUT_FILE = "temp/Final_Story.mp4"
+              LOG_FILE = "logs/pipeline.log"
+              STEPS = [
+                  "hadith", "script", "intro_outro_cta",
+                  "tts", "background", "music", "render", "upload"
+              ]
+          EOF
+
+          cat > paths.py << 'EOF'
+          import os
+
+          class Paths:
+              ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+              ASSETS = os.path.join(ROOT, "assets")
+              FONTS = os.path.join(ASSETS, "fonts")
+              LOGO = os.path.join(ASSETS, "logo.png")
+              TEMP = os.path.join(ROOT, "temp")
+              OUTPUT = os.path.join(TEMP, "Final_Story.mp4")
+          EOF
+
+          cat > chains.py << 'EOF'
+          class Chains:
+              AI = ["gemini", "openrouter", "groq", "cohere", "nvidia", "cloudflare", "anges"]
+              VIDEO = ["pexels", "pixabay", "coverr", "gradient"]
+              MUSIC = ["freesound", "pixabay_music"]
+              PHOTO = ["pexels", "pixabay", "pollinations_AI"]
+              TTS = ["elevenlabs", "edge_tts"]
+              TRANSLATE = ["mymemory", "ai"]
+          EOF
+
+      - name: 5. 📝 Write Management/auth Files
+        run: |
+          cd Video_Generator/Management/auth
+
+          cat > __init__.py << 'EOF'
+          from .api_keys import APIKeys
+          from .env_loader import EnvLoader
+          __all__ = ["APIKeys", "EnvLoader"]
+          EOF
+
+          cat > api_keys.py << 'EOF'
+          import os
+
+          class APIKeys:
+              KEYS = {
+                  "gemini": "GEMINI_API_KEY",
+                  "groq": "GROQ_API_KEY",
+                  "cohere": "COHERE_API_KEY",
+                  "nvidia": "NVIDIA_API_KEY",
+                  "cloudflare_id": "CLOUDFLARE_ACCOUNT_ID",
+                  "cloudflare_token": "CLOUDFLARE_API_TOKEN",
+                  "anges": "ANGES_API_KEY",
+                  "openrouter": "OPENROUTER_API_KEY",
+                  "elevenlabs": "ELEVENLABS_API_KEY",
+                  "pexels": "PEXELS_API_KEY",
+                  "pixabay": "PIXABAY_API_KEY",
+                  "coverr": "COVERR_API_KEY",
+                  "freesound": "FREESOUND_API_KEY",
+                  "ummah": "UMMAH_API_KEY",
+              }
+
+              @classmethod
+              def is_available(cls, name):
+                  env = cls.KEYS.get(name)
+                  return bool(env and os.getenv(env))
+
+              @classmethod
+              def get(cls, name):
+                  env = cls.KEYS.get(name)
+                  return os.getenv(env) if env else None
+
+              @classmethod
+              def get_available(cls):
+                  return [k for k in cls.KEYS if cls.is_available(k)]
+          EOF
+
+          cat > env_loader.py << 'EOF'
+          import os
+
+          class EnvLoader:
+              @staticmethod
+              def get(key, default=None):
+                  return os.getenv(key, default)
+
+              @staticmethod
+              def require(key):
+                  v = os.getenv(key)
+                  if not v: raise EnvironmentError(f"Missing env: {key}")
+                  return v
+
+              @staticmethod
+              def validate(keys):
+                  missing = [k for k in keys if not os.getenv(k)]
+                  return missing
+          EOF
+
+      - name: 6. 📝 Write Management/fallback Files
+        run: |
+          cd Video_Generator/Management/fallback
+
+          cat > __init__.py << 'EOF'
+          from .ai import AIFallback
+          from .video import VideoFallback
+          from .music import MusicFallback
+          from .photo import PhotoFallback
+          from .tts import TTSFallback
+          __all__ = ["AIFallback", "VideoFallback", "MusicFallback", "PhotoFallback", "TTSFallback"]
+          EOF
+
+          cat > ai.py << 'EOF'
+          import sys, os
+          BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+          AI_DIR = os.path.join(BASE, "Management", "fetching", "AI", "API_fallback")
+          if AI_DIR not in sys.path: sys.path.insert(0, AI_DIR)
+
+          class AIFallback:
+              def __init__(self):
+                  self.used = None
+                  self.failed = []
+
+              def generate(self, prompt, max_tokens=500):
+                  try:
+                      import ai_fallback
+                      res = ai_fallback.generate_text(prompt, max_tokens)
+                      if res: self.used = ai_fallback.LAST_USED_AI
+                      self.failed = ai_fallback.FAILED_AIS
+                      return res
+                  except Exception as e:
+                      print(f"[AIFallback] {e}")
+                      return None
+          EOF
+
+          cat > video.py << 'EOF'
+          import sys, os
+          BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+          V = os.path.join(BASE, "Management", "fetching", "Background", "Video")
+          for p in [os.path.join(V, "API_fallback"), os.path.join(V, "URL_fallback")]:
+              if p not in sys.path: sys.path.insert(0, p)
+
+          class VideoFallback:
+              def fetch(self, query="islamic mosque", duration=60):
+                  out = "temp/bg_video.mp4"
+                  try:
+                      from Management.fetching.Background.Video.API_fallback import pexels, pixabay, coverr
+                      from Management.fetching.Background.Video.URL_fallback import gradient
+                      for fn in [pexels.fetch, pixabay.fetch, coverr.fetch]:
+                          try:
+                              if fn(query=query, duration=duration, output_path=out): return out
+                          except: pass
+                      if gradient.fetch(duration=duration, output_path=out): return out
+                  except Exception as e:
+                      print(f"[VideoFallback] {e}")
+                  return None
+          EOF
+
+          cat > music.py << 'EOF'
+          import sys, os
+          BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+          M = os.path.join(BASE, "Management", "fetching", "Background", "Music")
+          for p in [os.path.join(M, "API_fallback"), os.path.join(M, "URL_fallback")]:
+              if p not in sys.path: sys.path.insert(0, p)
+
+          class MusicFallback:
+              def fetch(self, query="islamic peaceful", duration=60):
+                  out = "temp/music.mp3"
+                  try:
+                      from Management.fetching.Background.Music.API_fallback import freesound
+                      from Management.fetching.Background.Music.URL_fallback import pixabay_music
+                      if freesound.fetch(query=query, duration=duration, output_path=out): return out
+                      if pixabay_music.fetch(duration=duration, output_path=out): return out
+                  except Exception as e:
+                      print(f"[MusicFallback] {e}")
+                  return None
+          EOF
+
+          cat > photo.py << 'EOF'
+          class PhotoFallback:
+              def fetch(self, query="islamic", output_path="temp/bg_photo.jpg"):
+                  try:
+                      from Management.fetching.Background.Photo.API_fallback import pexels, pixabay
+                      from Management.fetching.Background.Photo.URL_fallback import pollinations_AI
+                      for fn in [pexels.fetch, pixabay.fetch]:
+                          try:
+                              if fn(query=query, output_path=output_path): return output_path
+                          except: pass
+                      if pollinations_AI.fetch(prompt=query, output_path=output_path): return output_path
+                  except Exception as e:
+                      print(f"[PhotoFallback] {e}")
+                  return None
+          EOF
+
+          cat > tts.py << 'EOF'
+          import sys, os
+          BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+          T = os.path.join(BASE, "Management", "fetching", "audio_TTS")
+          for p in [os.path.join(T, "API_fallback"), os.path.join(T, "URL_fallback")]:
+              if p not in sys.path: sys.path.insert(0, p)
+
+          class TTSFallback:
+              def generate(self, text, output_path="temp/voice.mp3"):
+                  try:
+                      from Management.fetching.audio_TTS.API_fallback import elevenlabs
+                      if elevenlabs.generate(text, output_path): return output_path
+                  except Exception as e:
+                      print(f"[TTS ElevenLabs] {e}")
+                  try:
+                      from Management.fetching.audio_TTS.URL_fallback import edge_tts
+                      if edge_tts.generate(text, output_path): return output_path
+                  except Exception as e:
+                      print(f"[TTS Edge] {e}")
+                  return None
+          EOF
+
+      - name: 7. 📝 Write Management/reporting Files
+        run: |
+          cd Video_Generator/Management/reporting
+
+          cat > __init__.py << 'EOF'
+          from .telegram import Telegram
+          from .logger import Logger
+          __all__ = ["Telegram", "Logger"]
+          EOF
+
+          cat > telegram.py << 'EOF'
+          import os, requests
+
+          class Telegram:
+              def __init__(self):
+                  self.token = os.getenv("TELEGRAM_API_REPORT_TOKEN")
+                  self.chat = os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
+
+              def send(self, text, parse_mode="HTML"):
+                  if not self.token or not self.chat: return
+                  try:
+                      requests.post(
+                          f"https://api.telegram.org/bot{self.token}/sendMessage",
+                          json={"chat_id": self.chat, "text": text[:4000], "parse_mode": parse_mode},
+                          timeout=10,
+                      )
+                  except Exception: pass
+
+              def document(self, path, caption=""):
+                  if not self.token or not self.chat or not os.path.exists(path): return
+                  try:
+                      with open(path, "rb") as f:
+                          requests.post(
+                              f"https://api.telegram.org/bot{self.token}/sendDocument",
+                              data={"chat_id": self.chat, "caption": caption[:1024]},
+                              files={"document": f}, timeout=300,
+                          )
+                  except Exception: pass
+
+              def error(self, step, error):
+                  self.send(f"❌ <b>Error in {step}</b>\n<pre>{str(error)[:1500]}</pre>")
+          EOF
+
+          cat > logger.py << 'EOF'
+          import os, logging
+          from datetime import datetime
+
+          class Logger:
+              def __init__(self, log_file="logs/pipeline.log"):
+                  os.makedirs(os.path.dirname(log_file), exist_ok=True)
+                  logging.basicConfig(
+                      filename=log_file,
+                      level=logging.INFO,
+                      format="%(asctime)s | %(levelname)s | %(message)s",
+                  )
+                  self.l = logging.getLogger("pipeline")
+
+              def info(self, m): self.l.info(m); print(f"ℹ️ {m}")
+              def warning(self, m): self.l.warning(m); print(f"⚠️ {m}")
+              def error(self, m): self.l.error(m); print(f"❌ {m}")
+              def step(self, step, status): self.l.info(f"[{step}] {status}")
+          EOF
+
+      - name: 8. 📝 Write Management/errors Files
+        run: |
+          cd Video_Generator/Management/errors
+
+          cat > __init__.py << 'EOF'
+          from .handler import ErrorHandler
+          __all__ = ["ErrorHandler"]
+          EOF
+
+          cat > handler.py << 'EOF'
+          class ErrorHandler:
+              def __init__(self, logger, telegram, state):
+                  self.logger = logger
+                  self.tg = telegram
+                  self.state = state
+
+              def catch(self, step, error):
+                  self.logger.error(f"[{step}] {error}")
+                  self.tg.error(step, error)
+                  try: self.state.fail(step, str(error))
+                  except Exception: pass
+          EOF
+
+      - name: 9. 📝 Write Management/state Files
+        run: |
+          cd Video_Generator/Management/state
+
+          cat > __init__.py << 'EOF'
+          from .tracker import StateTracker
+          __all__ = ["StateTracker"]
+          EOF
+
+          cat > tracker.py << 'EOF'
+          class StateTracker:
+              def __init__(self, steps):
+                  self.steps = {s: "pending" for s in steps}
+
+              def start(self, s):
+                  if s in self.steps: self.steps[s] = "running"
+
+              def done(self, s):
+                  if s in self.steps: self.steps[s] = "done"
+
+              def fail(self, s, error=""):
+                  if s in self.steps: self.steps[s] = f"failed: {error[:100]}"
+
+              def get_report(self):
+                  return "\n".join(f"{k}: {v}" for k, v in self.steps.items())
+          EOF
+
+      - name: 10. 📝 Write Management/cleanup Files
+        run: |
+          cd Video_Generator/Management/cleanup
+
+          cat > __init__.py << 'EOF'
+          from .cleaner import Cleaner
+          __all__ = ["Cleaner"]
+          EOF
+
+          cat > cleaner.py << 'EOF'
+          import os, shutil
+
+          class Cleaner:
+              def __init__(self, temp_dir="temp"):
+                  self.temp = temp_dir
+
+              def clean_all(self):
+                  if os.path.exists(self.temp):
+                      try: shutil.rmtree(self.temp, ignore_errors=True)
+                      except Exception: pass
+
+              def clean_file(self, path):
+                  if os.path.exists(path):
+                      try: os.remove(path)
+                      except Exception: pass
+          EOF
+
+      - name: 11. 📝 Write Management/uploader Files
+        run: |
+          cd Video_Generator/Management/uploader
+
+          cat > __init__.py << 'EOF'
+          from .drive import DriveUploader
+          from .upload_manager import UploadManager
+          __all__ = ["DriveUploader", "UploadManager"]
+          EOF
+
+          cat > drive.py << 'EOF'
+          import os, time
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          class DriveUploader:
+              def upload(self, file_path, custom_name=None):
+                  if not os.path.exists(file_path): return None
+                  cid = os.getenv("GDRIVE_CLIENT_ID")
+                  csec = os.getenv("GDRIVE_CLIENT_SECRET")
+                  rtok = os.getenv("GDRIVE_REFRESH_TOKEN")
+                  fid = os.getenv("GDRIVE_F_STORY_ID")
+                  if not all([cid, csec, rtok]): return None
+                  try:
+                      creds = Credentials(
+                          None, refresh_token=rtok, client_id=cid,
+                          client_secret=csec,
+                          token_uri="https://oauth2.googleapis.com/token",
+                      )
+                      svc = build("drive", "v3", credentials=creds, cache_discovery=False)
+                      meta = {"name": custom_name or f"Story_{int(time.time())}.mp4"}
+                      if fid: meta["parents"] = [fid]
+                      media = MediaFileUpload(file_path, mimetype="video/mp4", resumable=True)
+                      f = svc.files().create(body=meta, media_body=media, fields="id, webViewLink").execute()
+                      try:
+                          svc.permissions().create(
+                              fileId=f["id"], body={"type": "anyone", "role": "reader"}
+                          ).execute()
+                      except Exception: pass
+                      return f.get("webViewLink")
+                  except Exception as e:
+                      print(f"[DriveUploader] {e}")
+                      return None
+          EOF
+
+          cat > upload_manager.py << 'EOF'
+          from .drive import DriveUploader
+
+          class UploadManager:
+              def __init__(self):
+                  self.driver = DriveUploader()
+
+              def upload(self, file_path, custom_name=None):
+                  return self.driver.upload(file_path, custom_name)
+          EOF
+
+      - name: 12. 📝 Write Management/fetching AI Files
+        run: |
+          cd Video_Generator/Management/fetching/AI/API_fallback
+
+          cat > ai_fallback.py << 'EOF'
+          import sys, os
+          cur = os.path.dirname(os.path.abspath(__file__))
+          if cur not in sys.path: sys.path.insert(0, cur)
+
+          gemini_AI = openrouter_AI = groq_AI = cohere_AI = nvidia_AI = cloudflare_AI = anges_AI = None
+          try: import gemini_AI
+          except ImportError: pass
+          try: import openrouter_AI
+          except ImportError: pass
+          try: import groq_AI
+          except ImportError: pass
+          try: import cohere_AI
+          except ImportError: pass
+          try: import nvidia_AI
+          except ImportError: pass
+          try: import cloudflare_AI
+          except ImportError: pass
+          try: import anges_AI
+          except ImportError: pass
+
+          LAST_USED_AI = "None"
+          FAILED_AIS = []
+
+          def generate_text(prompt, max_tokens=500):
+              global LAST_USED_AI, FAILED_AIS
+              LAST_USED_AI = "None"
+              FAILED_AIS = []
+
+              for name, mod in [
+                  ("Gemini", gemini_AI), ("OpenRouter", openrouter_AI),
+                  ("Groq", groq_AI), ("Cohere", cohere_AI),
+                  ("NVIDIA", nvidia_AI), ("Cloudflare", cloudflare_AI),
+                  ("Anges", anges_AI),
+              ]:
+                  if not mod: continue
+                  try:
+                      res = mod.generate(prompt, max_tokens)
+                      if res and res.strip():
+                          LAST_USED_AI = name
+                          return res.strip()
+                  except Exception: pass
+                  FAILED_AIS.append(name)
+              return None
+          EOF
+
+          cat > gemini_AI.py << 'EOF'
+          import os, requests, random
+
+          def generate(prompt, max_tokens=500):
+              key = os.getenv("GEMINI_API_KEY")
+              if not key: return None
+              styles = ["emotional", "motivational", "calm", "storytelling", "philosophical"]
+              enhanced = f"Write in a {random.choice(styles)} tone.\n\n{prompt}"
+              url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
+              payload = {
+                  "contents": [{"parts": [{"text": enhanced}]}],
+                  "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.9},
+              }
+              try:
+                  r = requests.post(url, json=payload, timeout=30)
+                  if r.status_code == 200:
+                      return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+              except Exception: pass
+              return None
+          EOF
+
+          cat > openrouter_AI.py << 'EOF'
+          import os, requests
+
+          def generate(prompt, max_tokens=500):
+              key = os.getenv("OPENROUTER_API_KEY")
+              if not key: return None
+              headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+              payload = {"model": "openai/gpt-4o-mini", "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens}
+              try:
+                  r = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=30)
+                  if r.status_code == 200:
+                      return r.json()["choices"][0]["message"]["content"].strip()
+              except Exception: pass
+              return None
+          EOF
+
+          cat > groq_AI.py << 'EOF'
+          import os, requests
+
+          def generate(prompt, max_tokens=500):
+              key = os.getenv("GROQ_API_KEY")
+              if not key: return None
+              headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+              payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens}
+              try:
+                  r = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=30)
+                  if r.status_code == 200:
+                      return r.json()["choices"][0]["message"]["content"].strip()
+              except Exception: pass
+              return None
+          EOF
+
+          cat > cohere_AI.py << 'EOF'
+          import os, requests
+
+          def generate(prompt, max_tokens=500):
+              key = os.getenv("COHERE_API_KEY")
+              if not key: return None
+              headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+              payload = {"model": "command-a-03-2025", "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens}
+              try:
+                  r = requests.post("https://api.cohere.com/v2/chat", headers=headers, json=payload, timeout=30)
+                  if r.status_code == 200:
+                      return r.json()["message"]["content"][0]["text"].strip()
+              except Exception: pass
+              return None
+          EOF
+
+          cat > nvidia_AI.py << 'EOF'
+          import os, requests
+
+          def generate(prompt, max_tokens=500):
+              key = os.getenv("NVIDIA_API_KEY")
+              if not key: return None
+              headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+              payload = {"model": "nvidia/nemotron-3-ultra-550b-a55b", "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens}
+              try:
+                  r = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", headers=headers, json=payload, timeout=30)
+                  if r.status_code == 200:
+                      m = r.json()["choices"][0]["message"]
+                      return (m.get("content") or m.get("reasoning_content") or "").strip()
+              except Exception: pass
+              return None
+          EOF
+
+          cat > cloudflare_AI.py << 'EOF'
+          import os, requests
+
+          def generate(prompt, max_tokens=500):
+              acc = os.getenv("CLOUDFLARE_ACCOUNT_ID")
+              tok = os.getenv("CLOUDFLARE_API_TOKEN")
+              if not acc or not tok: return None
+              model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+              url = f"https://api.cloudflare.com/client/v4/accounts/{acc}/ai/run/{model}"
+              headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
+              payload = {"messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens}
+              try:
+                  r = requests.post(url, headers=headers, json=payload, timeout=30)
+                  if r.status_code == 200:
+                      return r.json().get("result", {}).get("response", "").strip()
+              except Exception: pass
+              return None
+          EOF
+
+          cat > anges_AI.py << 'EOF'
+          import os, requests
+
+          def generate(prompt, max_tokens=500):
+              key = os.getenv("ANGES_API_KEY")
+              if not key: return None
+              headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+              payload = {"model": "agnes-2.5-flash", "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens}
+              try:
+                  r = requests.post("https://apihub.agnes-ai.com/v1/chat/completions", headers=headers, json=payload, timeout=30)
+                  if r.status_code == 200:
+                      return r.json()["choices"][0]["message"]["content"].strip()
+              except Exception: pass
+              return None
+          EOF
+
+          # placeholders for magic, tanvo (image-based, not text)
+          cat > magic_AI.py << 'EOF'
+          import os, requests
+
+          def generate(prompt, max_tokens=500):
+              key = os.getenv("MAGICHOUR_API_KEY")
+              if not key: return None
+              headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+              payload = {"name": "test", "image_count": 1, "model": "z-image-turbo", "aspect_ratio": "1:1", "resolution": "640px", "style": {"prompt": prompt[:500], "tool": "ai-anime-generator"}}
+              try:
+                  r = requests.post("https://api.magichour.ai/v1/ai-image-generator", headers=headers, json=payload, timeout=30)
+                  if r.status_code in (200, 201, 202): return f"Magic ID: {r.json().get('id')}"
+              except Exception: pass
+              return None
+          EOF
+
+          cat > tanvo_AI.py << 'EOF'
+          import os, requests
+
+          def generate(prompt, max_tokens=500):
+              key = os.getenv("TANVO_API_KEY")
+              if not key: return None
+              headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+              payload = {"model": "studio-image-v1", "prompt": prompt[:500], "kind": "image", "options": {"aspect": "1:1", "resolution": "1K", "format": "PNG"}}
+              try:
+                  r = requests.post("https://tanvo.ai/api/v1/generations", headers=headers, json=payload, timeout=30)
+                  if r.status_code in (200, 201, 202): return f"Tanvo ID: {r.json().get('generation', {}).get('id')}"
+              except Exception: pass
+              return None
+          EOF
+
+      - name: 13. 📝 Write Fetching Background Files
+        run: |
+          cd Video_Generator/Management/fetching/Background
+
+          # MUSIC
+          cat > Music/API_fallback/freesound.py << 'EOF'
+          import os, subprocess, requests
+
+          def fetch(query="islamic peaceful", duration=60, output_path="temp/music.mp3"):
+              key = os.getenv("FREESOUND_API_KEY")
+              if not key: return _fallback(duration, output_path)
+              try:
+                  r = requests.get("https://freesound.org/apiv2/search/text/", params={"query": query, "token": key, "fields": "previews", "page_size": 5}, timeout=15)
+                  if r.status_code == 200:
+                      for res in r.json().get("results", []):
+                          url = res.get("previews", {}).get("preview-hq-mp3")
+                          if url:
+                              data = requests.get(url, timeout=30).content
+                              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                              with open("temp/raw.mp3", "wb") as f: f.write(data)
+                              subprocess.run(f'ffmpeg -y -stream_loop -1 -i temp/raw.mp3 -t {duration} -c:a libmp3lame {output_path}', shell=True, capture_output=True)
+                              if os.path.exists("temp/raw.mp3"): os.remove("temp/raw.mp3")
+                              return output_path
+              except Exception: pass
+              return _fallback(duration, output_path)
+
+          def _fallback(duration, output_path):
+              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+              try:
+                  subprocess.run(f'ffmpeg -y -f lavfi -i "sine=frequency=110:duration={duration}" -c:a libmp3lame {output_path}', shell=True, capture_output=True)
+                  return output_path
+              except: return None
+          EOF
+
+          cat > Music/URL_fallback/pixabay_music.py << 'EOF'
+          import os, subprocess, requests
+
+          def fetch(duration=60, output_path="temp/music.mp3"):
+              urls = ["https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3"]
+              for u in urls:
+                  try:
+                      data = requests.get(u, timeout=30).content
+                      if len(data) < 10000: continue
+                      os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                      with open("temp/raw.mp3", "wb") as f: f.write(data)
+                      subprocess.run(f'ffmpeg -y -stream_loop -1 -i temp/raw.mp3 -t {duration} -c:a libmp3lame {output_path}', shell=True, capture_output=True)
+                      if os.path.exists("temp/raw.mp3"): os.remove("temp/raw.mp3")
+                      return output_path
+                  except: pass
+              return None
+          EOF
+
+          # PHOTO
+          cat > Photo/API_fallback/pexels.py << 'EOF'
+          import os, requests
+
+          def fetch(query="islamic", output_path="temp/bg_photo.jpg"):
+              key = os.getenv("PEXELS_API_KEY")
+              if not key: return None
+              try:
+                  r = requests.get(f"https://api.pexels.com/v1/search?query={query}&orientation=portrait&per_page=1", headers={"Authorization": key}, timeout=15)
+                  if r.status_code == 200:
+                      photos = r.json().get("photos", [])
+                      if photos:
+                          url = photos[0]["src"]["original"]
+                          data = requests.get(url, timeout=30).content
+                          os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                          with open(output_path, "wb") as f: f.write(data)
+                          return output_path
+              except: pass
+              return None
+          EOF
+
+          cat > Photo/API_fallback/pixabay.py << 'EOF'
+          import os, requests
+
+          def fetch(query="islamic", output_path="temp/bg_photo.jpg"):
+              key = os.getenv("PIXABAY_API_KEY")
+              if not key: return None
+              try:
+                  r = requests.get(f"https://pixabay.com/api/?key={key}&q={query}&image_type=photo&orientation=vertical&per_page=1", timeout=15)
+                  if r.status_code == 200:
+                      hits = r.json().get("hits", [])
+                      if hits:
+                          url = hits[0].get("largeImageURL") or hits[0].get("webformatURL")
+                          data = requests.get(url, timeout=30).content
+                          os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                          with open(output_path, "wb") as f: f.write(data)
+                          return output_path
+              except: pass
+              return None
+          EOF
+
+          cat > Photo/URL_fallback/pollinations_AI.py << 'EOF'
+          import os, urllib.parse, requests
+
+          def fetch(prompt="islamic mosque", output_path="temp/bg_photo.jpg"):
+              try:
+                  url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}?width=1080&height=1920&nologo=true"
+                  r = requests.get(url, timeout=60)
+                  if r.status_code == 200 and len(r.content) > 5000:
+                      os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                      with open(output_path, "wb") as f: f.write(r.content)
+                      return output_path
+              except: pass
+              return None
+          EOF
+
+          # VIDEO
+          cat > Video/API_fallback/pexels.py << 'EOF'
+          import os, requests
+
+          def fetch(query="islamic mosque", duration=60, output_path="temp/bg_video.mp4"):
+              key = os.getenv("PEXELS_API_KEY")
+              if not key: return None
+              try:
+                  r = requests.get(f"https://api.pexels.com/videos/search?query={query}&orientation=portrait&per_page=1", headers={"Authorization": key}, timeout=15)
+                  if r.status_code == 200:
+                      vids = r.json().get("videos", [])
+                      if vids:
+                          files = vids[0].get("video_files", [])
+                          best = next((v for v in files if 720 <= v.get("width", 0) <= 1080), files[0] if files else None)
+                          if best:
+                              data = requests.get(best["link"], timeout=30).content
+                              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                              with open(output_path, "wb") as f: f.write(data)
+                              return output_path
+              except: pass
+              return None
+          EOF
+
+          cat > Video/API_fallback/pixabay.py << 'EOF'
+          import os, requests
+
+          def fetch(query="islamic mosque", duration=60, output_path="temp/bg_video.mp4"):
+              key = os.getenv("PIXABAY_API_KEY")
+              if not key: return None
+              try:
+                  r = requests.get(f"https://pixabay.com/api/videos/?key={key}&q={query}&orientation=vertical&per_page=1", timeout=15)
+                  if r.status_code == 200:
+                      hits = r.json().get("hits", [])
+                      if hits:
+                          url = hits[0].get("videos", {}).get("large", {}).get("url")
+                          if url:
+                              data = requests.get(url, timeout=30).content
+                              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                              with open(output_path, "wb") as f: f.write(data)
+                              return output_path
+              except: pass
+              return None
+          EOF
+
+          cat > Video/API_fallback/coverr.py << 'EOF'
+          import os, requests
+
+          def fetch(query="islamic", duration=60, output_path="temp/bg_video.mp4"):
+              key = os.getenv("COVERR_API_KEY")
+              if not key: return None
+              try:
+                  r = requests.get(f"https://api.coverr.co/videos?query={query}&page_size=1", headers={"Authorization": f"Bearer {key}"}, timeout=15)
+                  if r.status_code == 200:
+                      hits = r.json().get("hits", [])
+                      if hits:
+                          url = hits[0].get("urls", {}).get("mp4")
+                          if url:
+                              data = requests.get(url, timeout=30).content
+                              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                              with open(output_path, "wb") as f: f.write(data)
+                              return output_path
+              except: pass
+              return None
+          EOF
+
+          cat > Video/URL_fallback/gradient.py << 'EOF'
+          import os, subprocess, random
+
+          def fetch(duration=60, output_path="temp/bg_video.mp4"):
+              try:
+                  c0 = f"{random.randint(10,40):02x}{random.randint(10,40):02x}{random.randint(30,60):02x}"
+                  c1 = f"{random.randint(10,40):02x}{random.randint(10,40):02x}{random.randint(30,60):02x}"
+                  os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                  cmd = f'ffmpeg -y -f lavfi -i "gradients=s=1080x1920:c0=0x{c0}:c1=0x{c1}:speed=0.005" -t {duration} -c:v libx264 -preset veryfast -crf 20 {output_path}'
+                  subprocess.run(cmd, shell=True, check=True, capture_output=True)
+                  return output_path
+              except: return None
+          EOF
+
+      - name: 14. 📝 Write Intro_Outro_CTA
+        run: |
+          cd Video_Generator/Management/fetching/Intro_Outro_CTA/API_fallback
+
+          cat > intro_AI.py << 'EOF'
+          def generate_intro():
+              try:
+                  from Management.fallback.ai import AIFallback
+                  fb = AIFallback()
+                  res = fb.generate("Write a short 3-5 word intro phrase for Islamic video. Only output the phrase.", max_tokens=20)
+                  if res: return res.replace('"', '').strip()
+              except Exception: pass
+              return "Sawaj Studio Presents"
+          EOF
+
+          cat > outro_AI.py << 'EOF'
+          def generate_outro():
+              try:
+                  from Management.fallback.ai import AIFallback
+                  fb = AIFallback()
+                  res = fb.generate("Write a polite 2-4 word outro for Islamic video. Only output the phrase.", max_tokens=20)
+                  if res: return res.replace('"', '').strip()
+              except Exception: pass
+              return "JazakAllah Khair"
+          EOF
+
+          cat > cta_AI.py << 'EOF'
+          def generate_cta():
+              try:
+                  from Management.fallback.ai import AIFallback
+                  fb = AIFallback()
+                  res = fb.generate("Write a 3-5 word Call to Action for Islamic video. Only output the phrase.", max_tokens=20)
+                  if res: return res.replace('"', '').strip()
+              except Exception: pass
+              return "Follow for Daily Hadith"
+          EOF
+
+      - name: 15. 📝 Write Islamic Files
+        run: |
+          cd Video_Generator/Management/fetching/Islamic
+
+          cat > Dua/API_fallback/ummah.py << 'EOF'
+          import os, requests
+
+          def fetch():
+              try:
+                  key = os.getenv("UMMAH_API_KEY")
+                  headers = {"X-API-Key": key} if key else {}
+                  r = requests.get("https://ummahapi.com/api/duas/random", headers=headers, timeout=15)
+                  if r.status_code == 200:
+                      d = r.json().get("data", {})
+                      if d.get("arabic") and d.get("translation"):
+                          return {"arabic": d["arabic"], "english": d["translation"], "reference": d.get("reference", ""), "source": "UMMAH"}
+              except Exception: pass
+              return {
+                  "arabic": "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ",
+                  "english": "Our Lord, give us good in this world and the Hereafter.",
+                  "reference": "Surah Al-Baqarah (2:201)",
+                  "source": "Fallback",
+              }
+          EOF
+
+          cat > Hadis/URL_fallback/fawaz.py << 'EOF'
+          import random, requests
+
+          def fetch():
+              try:
+                  url = f"https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari/{random.randint(1, 7000)}.json"
+                  r = requests.get(url, timeout=15)
+                  if r.status_code == 200:
+                      hadiths = r.json().get("hadiths", [])
+                      if hadiths:
+                          return {
+                              "collection": "Sahih al-Bukhari",
+                              "number": str(hadiths[0].get("hadithnumber", "")),
+                              "english": hadiths[0].get("text", ""),
+                              "arabic": "",
+                              "source": "API",
+                          }
+              except Exception: pass
+              return {
+                  "collection": "Sahih al-Bukhari",
+                  "number": "1",
+                  "english": "The reward of deeds depends upon the intentions.",
+                  "arabic": "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ",
+                  "source": "Fallback",
+              }
+          EOF
+
+          cat > Hijri_date/URL_fallback/hijri_date.py << 'EOF'
+          import requests
+
+          def fetch():
+              try:
+                  r = requests.get("https://api.aladhan.com/v1/gToH", timeout=15)
+                  if r.status_code == 200:
+                      h = r.json().get("data", {}).get("hijri", {})
+                      return {
+                          "formatted": f"{h.get('day')} {h.get('month', {}).get('en')} {h.get('year')} AH",
+                          "source": "AlAdhan",
+                      }
+              except Exception: pass
+              return None
+          EOF
+
+          cat > Quran/API_fallback/quran_foundation.py << 'EOF'
+          import os, requests
+
+          def fetch(chapter_id=1):
+              cid = os.getenv("QF_CLIENT_ID")
+              csec = os.getenv("QF_CLIENT_SECRET")
+              if not cid or not csec: return None
+              try:
+                  t = requests.post("https://oauth2.quran.foundation/oauth2/token", auth=(cid, csec), data={"grant_type": "client_credentials", "scope": "content"}, timeout=15)
+                  if t.status_code != 200: return None
+                  at = t.json().get("access_token")
+                  r = requests.get(f"https://apis.quran.foundation/content/api/v4/chapters/{chapter_id}", headers={"x-auth-token": at, "x-client-id": cid}, timeout=15)
+                  if r.status_code == 200: return r.json().get("chapter")
+              except Exception: pass
+              return None
+          EOF
+
+          cat > Quran/URL_fallback/quran.py << 'EOF'
+          import requests
+
+          def fetch(ayah="2:255"):
+              try:
+                  r = requests.get(f"https://api.alquran.cloud/v1/ayah/{ayah}/en.asad", timeout=15)
+                  if r.status_code == 200:
+                      d = r.json().get("data", {})
+                      return {"surah": d.get("surah", {}).get("englishName", ""), "ayah": str(d.get("numberInSurah", "")), "text": d.get("text", ""), "source": "AlQuran"}
+              except Exception: pass
+              return None
+          EOF
+
+          cat > Quran/URL_fallback/quran_audio.py << 'EOF'
+          import os, requests
+
+          def fetch(surah=1, ayah=1, output_path="temp/quran_audio.mp3"):
+              try:
+                  url = f"https://everyayah.com/data/Alafasy_128kbps/{str(surah).zfill(3)}{str(ayah).zfill(3)}.mp3"
+                  r = requests.get(url, timeout=30)
+                  if r.status_code == 200 and len(r.content) > 5000:
+                      os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                      with open(output_path, "wb") as f: f.write(r.content)
+                      return output_path
+              except Exception: pass
+              return None
+          EOF
+
+          cat > Quran/URL_fallback/quran_tafsir.py << 'EOF'
+          import re, requests
+
+          def fetch(ayah="2:255"):
+              try:
+                  r = requests.get(f"https://api.quran.com/api/v4/tafsirs/169/by_ayah/{ayah}", timeout=15)
+                  if r.status_code == 200:
+                      t = r.json().get("tafsir", {}).get("text", "")
+                      if t: return {"ayah": ayah, "tafsir": re.sub("<[^<]+?>", "", t).strip(), "source": "Quran.com"}
+              except Exception: pass
+              return None
+          EOF
+
+      - name: 16. 📝 Write Translator and TTS Files
+        run: |
+          cd Video_Generator/Management/fetching
+
+          cat > Translator/URL_fallback/mymemory.py << 'EOF'
+          import requests
+
+          def translate(text, target_lang="hi"):
+              if not text or len(text.strip()) < 2: return ""
+              try:
+                  r = requests.get("https://api.mymemory.translated.net/get", params={"q": text[:500], "langpair": f"en|{target_lang}"}, timeout=15)
+                  if r.status_code == 200:
+                      t = r.json().get("responseData", {}).get("translatedText", "")
+                      if t and "MYMEMORY WARNING" not in t.upper(): return t
+              except Exception: pass
+              return ""
+          EOF
+
+          cat > audio_TTS/API_fallback/elevenlabs.py << 'EOF'
+          import os, requests
+
+          def generate(text, output_path="temp/voice.mp3"):
+              key = os.getenv("ELEVENLABS_API_KEY")
+              if not key: return None
+              headers = {"xi-api-key": key, "Content-Type": "application/json"}
+              payload = {"text": text, "model_id": "eleven_multilingual_v2", "voice_settings": {"stability": 0.42, "similarity_boost": 0.82}}
+              try:
+                  r = requests.post("https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB", headers=headers, json=payload, timeout=60)
+                  if r.status_code == 200 and len(r.content) > 1000:
+                      os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                      with open(output_path, "wb") as f: f.write(r.content)
+                      return output_path
+              except Exception: pass
+              return None
+          EOF
+
+          cat > audio_TTS/URL_fallback/edge_tts.py << 'EOF'
+          import os, subprocess
+
+          def generate(text, output_path="temp/voice_edge.mp3"):
+              try:
+                  os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                  tmp = output_path + ".txt"
+                  with open(tmp, "w", encoding="utf-8") as f: f.write(text[:900])
+                  cmd = f'edge-tts --file "{tmp}" --write-media "{output_path}" --voice hi-IN-MadhurNeural --rate=-20%'
+                  res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=180)
+                  if os.path.exists(tmp): os.remove(tmp)
+                  if res.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                      return output_path
+              except Exception: pass
+              return None
+          EOF
+
+      - name: 17. 📝 Write Story_Render Config Files
+        run: |
+          cd Video_Generator/Story_Generator/Story_Render
+
+          cat > __init__.py << 'EOF'
+          from .main_render import build_and_render_story
+          __all__ = ["build_and_render_story"]
+          EOF
+
+          cat > main_render.py << 'EOF'
+          import os
+          from .tools.audio_helper import get_audio_duration
+          from .tools.cta_generator import generate_cta_image
+          from .subtitle.builders import create_main_subtitles, create_intro_subtitle, create_outro_subtitle
+          from .video_engine import build_ffmpeg_cmd, run_ffmpeg
+          from .config import generate_ass_style_string, ARABIC_STYLE, HINDI_STYLE, ENGLISH_STYLE, INTRO_STYLE, OUTRO_STYLE
+
+          def merge_ass_files(paths, output_path):
+              header = "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+              for n, s in [("Arabic", ARABIC_STYLE), ("Hindi", HINDI_STYLE), ("English", ENGLISH_STYLE), ("Intro", INTRO_STYLE), ("Outro", OUTRO_STYLE)]:
+                  header += generate_ass_style_string(n, s) + "\n"
+              header += "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+              with open(output_path, "w", encoding="utf-8") as f:
+                  f.write(header)
+                  for p in paths:
+                      if p and os.path.exists(p):
+                          with open(p, "r", encoding="utf-8") as fp:
+                              for line in fp:
+                                  if line.startswith("Dialogue:"): f.write(line)
+              return output_path
+
+          def build_and_render_story(bg_video, music_path, voice_path, hadith, hindi_text, intro_text, outro_text, cta_text, output_path="temp/Final_Story.mp4"):
+              os.makedirs("temp", exist_ok=True)
+              duration = get_audio_duration(voice_path)
+              intro_ass = create_intro_subtitle(intro_text, duration=2.5, output_path="temp/intro.ass")
+              main_ass = create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main.ass")
+              outro_ass = create_outro_subtitle(outro_text, duration, outro_duration=3.5, output_path="temp/outro.ass")
+              cta_img = generate_cta_image(output_path="temp/cta.png")
+              master = merge_ass_files([intro_ass, main_ass, outro_ass], "temp/master.ass")
+              logo = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "assets", "logo.png")
+              cmd = build_ffmpeg_cmd(bg_video, voice_path, music_path, cta_img, logo, master, duration, output_path)
+              return output_path if run_ffmpeg(cmd) else None
+          EOF
+
+          cat > render_main.py << 'EOF'
+          from .main_render import build_and_render_story
+          __all__ = ["build_and_render_story"]
+          EOF
+
+          # CONFIG FILES
+          cd config
+
+          cat > __init__.py << 'EOF'
+          from .sizes import (ARABIC_SIZE, HINDI_SIZE, ENGLISH_SIZE, INTRO_SIZE, OUTRO_SIZE, CTA_SIZE, MARGIN_L, ARABIC_MARGIN_V, HINDI_MARGIN_V, ENGLISH_MARGIN_V, INTRO_MARGIN_V, OUTRO_MARGIN_V, CTA_MARGIN_V)
+          from .colors import BASE_COLOR
+          from .fonts import SELECTED_ARABIC, SELECTED_HINDI, SELECTED_ENGLISH
+
+          ARABIC_STYLE = {"font": SELECTED_ARABIC, "size": ARABIC_SIZE, "alignment": 1, "margin_l": MARGIN_L, "margin_v": ARABIC_MARGIN_V, "bold": -1}
+          HINDI_STYLE = {"font": SELECTED_HINDI, "size": HINDI_SIZE, "alignment": 1, "margin_l": MARGIN_L, "margin_v": HINDI_MARGIN_V, "bold": -1}
+          ENGLISH_STYLE = {"font": SELECTED_ENGLISH, "size": ENGLISH_SIZE, "alignment": 1, "margin_l": MARGIN_L, "margin_v": ENGLISH_MARGIN_V, "bold": -1}
+          INTRO_STYLE = {"font": SELECTED_ENGLISH, "size": INTRO_SIZE, "alignment": 8, "margin_v": INTRO_MARGIN_V, "bold": -1}
+          OUTRO_STYLE = {"font": SELECTED_ENGLISH, "size": OUTRO_SIZE, "alignment": 8, "margin_v": OUTRO_MARGIN_V, "bold": -1}
+          CTA_STYLE = {"font": SELECTED_ENGLISH, "size": CTA_SIZE, "alignment": 2, "margin_v": CTA_MARGIN_V, "bold": -1}
+
+          def generate_ass_style_string(name, s):
+              return f"Style: {name},{s['font']},{s['size']},{BASE_COLOR},&H000000FF&,&H00000000&,&H80000000,{s['bold']},0,0,0,100,100,0,0,1,3,2,{s['alignment']},40,40,{s['margin_v']},1"
+          EOF
+
+          cat > colors.py << 'EOF'
+          PREMIUM_COLORS = ["&H00D7FF&", "&HFFFF00&", "&H507FFF&", "&H90EE90&", "&HD670DA&", "&HEBCE87&", "&H00FFFF&", "&H00A5FF&", "&HCBC0FF&", "&HD0E040&", "&HFF00FF&", "&H00FF00&"]
+
+          def get_color_tag(i): return PREMIUM_COLORS[i % len(PREMIUM_COLORS)]
+          EOF
+
+          cat > screen.py << 'EOF'
+          PLAY_RES_X = 1080
+          PLAY_RES_Y = 1920
+          EOF
+
+          cat > styles.py << 'EOF'
+          import random
+          PLAY_RES_X = 1080
+          PLAY_RES_Y = 1920
+          ARABIC_FONTS = ["Amiri", "Reem Kufi", "Scheherazade"]
+          HINDI_FONTS = ["Yatra One", "Rozha One", "Eczar"]
+          ENGLISH_FONTS = ["Playfair Display", "Cinzel", "Montserrat", "Lora"]
+          SELECTED_ARABIC = random.choice(ARABIC_FONTS)
+          SELECTED_HINDI = random.choice(HINDI_FONTS)
+          SELECTED_ENGLISH = random.choice(ENGLISH_FONTS)
+          ARABIC_STYLE = {"font": SELECTED_ARABIC, "size": 75, "alignment": 1, "margin_l": 150, "margin_v": 760, "bold": -1}
+          HINDI_STYLE = {"font": SELECTED_HINDI, "size": 65, "alignment": 1, "margin_l": 150, "margin_v": 570, "bold": -1}
+          ENGLISH_STYLE = {"font": SELECTED_ENGLISH, "size": 52, "alignment": 1, "margin_l": 150, "margin_v": 400, "bold": -1}
+          INTRO_STYLE = {"font": SELECTED_ENGLISH, "size": 70, "alignment": 8, "margin_v": 200, "bold": -1}
+          OUTRO_STYLE = {"font": SELECTED_ENGLISH, "size": 80, "alignment": 8, "margin_v": 250, "bold": -1}
+          CTA_STYLE = {"font": SELECTED_ENGLISH, "size": 60, "alignment": 2, "margin_v": 600, "bold": -1}
+          def generate_ass_style_string(name, s):
+              return f"Style: {name},{s['font']},{s['size']},&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,{s['bold']},0,0,0,100,100,0,0,1,3,2,{s['alignment']},40,40,{s['margin_v']},1"
+          EOF
+
+          # colors/ files
+          for f in arabic_text_color:base_color:cta_text_color:english_text_color:hex_colors:highlight_color:hindi_text_color:intro_text_color:outro_text_color; do
+            echo "# color file $f.py" > colors/$f.py
+          done
+          cat > colors/__init__.py << 'EOF'
+          from .hex_colors import PREMIUM_COLORS, get_color_tag
+          from .base_color import BASE_COLOR
+          __all__ = ["PREMIUM_COLORS", "get_color_tag", "BASE_COLOR"]
+          EOF
+          cat > colors/hex_colors.py << 'EOF'
+          PREMIUM_COLORS = ["&H00D7FF&", "&HFFFF00&", "&H507FFF&", "&H90EE90&", "&HD670DA&", "&HEBCE87&", "&H00FFFF&", "&H00A5FF&", "&HCBC0FF&", "&HD0E040&", "&HFF00FF&", "&H00FF00&"]
+          def get_color_tag(i): return PREMIUM_COLORS[i % len(PREMIUM_COLORS)]
+          EOF
+          cat > colors/base_color.py << 'EOF'
+          BASE_COLOR = "&H00FFFFFF&"
+          EOF
+
+          # fonts/ files
+          cat > fonts/__init__.py << 'EOF'
+          from .arabic_fonts import SELECTED_ARABIC
+          from .hindi_fonts import SELECTED_HINDI
+          from .english_fonts import SELECTED_ENGLISH
+          __all__ = ["SELECTED_ARABIC", "SELECTED_HINDI", "SELECTED_ENGLISH"]
+          EOF
+          cat > fonts/arabic_fonts.py << 'EOF'
+          import random
+          SELECTED_ARABIC = random.choice(["Amiri", "Reem Kufi", "Scheherazade"])
+          EOF
+          cat > fonts/hindi_fonts.py << 'EOF'
+          import random
+          SELECTED_HINDI = random.choice(["Yatra One", "Rozha One", "Eczar"])
+          EOF
+          cat > fonts/english_fonts.py << 'EOF'
+          import random
+          SELECTED_ENGLISH = random.choice(["Playfair Display", "Cinzel", "Montserrat", "Lora"])
+          EOF
+          cat > fonts/font_sizes.py << 'EOF'
+          ARABIC_SIZE = 75
+          HINDI_SIZE = 65
+          ENGLISH_SIZE = 52
+          EOF
+          cat > fonts/margins.py << 'EOF'
+          ARABIC_MARGIN_V = 760
+          HINDI_MARGIN_V = 570
+          ENGLISH_MARGIN_V = 400
+          EOF
+
+          # sizes/ files
+          cat > sizes/__init__.py << 'EOF'
+          from .font_sizes import ARABIC_SIZE, HINDI_SIZE, ENGLISH_SIZE, INTRO_SIZE, OUTRO_SIZE, CTA_SIZE
+          from .margins import MARGIN_L, ARABIC_MARGIN_V, HINDI_MARGIN_V, ENGLISH_MARGIN_V, INTRO_MARGIN_V, OUTRO_MARGIN_V, CTA_MARGIN_V
+          from .screen_size import PLAY_RES_X, PLAY_RES_Y, ASPECT_RATIO
+          __all__ = ["ARABIC_SIZE", "HINDI_SIZE", "ENGLISH_SIZE", "INTRO_SIZE", "OUTRO_SIZE", "CTA_SIZE", "MARGIN_L", "ARABIC_MARGIN_V", "HINDI_MARGIN_V", "ENGLISH_MARGIN_V", "INTRO_MARGIN_V", "OUTRO_MARGIN_V", "CTA_MARGIN_V", "PLAY_RES_X", "PLAY_RES_Y", "ASPECT_RATIO"]
+          EOF
+          cat > sizes/font_sizes.py << 'EOF'
+          ARABIC_SIZE = 75
+          HINDI_SIZE = 65
+          ENGLISH_SIZE = 52
+          INTRO_SIZE = 70
+          OUTRO_SIZE = 80
+          CTA_SIZE = 60
+          EOF
+          cat > sizes/margins.py << 'EOF'
+          MARGIN_L = 150
+          ARABIC_MARGIN_V = 760
+          HINDI_MARGIN_V = 570
+          ENGLISH_MARGIN_V = 400
+          INTRO_MARGIN_V = 200
+          OUTRO_MARGIN_V = 250
+          CTA_MARGIN_V = 600
+          EOF
+          cat > sizes/screen_size.py << 'EOF'
+          PLAY_RES_X = 1080
+          PLAY_RES_Y = 1920
+          ASPECT_RATIO = "9:16"
+          EOF
+
+      - name: 18. 📝 Write Subtitle Files
+        run: |
+          cd Video_Generator/Story_Generator/Story_Render/subtitle
+
+          cat > __init__.py << 'EOF'
+          from .builders import create_main_subtitles, create_intro_subtitle, create_outro_subtitle, create_cta_subtitle
+          __all__ = ["create_main_subtitles", "create_intro_subtitle", "create_outro_subtitle", "create_cta_subtitle"]
+          EOF
+
+          cat > ass_builder.py << 'EOF'
+          from .builders.main_sub_builder import create_main_subtitles
+          __all__ = ["create_main_subtitles"]
+          EOF
+
+          cat > cta_builder.py << 'EOF'
+          from .builders.cta_sub_builder import create_cta_subtitle
+          __all__ = ["create_cta_subtitle"]
+          EOF
+
+          cat > intro_builder.py << 'EOF'
+          from .builders.intro_sub_builder import create_intro_subtitle
+          __all__ = ["create_intro_subtitle"]
+          EOF
+
+          cat > outro_builder.py << 'EOF'
+          from .builders.outro_sub_builder import create_outro_subtitle
+          __all__ = ["create_outro_subtitle"]
+          EOF
+
+          # assembler
+          cat > assembler/__init__.py << 'EOF'
+          from .ass_header import get_ass_header
+          from .ass_style import get_all_styles
+          from .ass_saver import save_ass
+          __all__ = ["get_ass_header", "get_all_styles", "save_ass"]
+          EOF
+          cat > assembler/ass_header.py << 'EOF'
+          def get_ass_header():
+              return "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n"
+          EOF
+          cat > assembler/ass_saver.py << 'EOF'
+          import os
+          def save_ass(content, path):
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              with open(path, "w", encoding="utf-8") as f: f.write(content)
+              return path
+          EOF
+          cat > assembler/ass_style.py << 'EOF'
+          from ...config import generate_ass_style_string, ARABIC_STYLE, HINDI_STYLE, ENGLISH_STYLE, INTRO_STYLE, OUTRO_STYLE, CTA_STYLE
+          def get_all_styles(include_cta=False):
+              s = "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+              for n, st in [("Arabic", ARABIC_STYLE), ("Hindi", HINDI_STYLE), ("English", ENGLISH_STYLE), ("Intro", INTRO_STYLE), ("Outro", OUTRO_STYLE)]:
+                  s += generate_ass_style_string(n, st) + "\n"
+              if include_cta: s += generate_ass_style_string("CTA", CTA_STYLE) + "\n"
+              return s
+          EOF
+
+          # builders
+          cat > builders/__init__.py << 'EOF'
+          from .main_sub_builder import create_main_subtitles
+          from .intro_sub_builder import create_intro_subtitle
+          from .outro_sub_builder import create_outro_subtitle
+          from .cta_sub_builder import create_cta_subtitle
+          __all__ = ["create_main_subtitles", "create_intro_subtitle", "create_outro_subtitle", "create_cta_subtitle"]
+          EOF
+
+          cat > builders/main_sub_builder.py << 'EOF'
+          import re
+          from ..assembler import get_ass_header, get_all_styles, save_ass
+          from ..timing import ts, compute_word_timings
+          from ...config.colors import get_color_tag
+
+          def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main.ass"):
+              ara = re.sub(r'[\n\r"]', ' ', str(hadith.get("arabic", ""))).strip()
+              hin = re.sub(r'[\n\r"]', ' ', str(hindi_text)).strip()
+              eng = re.sub(r'[\n\r"]', ' ', str(hadith.get("english", ""))).strip()
+              content = get_ass_header() + "\n[V4+ Styles]\n" + get_all_styles() + "\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              start_t = 4.0
+              end_t = max(duration - 5.5, start_t + 1.0)
+              total = end_t - start_t
+
+              def process(text, style, lang):
+                  words = text.split()
+                  if not words: return ""
+                  timings = compute_word_timings(words, total)
+                  out = ""
+                  for i in range(len(words)):
+                      ws = start_t + timings[i][0]
+                      we = start_t + timings[i][1]
+                      vis = words[max(0, i - 2):i + 1]
+                      dot_c = get_color_tag(i // 3 + lang * 3)
+                      line = f"\u202B" if lang == 0 else ""
+                      line += f"{{\\c{dot_c}}}●  "
+                      for j, w in enumerate(vis):
+                          gi = max(0, i - 2) + j
+                          c = get_color_tag(gi)
+                          line += f"{{\\c{c}\\k{int((we-ws)*100)}}}{w} " if gi == i else f"{{\\c{c}}}{w} "
+                      if lang == 0: line += "\u202C"
+                      out += f"Dialogue: 0,{ts(ws)},{ts(we)},{style},,,0,0,,{line.strip()}\n"
+                  return out
+
+              if ara: content += process(ara, "Arabic", 0)
+              if hin: content += process(hin, "Hindi", 1)
+              if eng: content += process(eng, "English", 2)
+              return save_ass(content, output_path)
+          EOF
+
+          cat > builders/intro_sub_builder.py << 'EOF'
+          from ..assembler import get_ass_header, get_all_styles, save_ass
+          from ..timing import ts
+          def create_intro_subtitle(intro_text, duration=3.5, output_path="temp/intro.ass"):
+              if not intro_text: return None
+              content = get_ass_header() + "\n[V4+ Styles]\n" + get_all_styles() + "\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              content += f"Dialogue: 0,{ts(0)},{ts(duration)},Intro,,0,0,0,,{{\\fad(1000,1000)\\blur5\\c&H00D7FF&\\3c&H000000&}}{intro_text.strip()}\n"
+              return save_ass(content, output_path)
+          EOF
+
+          cat > builders/outro_sub_builder.py << 'EOF'
+          from ..assembler import get_ass_header, get_all_styles, save_ass
+          from ..timing import ts
+          from ...config.colors import get_color_tag
+          def create_outro_subtitle(outro_text, total_duration, outro_duration=3.5, output_path="temp/outro.ass"):
+              if not outro_text: return None
+              content = get_ass_header() + "\n[V4+ Styles]\n" + get_all_styles() + "\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              st = max(0, total_duration - outro_duration)
+              content += f"Dialogue: 0,{ts(st)},{ts(total_duration)},Outro,,0,0,0,,{{\\fad(500,500)\\c{get_color_tag(1)}}}{outro_text.strip()}\n"
+              return save_ass(content, output_path)
+          EOF
+
+          cat > builders/cta_sub_builder.py << 'EOF'
+          from ..assembler import get_ass_header, get_all_styles, save_ass
+          from ..timing import ts
+          from ...config.colors import get_color_tag
+          def create_cta_subtitle(cta_text, total_duration, cta_duration=3.5, output_path="temp/cta.ass"):
+              if not cta_text: return None
+              content = get_ass_header() + "\n[V4+ Styles]\n" + get_all_styles(include_cta=True) + "\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              st = max(0, total_duration - cta_duration)
+              content += f"Dialogue: 0,{ts(st)},{ts(total_duration)},CTA,,0,0,0,,{{\\fad(500,500)\\c{get_color_tag(2)}}}● {cta_text.strip()}\n"
+              return save_ass(content, output_path)
+          EOF
+
+          # languages
+          cat > languages/__init__.py << 'EOF'
+          from .arabic_render import build_arabic_text
+          from .hindi_render import build_hindi_text
+          from .english_render import build_english_text
+          __all__ = ["build_arabic_text", "build_hindi_text", "build_english_text"]
+          EOF
+          cat > languages/arabic_render.py << 'EOF'
+          import re
+          def build_arabic_text(t):
+              if not t: return ""
+              return f"\u202B{re.sub(r'\\s+', ' ', str(t)).strip()}\u202C"
+          EOF
+          cat > languages/hindi_render.py << 'EOF'
+          import re
+          def build_hindi_text(t):
+              if not t: return ""
+              return re.sub(r'\\s+', ' ', str(t)).strip()
+          EOF
+          cat > languages/english_render.py << 'EOF'
+          import re
+          def build_english_text(t):
+              if not t: return ""
+              return re.sub(r'\\s+', ' ', str(t)).strip()
+          EOF
+          # legacy files
+          for f in arabic:english:hindi; do echo "from .${f}_render import build_${f}_text" > languages/${f}.py; done
+
+          # timing
+          cat > timing/__init__.py << 'EOF'
+          from .time_format import ts
+          from .word_weight import compute_word_timings
+          __all__ = ["ts", "compute_word_timings"]
+          EOF
+          cat > timing/time_format.py << 'EOF'
+          def ts(t):
+              h, m, s = int(t // 3600), int((t % 3600) // 60), int(t % 60)
+              ms = int(round((t - int(t)) * 100))
+              if ms == 100: ms = 99
+              return f"{h}:{m:02d}:{s:02d}.{ms:02d}"
+          EOF
+          cat > timing/word_weight.py << 'EOF'
+          def compute_word_timings(words, total):
+              if not words: return []
+              weights = [2.0 if w[-1] in '.!?।' else 1.5 if w[-1] in ',،;:' else 1.0 for w in words]
+              tw = sum(weights) or 1.0
+              tpp = total / tw
+              out, cur = [], 0.0
+              for w in weights:
+                  d = w * tpp
+                  out.append((cur, cur + d))
+                  cur += d
+              return out
+          EOF
+
+      - name: 19. 📝 Write Tools and Video Engine Files
+        run: |
+          cd Video_Generator/Story_Generator/Story_Render
+
+          # tools
+          cat > tools/__init__.py << 'EOF'
+          from .duration_checker import get_audio_duration
+          from .cta_img_drawer import draw_cta_base
+          from .cta_text_placer import place_cta_text, generate_cta_image
+          __all__ = ["get_audio_duration", "draw_cta_base", "place_cta_text", "generate_cta_image"]
+          EOF
+          cat > tools/duration_checker.py << 'EOF'
+          import subprocess, os
+          def get_audio_duration(p):
+              if not os.path.exists(p): return 15.0
+              try:
+                  r = subprocess.run(f'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "{p}"', shell=True, capture_output=True, text=True)
+                  return float(r.stdout.strip())
+              except: return 15.0
+          EOF
+          cat > tools/audio_helper.py << 'EOF'
+          from .duration_checker import get_audio_duration
+          __all__ = ["get_audio_duration"]
+          EOF
+          cat > tools/cta_img_drawer.py << 'EOF'
+          import os
+          from PIL import Image, ImageDraw
+          def draw_cta_base(path="temp/cta_base.png"):
+              img = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
+              d = ImageDraw.Draw(img)
+              d.rounded_rectangle([230, 1150, 850, 1750], radius=30, fill=(15, 15, 15, 150), outline=(255, 255, 255, 80), width=3)
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              img.save(path, "PNG")
+              return path
+          EOF
+          cat > tools/cta_text_placer.py << 'EOF'
+          import os, random
+          from PIL import Image, ImageDraw, ImageFont
+          def place_cta_text(base, path="temp/cta.png"):
+              img = Image.open(base).convert("RGBA")
+              d = ImageDraw.Draw(img)
+              try: f = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf", 65)
+              except: f = ImageFont.load_default()
+              colors = ["#FFD700", "#00FFFF", "#FF007F", "#39FF14"]
+              random.shuffle(colors)
+              d.text((540, 1250), random.choice(["Like • Share • Follow", "Support the Channel"]), font=f, fill=colors[0], anchor="mm")
+              for i, (t, y) in enumerate(zip(["LIKE", "SUBSCRIBE", "COMMENT", "SHARE"], [1340, 1445, 1550, 1655])):
+                  d.rounded_rectangle([300, y, 780, y + 90], radius=15, outline=colors[i % len(colors)], width=6)
+                  d.text((540, y + 45), t, font=f, fill=colors[i % len(colors)], anchor="mm")
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              img.save(path, "PNG")
+              return path
+          def generate_cta_image(path="temp/cta.png"):
+              return place_cta_text(draw_cta_base("temp/cta_base.png"), path)
+          EOF
+          cat > tools/cta_generator.py << 'EOF'
+          from .cta_text_placer import generate_cta_image
+          __all__ = ["generate_cta_image"]
+          EOF
+
+          # video_engine
+          cat > video_engine/__init__.py << 'EOF'
+          from .ffmpeg_builder import build_ffmpeg_cmd
+          from .ffmpeg_runner import run_ffmpeg
+          __all__ = ["build_ffmpeg_cmd", "run_ffmpeg"]
+          EOF
+
+          cat > video_engine/video_filter.py << 'EOF'
+          from .logo_processor import get_logo_filter
+          from .logo_placer import get_moving_logo_expr, get_fixed_logo_pos
+
+          def build_video_filter(has_logo, logo_idx, cta_idx, cta_start):
+              filters = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,vignette=PI/4[bg];"
+              cur = "bg"
+              if has_logo and logo_idx != -1:
+                  lm = get_logo_filter(400, 160)
+                  lf = get_logo_filter(600, 240)
+                  filters += f"[{logo_idx}:v]split[lm][lf];[lm]{lm}[lms];[lf]{lf}[lfs];"
+                  x, y = get_moving_logo_expr()
+                  filters += f"[{cur}][lms]overlay=x='{x}':y='{y}':enable='lt(t,{cta_start})'[bg1];"
+                  fx, fy = get_fixed_logo_pos()
+                  filters += f"[bg1][lfs]overlay=x='{fx}':y='{fy}':enable='gte(t,{cta_start})'[bg2];"
+                  cur = "bg2"
+              return filters, cur
+          EOF
+
+          cat > video_engine/logo_processor.py << 'EOF'
+          def get_logo_filter(w=400, h=160):
+              return f"scale={w}:{h},format=rgba,colorchannelmixer=rr=0.094:gg=0.466:bb=0.949:aa=1.0,split[lg][sh];[sh]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.9,boxblur=10:2[sb];[sb][lg]overlay=6:6"
+          EOF
+
+          cat > video_engine/logo_placer.py << 'EOF'
+          def get_moving_logo_expr():
+              return "40+abs(mod(t*150, 2*(W-w-80)) - (W-w-80))", "40+abs(mod(t*200, 2*(H-h-80)) - (H-h-80))"
+          def get_fixed_logo_pos(): return "(W-w)/2", "850"
+          EOF
+
+          cat > video_engine/logo_watermark.py << 'EOF'
+          from .logo_processor import get_logo_filter
+          __all__ = ["get_logo_filter"]
+          EOF
+
+          cat > video_engine/audio_mixer.py << 'EOF'
+          def build_audio_filter(has_music):
+              if has_music:
+                  return "[2:a]volume=0.15[bgm];[bgm][1:a]sidechaincompress=threshold=0.05:ratio=8:attack=50:release=500[db];[1:a][db]amix=inputs=2:duration=first[a_out]"
+              return "[1:a]volume=1.0[a_out]"
+          EOF
+
+          cat > video_engine/ffmpeg_builder.py << 'EOF'
+          import os
+          from .video_filter import build_video_filter
+          from .audio_mixer import build_audio_filter
+
+          def build_ffmpeg_cmd(bg_video, voice_path, music_path, cta_image_path, logo_path, master_ass_path, duration, output_path):
+              has_music = os.path.exists(music_path) and os.path.getsize(music_path) > 0
+              has_logo = os.path.exists(logo_path)
+              cmd = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", bg_video, "-i", voice_path]
+              if has_music: cmd += ["-i", music_path]
+              cmd += ["-loop", "1", "-i", cta_image_path]
+              cta_idx = 3 if has_music else 2
+              logo_idx = -1
+              if has_logo:
+                  cmd += ["-i", logo_path]
+                  logo_idx = 4 if has_music else 3
+              cta_start = max(0, duration - 5.0)
+              vf, cur = build_video_filter(has_logo, logo_idx, cta_idx, cta_start)
+              abs_ass = os.path.abspath(master_ass_path)
+              fonts = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "assets", "fonts"))
+              vf += f"[{cur}]subtitles='{abs_ass}':fontsdir='{fonts}'[vs];"
+              vf += f"[vs][{cta_idx}:v]overlay=0:0:enable='gte(t,{cta_start})'[v_out]"
+              af = build_audio_filter(has_music)
+              cmd += ["-filter_complex", f"{vf}; {af}", "-map", "[v_out]", "-map", "[a_out]", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-r", "24", "-c:a", "aac", "-b:a", "128k", "-t", f"{duration:.2f}", "-shortest", output_path]
+              return cmd
+          EOF
+
+          cat > video_engine/ffmpeg_runner.py << 'EOF'
+          import subprocess
+          def run_ffmpeg(cmd, timeout=300):
+              try:
+                  r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+                  return r.returncode == 0
+              except: return False
+          EOF
+
+          cat > video_engine/ffmpeg_render.py << 'EOF'
+          from .ffmpeg_builder import build_ffmpeg_cmd
+          from .ffmpeg_runner import run_ffmpeg
+          def render_final_video(bg_video, music_path, voice_path, master_ass_path, cta_image_path, duration, output_path="temp/Final.mp4"):
+              logo = "../assets/logo.png"
+              cmd = build_ffmpeg_cmd(bg_video, voice_path, music_path, cta_image_path, logo, master_ass_path, duration, output_path)
+              return output_path if run_ffmpeg(cmd) else None
+          EOF
+
+      - name: 20. 📝 Create .gitkeep files
+        run: |
+          find Video_Generator -type d -empty -exec touch {}/.gitkeep \;
+
+      - name: 21. 💾 Commit and Push
+        run: |
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          git add Video_Generator/
+          git commit -m "🏗️ Full Video_Generator structure with all code" || echo "No changes"
+          git push origin HEAD:${{ github.ref_name }} || echo "Push failed"
