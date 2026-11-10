@@ -1,21 +1,21 @@
-name: 🛡️Reverse System (Backend to Workshop)
+name: 🔄 Mast
 
 on:
   workflow_dispatch:
     inputs:
-      confirm_delete:
-        description: '⚠️ WARNING: Workshop ka pura code delete hokar Backend ka code aayega. Kya aap sure hain?'
+      action:
+        description: 'क्या करना है? (What to do?)'
         type: choice
-        default: 'No'
+        default: 'Backend Update'
         options:
-          - 'No'
-          - 'Yes, Delete Workshop & Copy Backend'
+          - 'Backend Update'         # Workshop से Backend में कोड भेजेगा
+          - 'Workshop Reverse'       # Workshop का कोड डिलीट करके Backend का कोड लाएगा
 
 permissions:
   contents: write
 
 jobs:
-  reverse_workshop_from_backend:
+  sync_process:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -25,40 +25,57 @@ jobs:
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
 
     steps:
-      - name: 1. 📥 Checkout Workshop (जिसे पूरी तरह साफ करना है)
+      # ─────────────────────────────────────────────────────────────
+      # STEP 1: CHECKOUT (दोनों रेपोज को एक साथ लोड करना)
+      # ─────────────────────────────────────────────────────────────
+      - name: 1. 📥 Checkout Workshop
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Workshop'
           token: ${{ secrets.TOKEN_GITHUB }}
           path: 'Workshop'
 
-      - name: 2. 📥 Checkout Backend (जिसका कोड वापस लाना है)
+      - name: 2. 📥 Checkout Backend
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Backend'
           token: ${{ secrets.TOKEN_GITHUB }}
           path: 'Backend'
 
-      - name: 3. 🚨 WIPE & REPLACE (Workshop को खाली करके Backend का कोड डालना)
-        if: ${{ inputs.confirm_delete == 'Yes, Delete Workshop & Copy Backend' }}
+      # ─────────────────────────────────────────────────────────────
+      # STEP 3A: BACKEND UPDATE (Workshop ➡️ Backend)
+      # ─────────────────────────────────────────────────────────────
+      - name: 3A. 🚀 Update Backend (Workshop ➡️ Backend)
+        if: ${{ inputs.action == 'Backend Update' }}
         run: |
-          echo "🚨 WARNING: Deleting all files inside Workshop/Video_Generator/..."
+          echo "🚀 Syncing Workshop code to Backend..."
+          rsync -av --delete --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='temp/' Workshop/Video_Generator/ Backend/Video_Generator/
           
-          # चरण 1: Workshop के Video_Generator फोल्डर को पूरी तरह खाली (Delete) कर दो
+          cd Backend
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          
+          if git diff-index --quiet HEAD && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+            echo "STATUS=No Changes (Already in sync)" >> $GITHUB_ENV
+          else
+            git add Video_Generator/
+            git commit -m "🚀 Production Update: Synced from Workshop"
+            git push origin main
+            echo "STATUS=Success! Backend Updated." >> $GITHUB_ENV
+          fi
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 3B: WORKSHOP REVERSE (Backend ➡️ Workshop)
+      # ─────────────────────────────────────────────────────────────
+      - name: 3B. 🛡️ Reverse Workshop (Backend ➡️ Workshop)
+        if: ${{ inputs.action == 'Workshop Reverse' }}
+        run: |
+          echo "🚨 Deleting all files inside Workshop/Video_Generator/..."
           rm -rf Workshop/Video_Generator/*
           
-          echo "✅ Workshop/Video_Generator/ is now empty."
           echo "🚀 Copying fresh code from Backend..."
-
-          # चरण 2: Backend के Video_Generator का सारा कोड Workshop में कॉपी करो
-          # हमने --delete नहीं लगाया क्योंकि हमने पहले ही rm -rf से सब डिलीट कर दिया है
           rsync -av --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='temp/' Backend/Video_Generator/ Workshop/Video_Generator/
           
-          echo "✅ Replacement Complete."
-
-      - name: 4. 💾 Commit & Force Push to Workshop
-        if: ${{ inputs.confirm_delete == 'Yes, Delete Workshop & Copy Backend' }}
-        run: |
           cd Workshop
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
@@ -66,28 +83,34 @@ jobs:
           git add Video_Generator/
           
           if git diff-index --quiet HEAD; then
-            echo "⚠️ No changes to restore. Workshop is already identical to Backend."
-            echo "REVERSE_STATUS=No Changes Needed" >> $GITHUB_ENV
+            echo "STATUS=No Changes (Workshop already identical to Backend)" >> $GITHUB_ENV
           else
-            # जब हम बहुत सारी फाइलें डिलीट करते हैं, तो एक बड़ा कमिट बनता है
-            git commit -m "🛡️ Total Reverse: Workshop Video_Generator wiped and replaced with Backend code"
+            git commit -m "🛡️ Workshop Restored: Wiped & Replaced with Backend code"
             git push origin main
-            echo "REVERSE_STATUS=Success (Workshop Overwritten)" >> $GITHUB_ENV
+            echo "STATUS=Success! Workshop Restored from Backend." >> $GITHUB_ENV
           fi
 
-      - name: 5. 📤 Send Telegram Report
+      # ─────────────────────────────────────────────────────────────
+      # STEP 4: TELEGRAM REPORT
+      # ─────────────────────────────────────────────────────────────
+      - name: 4. 📤 Send Telegram Report
         if: always()
         run: |
-          if [ "${{ inputs.confirm_delete }}" = "No" ]; then
-            MSG="🛡️ Reverse Cancelled. No changes made to Workshop."
+          ACTION="${{ inputs.action }}"
+          STATUS="${STATUS:-Failed or Cancelled}"
+          
+          if [ "$ACTION" = "Backend Update" ]; then
+            MSG="🚀 *Backend Update Process*
+            📁 Folder: Video_Generator
+            📊 Status: ${STATUS}"
           else
-            STATUS="${REVERSE_STATUS:-Failed}"
-            MSG="🛡️ REVERSE SYSTEM COMPLETED
-            📁 Action: Deleted all files in Workshop/Video_Generator
-            📥 Action: Copied all files from Backend
-            📊 Status: $STATUS"
+            MSG="🛡️ *Workshop Reverse Process*
+            🗑️ Action: Workshop code deleted
+            📥 Action: Backend code copied
+            📊 Status: ${STATUS}"
           fi
           
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
-            --data-urlencode "text=${MSG}" || true
+            --data-urlencode "text=${MSG}" \
+            -d "parse_mode=Markdown" || true
