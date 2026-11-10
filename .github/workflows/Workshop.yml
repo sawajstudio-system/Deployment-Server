@@ -1,4 +1,4 @@
-name: 🧪 Workshop Story Generator demo
+name: 🧪Workshop
 
 on:
   workflow_dispatch:
