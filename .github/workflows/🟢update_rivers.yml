@@ -1,4 +1,4 @@
-name: ♻️🚯
+name: 🟢update_rivers
 
 on:
   workflow_dispatch:
