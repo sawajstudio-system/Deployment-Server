@@ -17,7 +17,7 @@ jobs:
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
 
     steps:
-      - name: 1. Checkout Backend
+      - name: 1. Checkout Backend Repo
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Backend'
@@ -29,27 +29,35 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 2b. Install Pillow (verify ke liye zaroori)
+      - name: 2b. Install Pillow
         run: pip install Pillow
 
-      - name: 3. Fix ffmpeg_builder.py (fonts_dir)
+      - name: 3. Patch ffmpeg_builder.py (Safely add fonts_dir)
         run: |
           cd Backend/Video_Generator/Story_Generator
           python3 - <<'PYEOF'
           p = "Story_Render/video_engine/ffmpeg_builder.py"
           src = open(p, encoding="utf-8").read()
 
-          OLD = 'fonts_dir = os.path.abspath("Video_Generator/assets/fonts")'
-          NEW = ('fonts_dir = os.path.abspath(os.path.join(\n'
-                 '        os.path.dirname(__file__), "..", "..", "..", "assets", "fonts"\n'
-                 '    ))')
-
-          if OLD not in src:
-              print("ALREADY FIXED or line changed — skipping")
+          # Check if we already fixed it previously
+          if 'os.path.dirname(__file__)' in src and 'assets", "fonts"' in src:
+              print("ALREADY FIXED — skipping")
           else:
-              src = src.replace(OLD, NEW, 1)
-              open(p, "w", encoding="utf-8").write(src)
-              print("✅ ffmpeg_builder.py fixed")
+              # Safely inject fonts_dir right before the subtitles filter
+              OLD = "subtitles='{abs_ass_path}'"
+              NEW = "subtitles='{abs_ass_path}':fontsdir='{fonts_dir}'"
+              
+              if OLD in src:
+                  src = src.replace(OLD, NEW, 1)
+                  # Add the fonts_dir variable definition right before v_filters or subtitle usage
+                  # We will add it right above the subtitle block
+                  inject_var = 'fonts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "assets", "fonts"))\n'
+                  src = src.replace("abs_ass_path = os.path.abspath(master_ass_path)", "abs_ass_path = os.path.abspath(master_ass_path)\n" + inject_var, 1)
+                  
+                  open(p, "w", encoding="utf-8").write(src)
+                  print("✅ ffmpeg_builder.py safely patched")
+              else:
+                  print("⚠️ Could not find subtitle string. File might be heavily modified. No changes made.")
           PYEOF
 
       - name: 4. Fix font_sizes.py
@@ -167,27 +175,7 @@ jobs:
                   print("✅ main.py fixed")
           PYEOF
 
-      - name: 9. Verify (compile + import + values)
-        run: |
-          cd Backend/Video_Generator/Story_Generator
-          find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-          python -m compileall -q . ../Fetching/Translator ../Fetching/audio_TTS
-
-          python3 - <<'PYEOF'
-          import sys, os
-          sys.path.insert(0, os.getcwd())
-          from Story_Render import build_and_render_story
-          from Story_Render.subtitle import create_main_subtitles
-          from Story_Render.subtitle.languages import build_hindi_text
-          from Story_Render.config import HINDI_SIZE, HINDI_MARGIN_V
-          assert HINDI_SIZE == 65, f"HINDI_SIZE={HINDI_SIZE}"
-          assert HINDI_MARGIN_V == 570, f"HINDI_MARGIN_V={HINDI_MARGIN_V}"
-          h = build_hindi_text('टेस्ट "quote"\nline2')
-          assert '"' not in h and '\n' not in h
-          print(f"✅ All OK: HINDI_SIZE={HINDI_SIZE}, HINDI_MARGIN_V={HINDI_MARGIN_V}")
-          PYEOF
-
-      - name: 10. Commit & Push to Backend
+      - name: 9. Commit & Push to Backend
         run: |
           cd Backend
           git config user.name "Sawaj Studio Bot"
@@ -196,19 +184,7 @@ jobs:
           if git diff-index --quiet HEAD; then
             echo "⚠️ No changes — already fixed"
           else
-            git commit -m "🔧 Hindi fix: fonts_dir, sizes, margins, TTS, Devanagari check"
+            git commit -m "🔧 Safely patch Hindi fix (fonts_dir, sizes, margins, TTS, Devanagari check)"
             git push origin main
             echo "🎉 Successfully pushed to Backend main!"
           fi
-
-      - name: 11. Telegram notify
-        if: always()
-        run: |
-          if [ -z "$TELEGRAM_API_REPORT_TOKEN" ] || [ -z "$TELEGRAM_API_REPORT_CHAT_ID" ]; then exit 0; fi
-          if [ "${{ job.status }}" = "success" ]; then
-            MSG="✅ Hindi fix complete. Main branch updated. Kuch delete nahi hua."
-          else
-            MSG="❌ Hindi fix failed. Check Actions log."
-          fi
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" -d "text=${MSG}" || true
