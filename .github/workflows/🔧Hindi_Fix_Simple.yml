@@ -22,6 +22,7 @@ jobs:
         with:
           repository: 'sawajstudio-system/Backend'
           token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Backend'
 
       - name: 2. Setup Python
         uses: actions/setup-python@v5
@@ -33,7 +34,7 @@ jobs:
 
       - name: 3. Fix ffmpeg_builder.py (fonts_dir)
         run: |
-          cd Video_Generator/Story_Generator
+          cd Backend/Video_Generator/Story_Generator
           python3 - <<'PYEOF'
           p = "Story_Render/video_engine/ffmpeg_builder.py"
           src = open(p, encoding="utf-8").read()
@@ -53,7 +54,7 @@ jobs:
 
       - name: 4. Fix font_sizes.py
         run: |
-          cd Video_Generator/Story_Generator
+          cd Backend/Video_Generator/Story_Generator
           cat > Story_Render/config/sizes/font_sizes.py <<'EOF'
           ARABIC_SIZE  = 75
           HINDI_SIZE   = 65
@@ -66,7 +67,7 @@ jobs:
 
       - name: 5. Fix margins.py
         run: |
-          cd Video_Generator/Story_Generator
+          cd Backend/Video_Generator/Story_Generator
           cat > Story_Render/config/sizes/margins.py <<'EOF'
           MARGIN_L = 150
 
@@ -82,7 +83,7 @@ jobs:
 
       - name: 6. Fix mymemory.py (return empty on fail)
         run: |
-          cd Video_Generator
+          cd Backend/Video_Generator
           python3 - <<'PYEOF'
           p = "Fetching/Translator/URL_fallback/mymemory.py"
           src = open(p, encoding="utf-8").read()
@@ -101,7 +102,7 @@ jobs:
 
       - name: 7. Fix edge_tts.py (safer rate + timeout)
         run: |
-          cd Video_Generator
+          cd Backend/Video_Generator
           cat > Fetching/audio_TTS/URL_fallback/edge_tts.py <<'EOF'
           import os
           import subprocess
@@ -139,7 +140,7 @@ jobs:
 
       - name: 8. Fix main.py (Devanagari check)
         run: |
-          cd Video_Generator/Story_Generator
+          cd Backend/Video_Generator/Story_Generator
           python3 - <<'PYEOF'
           p = "main.py"
           src = open(p, encoding="utf-8").read()
@@ -168,7 +169,7 @@ jobs:
 
       - name: 9. Verify (compile + import + values)
         run: |
-          cd Video_Generator/Story_Generator
+          cd Backend/Video_Generator/Story_Generator
           find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
           python -m compileall -q . ../Fetching/Translator ../Fetching/audio_TTS
 
@@ -186,9 +187,9 @@ jobs:
           print(f"✅ All OK: HINDI_SIZE={HINDI_SIZE}, HINDI_MARGIN_V={HINDI_MARGIN_V}")
           PYEOF
 
-      - name: 10. Commit & Push (main only)
+      - name: 10. Commit & Push to Backend
         run: |
-          cd ../..
+          cd Backend
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
           git add -A
@@ -197,7 +198,7 @@ jobs:
           else
             git commit -m "🔧 Hindi fix: fonts_dir, sizes, margins, TTS, Devanagari check"
             git push origin main
-            echo "🎉 Pushed to main"
+            echo "🎉 Successfully pushed to Backend main!"
           fi
 
       - name: 11. Telegram notify
