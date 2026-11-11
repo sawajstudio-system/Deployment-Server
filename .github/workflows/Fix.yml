@@ -1,4 +1,4 @@
-name: 📊 Live Status Report (Green/Red/Orange)
+name: 📊 Ultimate Live Status Report (Folder + Status)
 
 on:
   workflow_dispatch:
@@ -18,9 +18,9 @@ jobs:
           path: 'Workshop'
 
       # ═══════════════════════════════════════════════════════════════
-      # 1. ADD STATUS REPORTER TOOL
+      # 1. UPDATE LIVE STATUS REPORTER (पूरा Folder Tree बनाने के लिए)
       # ═══════════════════════════════════════════════════════════════
-      - name: 2. 🛠️ Create Live Status Reporter
+      - name: 2. 🛠️ Update Live Status Reporter
         run: |
           cd Workshop/Video_Generator/Management/reporting
           cat > live_status.py << 'EOF'
@@ -29,7 +29,7 @@ jobs:
           class LiveStatus:
               def __init__(self, telegram):
                   self.tg = telegram
-                  # शुरुआत में सब कुछ पेंडिंग (🟠) है
+                  # शुरुआत में सारी फाइलें पेंडिंग (🟠) हैं
                   self.files = {
                       "Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py": "🟠",
                       "Management/fallback/ai.py": "🟠",
@@ -47,11 +47,24 @@ jobs:
                       self.send_report(step_name)
 
               def send_report(self, current_step):
+                  # पूरा Folder Structure जैसा तुमने माँगा है
                   msg = f"📊 <b>Live Status: {current_step}</b>\n"
-                  msg += "━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                  for file, icon in self.files.items():
-                      msg += f"{icon} {file}\n"
-                  
+                  msg += "━━━━━━━━━━━━━━━━━━━━━━━\n"
+                  msg += "Video_Generator/\n"
+                  msg += "│\n"
+                  msg += "├── Management/\n"
+                  msg += f"│   ├── fetching/Islamic/Hadis/URL_fallback/fawaz.py     {self.files['Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py']}\n"
+                  msg += "│   │\n"
+                  msg += "│   ├── fallback/\n"
+                  msg += f"│   │   ├── ai.py                                        {self.files['Management/fallback/ai.py']}\n"
+                  msg += f"│   │   ├── tts.py                                       {self.files['Management/fallback/tts.py']}\n"
+                  msg += f"│   │   ├── video.py                                     {self.files['Management/fallback/video.py']}\n"
+                  msg += f"│   │   └── music.py                                     {self.files['Management/fallback/music.py']}\n"
+                  msg += "│   │\n"
+                  msg += f"│   └── uploader/drive.py                                {self.files['Management/uploader/drive.py']}\n"
+                  msg += "│\n"
+                  msg += "└── Story_Generator/\n"
+                  msg += f"    └── Story_Render/video_engine/ffmpeg_builder.py      {self.files['Story_Generator/Story_Render/video_engine/ffmpeg_builder.py']}\n"
                   msg += "\n━━━━━━━━━━━━━━━━━━━━━━━\n"
                   msg += "🟢 = काम सफल\n"
                   msg += "🔴 = एरर आया\n"
@@ -59,10 +72,10 @@ jobs:
                   
                   self.tg.send(msg)
           EOF
-          echo "✅ live_status.py created"
+          echo "✅ live_status.py updated"
 
       # ═══════════════════════════════════════════════════════════════
-      # 2. UPDATE MAIN.PY (Active Live Status)
+      # 2. UPDATE MAIN.PY (Health Check + Live Status)
       # ═══════════════════════════════════════════════════════════════
       - name: 3. 🧠 Update main.py
         run: |
@@ -219,5 +232,5 @@ jobs:
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
           git add Video_Generator/
-          git commit -m "📊 Added Live Status (🟢/🔴/🟠) reporting" || echo "No changes"
+          git commit -m "📊 Added Ultimate Live Status (Full Folder Structure)" || echo "No changes"
           git push origin main || echo "Push failed"
