@@ -1,266 +1,206 @@
-name: 🚀 Full System Upgrade (Final)
+name: 🎬 Final Story Pipeline (Health + Video)
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  upgrade:
+  run_all:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
+      ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
+      TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      UMMAH_API_KEY: ${{ secrets.UMMAH_API_KEY }}
+
     steps:
       - name: 1. 📥 Checkout Workshop
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Workshop'
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'Workshop'
 
-      # ═══════════════════════════════════════════════════════════════
-      # 1. FIX ERROR GUARD FILE NAME
-      # ═══════════════════════════════════════════════════════════════
-      - name: 2. 🛡️ Fix Error Guard File
+      - name: 2. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 3. 📦 FFmpeg + Fonts
         run: |
-          cd Workshop/Video_Generator/Management/errors
-          
-          # अगर तुमने गलती से System_error_guard.py बना दिया है, तो उसे सही नाम (master_guard.py) में बदल दो
-          if [ -f "System_error_guard.py" ]; then
-            mv System_error_guard.py master_guard.py
-          fi
+          sudo apt-get update -q
+          sudo apt-get install -y -q ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
+          sudo fc-cache -f -v
 
-          # नई और सही master_guard.py लिखो
-          cat > master_guard.py << 'EOF'
-          import sys, traceback, os
+      - name: 4. 📥 Python पैकेज
+        run: pip install -r Video_Generator/Story_Generator/requirements.txt
 
-          class MasterErrorGuard:
-              def __init__(self, telegram, logger):
-                  self.tg = telegram
-                  self.logger = logger
+      # ═══════════════════════════════════════════════════════════════
+      # PART 1: HEALTH CHECK (Folder Structure)
+      # ═══════════════════════════════════════════════════════════════
+      - name: 5. 🩺 Health Check (Folder Structure)
+        run: |
+          python << 'PYEOF'
+          import os, sys, ast, requests
+          from datetime import datetime
+          from pathlib import Path
 
-              def monitor(self, step_name, func, *args, **kwargs):
+          ROOT = Path("Video_Generator")
+          TG_TOKEN = os.getenv("TELEGRAM_API_REPORT_TOKEN")
+          TG_CHAT = os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
+
+          SKIP_DIRS = {".git", "__pycache__", ".github", "node_modules", ".venv", "venv", "env", "temp", "logs"}
+          SKIP_FILES = {".DS_Store", ".gitkeep", "Thumbs.db", ".env"}
+
+          def check_file(full_path, rel):
+              if not full_path.exists(): return (False, "missing")
+              if full_path.stat().st_size == 0: return (False, "empty")
+              if rel.endswith(".py"):
                   try:
-                      return func(*args, **kwargs)
-                  except Exception as e:
-                      tb = traceback.extract_tb(sys.exc_info()[2])
-                      last_frame = tb[-1]
-                      failed_file = os.path.basename(last_frame.filename)
-                      line_no = last_frame.lineno
-                      line_code = last_frame.line
-                      error_msg = str(e)
+                      code = full_path.read_text(encoding="utf-8")
+                      ast.parse(code)
+                  except SyntaxError as e: return (False, f"syntax: {e.msg}")
+                  except Exception as e: return (False, f"read: {str(e)[:30]}")
+              return (True, "ok")
 
-                      self.logger.error(f"[{step_name}] {failed_file} (Line {line_no}): {error_msg}")
+          # Scan
+          all_files = []
+          for root, dirs, files in os.walk(ROOT):
+              dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+              for file in files:
+                  if file in SKIP_FILES: continue
+                  full = Path(root) / file
+                  rel = full.relative_to(ROOT)
+                  rel_str = str(rel).replace("\\", "/")
+                  ok, reason = check_file(full, rel_str)
+                  all_files.append({"path": rel_str, "ok": ok, "reason": reason})
 
-                      msg = f"🚨 <b>System Crash Detected!</b>\n\n"
-                      msg += f"📍 <b>Step:</b> {step_name}\n"
-                      msg += f"📂 <b>File:</b> <code>{failed_file}</code>\n"
-                      msg += f"🔢 <b>Line:</b> {line_no}\n"
-                      msg += f"💻 <b>Code:</b> <code>{line_code}</code>\n\n"
-                      msg += f"❌ <b>Error:</b> {error_msg[:300]}\n\n"
-                      if "FFmpeg" in error_msg or "render" in step_name.lower():
-                          msg += f"<pre>{error_msg[:1000]}</pre>"
-                      self.tg.send(msg)
-                      raise e
-          EOF
-          echo "✅ master_guard.py ready"
+          all_files.sort(key=lambda x: x["path"])
+          total_ok = sum(1 for f in all_files if f["ok"])
+          total_fail = sum(1 for f in all_files if not f["ok"])
+          broken = [f for f in all_files if not f["ok"]]
+
+          # Build Tree
+          def build_tree(files_list):
+              tree = {}
+              for f in files_list:
+                  parts = f["path"].split("/")
+                  current = tree
+                  for i, part in enumerate(parts):
+                      if i == len(parts) - 1:
+                          if "_files" not in current: current["_files"] = []
+                          current["_files"].append({"name": part, "ok": f["ok"], "reason": f["reason"]})
+                      else:
+                          if part not in current: current[part] = {}
+                          current = current[part]
+              return tree
+
+          def render_tree(tree, prefix="", is_root=True):
+              lines = []
+              files = tree.get("_files", [])
+              folders = [(k, v) for k, v in tree.items() if k != "_files"]
+              folders.sort(key=lambda x: x[0])
+              files.sort(key=lambda x: x["name"])
+              total_items = len(files) + len(folders)
+              item_idx = 0
+              for folder_name, subtree in folders:
+                  item_idx += 1
+                  is_last_item = (item_idx == total_items)
+                  sub_files = []
+                  def count_files(t):
+                      for f in t.get("_files", []): sub_files.append(f)
+                      for k, v in t.items():
+                          if k != "_files": count_files(v)
+                  count_files(subtree)
+                  sub_ok = sum(1 for f in sub_files if f["ok"])
+                  icon = "🟢" if sub_ok == len(sub_files) else "🔴"
+                  connector = "└──" if is_last_item else "├──"
+                  lines.append(f"{prefix}{connector} {folder_name}/    {icon} {len(sub_files)}")
+                  new_prefix = prefix + ("    " if is_last_item else "│   ")
+                  lines.extend(render_tree(subtree, new_prefix, is_root=False))
+              for f in files:
+                  item_idx += 1
+                  is_last_item = (item_idx == total_items)
+                  icon = "🟢" if f["ok"] else "🔴"
+                  tail = "" if f["ok"] else f"  ← {f['reason']}"
+                  connector = "└──" if is_last_item else "├──"
+                  lines.append(f"{prefix}{connector} {f['name']}    {icon}{tail}")
+              return lines
+
+          tree = build_tree(all_files)
+          tree_lines = ["Video_Generator/"]
+          tree_lines.extend(render_tree(tree, prefix="│ "))
+
+          # Send Report
+          MAX_CHARS = 3800
+          def send_chunks(text, title):
+              if not TG_TOKEN or not TG_CHAT: return
+              lines = text.split("\n")
+              chunks, current = [], ""
+              for line in lines:
+                  add = ("\n" if current else "") + line
+                  if len(current) + len(add) > MAX_CHARS:
+                      chunks.append(current); current = line
+                  else: current += add
+              if current: chunks.append(current)
+              total = len(chunks)
+              for i, chunk in enumerate(chunks, 1):
+                  header = f"<b>{title} ({i}/{total})</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n"
+                  try:
+                      requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                                    json={"chat_id": TG_CHAT, "text": header + chunk, "parse_mode": "HTML"}, timeout=15)
+                  except Exception: pass
+
+          now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+          report = [f"🎬 <b>Video_Generator — Health Report</b>", f"📅 {now}", "━━━━━━━━━━━━━━━━━━━━━━━", ""]
+          report.extend(tree_lines)
+          report.append("")
+          report.append("━━━━━━━━━━━━━━━━━━━━━━━")
+          report.append("📊 <b>Summary</b>")
+          report.append(f"कुल फाइलें: {total_ok + total_fail}")
+          report.append(f"🟢 सही: {total_ok}")
+          report.append(f"🔴 खराब: {total_fail}")
+          if broken:
+              report.append("")
+              report.append("🔴 <b>Fix चाहिए:</b>")
+              for b in broken[:15]: report.append(f"  • {b['path']} — {b['reason']}")
+          else:
+              report.append("")
+              report.append("✅ सब कुछ ठीक है")
+          report.append("━━━━━━━━━━━━━━━━━━━━━━━")
+          send_chunks("\n".join(report), "🩺 Health Report")
+          print("✅ Health Report Sent to Telegram")
+          PYEOF
 
       # ═══════════════════════════════════════════════════════════════
-      # 2. UPDATE MAIN.PY (Active Master Guard + Google TTS)
+      # PART 2: VIDEO GENERATION
       # ═══════════════════════════════════════════════════════════════
-      - name: 3. 🧠 Update main.py
+      - name: 6. 🎬 Run Pipeline (Video Generation)
         run: |
-          cd Workshop/Video_Generator/Story_Generator
-          cat > main.py << 'EOF'
-          #!/usr/bin/env python3
-          import os, sys, requests, subprocess, random, shutil, traceback
-          from concurrent.futures import ThreadPoolExecutor
+          cd Video_Generator/Story_Generator
+          python main.py
 
-          BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-          sys.path.insert(0, BASE_DIR)
-
-          from Management import (
-              Settings, Chains, Logger, Telegram, ErrorHandler,
-              StateTracker, Cleaner,
-              AIFallback, VideoFallback, MusicFallback, TTSFallback,
-              UploadManager,
-          )
-          from Management.errors.master_guard import MasterErrorGuard
-          
-          from Management.fetching.Islamic.Hadis.URL_fallback import fawaz
-          from Management.fetching.Translator.URL_fallback import mymemory
-          from Management.fetching.Intro_Outro_CTA.API_fallback import intro_AI, outro_AI, cta_AI
-          from Management.fetching.Background.Video.API_fallback import pexels, pixabay, coverr
-          from Management.fetching.Background.Video.URL_fallback import gradient
-          from Management.fetching.Background.Music.API_fallback import freesound
-          from Management.fetching.Background.Music.URL_fallback import pixabay_music
-          from Story_Render import build_and_render_story
-
-          def run_pipeline():
-              print("═" * 60)
-              print("🎬 STARTING PREMIUM STORY PIPELINE (Master Guard Active)")
-              print("═" * 60)
-
-              settings = Settings()
-              logger = Logger(settings.LOG_FILE)
-              tg = Telegram()
-              state = StateTracker(settings.STEPS)
-              cleaner = Cleaner(settings.TEMP_DIR)
-              
-              guard = MasterErrorGuard(tg, logger)
-
-              ai_fb = AIFallback()
-              tts_fb = TTSFallback()
-              uploader = UploadManager()
-
-              tg.send("🚀 <b>Video Generation Started!</b>")
-              os.makedirs("temp", exist_ok=True)
-
-              try:
-                  # ── Step 1: हदीस ──
-                  state.start("hadith")
-                  tg.send("1. 📖 हदीस ला रहे हैं...")
-                  hadith = guard.monitor("Hadith Fetch", fawaz.fetch)
-                  if not hadith: raise RuntimeError("No hadith found")
-                  english_text = hadith.get("english", "")
-                  state.done("hadith")
-
-                  # ── Step 2: AI स्क्रिप्ट ──
-                  state.start("script")
-                  tg.send("2. 🧠 AI स्क्रिप्ट बना रहा है...")
-                  prompt = f"Translate to Hindi and add a short moral lesson. Total 70-80 words. Only Hindi text.\n\nHadith: {english_text}"
-                  hindi_text = guard.monitor("AI Script", ai_fb.generate, prompt, 250)
-                  
-                  if not hindi_text:
-                      tg.send("⚠️ AI Failed. Trying MyMemory...")
-                      hindi_text = guard.monitor("Translate Fallback", mymemory.translate, english_text)
-                      
-                  if not hindi_text or not any('\u0900' <= ch <= '\u097F' for ch in hindi_text):
-                      raise RuntimeError(f"Hindi failed: {(hindi_text or '')[:60]!r}")
-                  state.done("script")
-
-                  # ── Step 3: Intro / Outro / CTA ──
-                  state.start("intro_outro_cta")
-                  tg.send("3. ✨ Intro/Outro/CTA बन रहे हैं...")
-                  base_intro = guard.monitor("Intro Gen", intro_AI.generate_intro)
-                  book_name = hadith.get("collection", "Hadith")
-                  hadith_num = hadith.get("number", "")
-                  intro_text = f"{base_intro}\\N{book_name} - Hadith #{hadith_num}"
-                  outro_text = guard.monitor("Outro Gen", outro_AI.generate_outro)
-                  cta_text = guard.monitor("CTA Gen", cta_AI.generate_cta)
-                  state.done("intro_outro_cta")
-
-                  # ── Step 4: TTS (आवाज़) ──
-                  state.start("tts")
-                  tg.send("4. 🎙️ आवाज़ बन रही है...")
-                  voice_path = "temp/voice.mp3"
-                  tts_text = f"हदीस शरीफ। {hindi_text}"
-                  
-                  voice = guard.monitor("TTS ElevenLabs", tts_fb.generate, tts_text, voice_path)
-                  
-                  if not voice:
-                      tg.send("⚠️ ElevenLabs failed. Trying Edge-TTS...")
-                      from Management.fetching.audio_TTS.URL_fallback import edge_tts
-                      voice = guard.monitor("TTS Edge", edge_tts.generate, tts_text, voice_path)
-                  
-                  if not voice:
-                      tg.send("⚠️ Edge-TTS failed. Trying Google TTS (Backup)...")
-                      try:
-                          from gtts import gTTS
-                          tts = gTTS(text=tts_text, lang='hi', slow=False)
-                          tts.save(voice_path)
-                          voice = voice_path
-                          tg.send("✅ Google TTS worked!")
-                      except Exception as e:
-                          raise RuntimeError(f"All TTS failed including Google: {e}")
-
-                  if not voice: 
-                      raise RuntimeError("Voice generation completely failed")
-                  state.done("tts")
-
-                  # ── Step 5: Background वीडियो ──
-                  state.start("background")
-                  tg.send("5. 🎥 वीडियो डाउनलोड हो रहे हैं...")
-                  final_bg_video = "temp/bg_video.mp4"
-                  guard.monitor("Background Fetch", gradient.fetch, 20.0, final_bg_video)
-                  state.done("background")
-
-                  # ── Step 6: म्यूजिक ──
-                  state.start("music")
-                  tg.send("6. 🎵 म्यूजिक मिक्स हो रहा है...")
-                  music_path = "temp/music.mp3"
-                  guard.monitor("Music Fetch", freesound.fetch, "islamic peaceful", 20, music_path)
-                  state.done("music")
-
-                  # ── Step 7: Final Render ──
-                  state.start("render")
-                  tg.send("7. 🎬 Final Video Render हो रही है...")
-                  final_video_path = "temp/Final_Story.mp4"
-                  
-                  render_success = guard.monitor(
-                      "Video Rendering",
-                      build_and_render_story,
-                      bg_video=final_bg_video,
-                      music_path=music_path,
-                      voice_path=voice_path,
-                      hadith=hadith,
-                      hindi_text=hindi_text,
-                      intro_text=intro_text,
-                      outro_text=outro_text,
-                      cta_text=cta_text,
-                      output_path=final_video_path
-                  )
-                  
-                  if not render_success:
-                      raise RuntimeError("Render failed (Check FFmpeg logs)")
-                  state.done("render")
-
-                  # ── Step 8: Upload ──
-                  state.start("upload")
-                  tg.send("8. ☁️ Google Drive पर Upload हो रही है...")
-                  drive_link = guard.monitor("Drive Upload", uploader.upload, final_video_path)
-                  state.done("upload")
-
-                  # ── Step 9: Final Report ──
-                  report = f"🎉 <b>Video Ready!</b>\n\n"
-                  report += f"📜 <b>Hadith:</b> {book_name} #{hadith_num}\n"
-                  if drive_link:
-                      report += f"\n📥 <a href='{drive_link}'>Click here to view</a>"
-                  else:
-                      report += "\n❌ Google Drive Upload Failed."
-
-                  tg.send(report)
-                  logger.info("🎉 Pipeline complete")
-
-              except Exception as e:
-                  logger.error(f"Pipeline crashed: {e}")
-              finally:
-                  cleaner.clean_all()
-                  logger.info("🧹 Cleanup done")
-
-          if __name__ == "__main__":
-              run_pipeline()
-          EOF
-          echo "✅ main.py updated (Master Guard Active)"
-
-      # ═══════════════════════════════════════════════════════════════
-      # 3. UPDATE REQUIREMENTS (Add gTTS)
-      # ═══════════════════════════════════════════════════════════════
-      - name: 4. 📦 Add gTTS to requirements
-        run: |
-          cd Workshop/Video_Generator/Story_Generator
-          if ! grep -q "gTTS" requirements.txt; then
-            echo "gTTS" >> requirements.txt
-          fi
-          echo "✅ requirements.txt updated"
-
-      # ═══════════════════════════════════════════════════════════════
-      # 4. COMMIT & PUSH
-      # ═══════════════════════════════════════════════════════════════
-      - name: 5. 💾 Commit & Push
-        run: |
-          cd Workshop
-          git config user.name "Sawaj Studio Bot"
-          git config user.email "bot@sawajstudio.com"
-          git add Video_Generator/
-          git commit -m "🚀 Full Upgrade: Error Guard Fixed + Google TTS + main.py updated" || echo "No changes"
-          git push origin main || echo "Push failed"
+      - name: 7. 🧹 Cleanup
+        if: always()
+        run: rm -rf Video_Generator/Story_Generator/temp 2>/dev/null || true
