@@ -1,206 +1,95 @@
-name: 🎬 Final Story Pipeline (Health + Video)
+name: 🎬 Fix FFmpeg Audio Error
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  run_all:
+  fix:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
-
-    env:
-      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
-      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
-      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
-      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
-      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
-      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
-      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
-      ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
-      TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
-      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
-      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-      UMMAH_API_KEY: ${{ secrets.UMMAH_API_KEY }}
-
     steps:
       - name: 1. 📥 Checkout Workshop
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Workshop'
           token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Workshop'
 
-      - name: 2. 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: 3. 📦 FFmpeg + Fonts
+      # ═══════════════════════════════════════════════════════════════
+      # 1. FIX AUDIO MIXER (सबसे बड़ी गड़बड़ी यहीं थी)
+      # ═══════════════════════════════════════════════════════════════
+      - name: 2. 🎙️ Fix audio_mixer.py
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
-          sudo fc-cache -f -v
-
-      - name: 4. 📥 Python पैकेज
-        run: pip install -r Video_Generator/Story_Generator/requirements.txt
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/video_engine
+          cat > audio_mixer.py << 'EOF'
+          def build_audio_filter(has_music):
+              # ✅ सबसे सिंपल और सेफ ऑडियो फिल्टर
+              if has_music:
+                  # Voice और Music को मिक्स करो
+                  return "[1:a]volume=1.0[a_voice];[2:a]volume=0.15[a_music];[a_voice][a_music]amix=inputs=2:duration=first[a_out]"
+              else:
+                  # सिर्फ Voice चलाओ
+                  return "[1:a]volume=1.0[a_out]"
+          EOF
+          echo "✅ audio_mixer.py fixed"
 
       # ═══════════════════════════════════════════════════════════════
-      # PART 1: HEALTH CHECK (Folder Structure)
+      # 2. FIX FFMPEG BUILDER (नाम की गड़बड़ी हटाना)
       # ═══════════════════════════════════════════════════════════════
-      - name: 5. 🩺 Health Check (Folder Structure)
+      - name: 3. 🎥 Fix ffmpeg_builder.py
         run: |
-          python << 'PYEOF'
-          import os, sys, ast, requests
-          from datetime import datetime
-          from pathlib import Path
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/video_engine
+          cat > ffmpeg_builder.py << 'EOF'
+          import os
+          from .video_filter import build_video_filter
+          from .audio_mixer import build_audio_filter
 
-          ROOT = Path("Video_Generator")
-          TG_TOKEN = os.getenv("TELEGRAM_API_REPORT_TOKEN")
-          TG_CHAT = os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
+          def build_ffmpeg_cmd(bg, voice, music, cta, logo, ass, dur, out):
+              hm = os.path.exists(music) and os.path.getsize(music) > 0
+              hl = os.path.exists(logo)
+              c = ["ffmpeg","-y","-stream_loop","-1","-i",bg,"-i",voice]
+              
+              if hm: c += ["-i", music]
+              c += ["-loop","1","-i",cta]
+              ci = 3 if hm else 2
+              
+              li = -1
+              if hl:
+                  c += ["-i", logo]
+                  li = 4 if hm else 3
+                  
+              cst = max(0, dur - 5.0)
+              vf, cur = build_video_filter(hl, li, ci, cst)
+              aa = os.path.abspath(ass)
+              fo = os.path.abspath(os.path.join(os.path.dirname(__file__),"..","..","..","assets","fonts"))
+              
+              # वीडियो फिल्टर में सबटाइटल और CTA जोड़ो
+              vf += f"[{cur}]subtitles='{aa}':fontsdir='{fo}'[vs];"
+              vf += f"[vs][{ci}:v]overlay=0:0:enable='gte(t,{cst})'[v_out]"
+              
+              # ऑडियो फिल्टर लोड करो
+              af = build_audio_filter(hm)
+              
+              # फाइनल कमांड
+              c += ["-filter_complex", f"{vf}; {af}", "-map","[v_out]","-map","[a_out]","-c:v","libx264","-preset","ultrafast","-crf","30","-r","24","-c:a","aac","-b:a","128k","-t",f"{dur:.2f}","-shortest",out]
+              return c
+          EOF
+          echo "✅ ffmpeg_builder.py fixed"
 
-          SKIP_DIRS = {".git", "__pycache__", ".github", "node_modules", ".venv", "venv", "env", "temp", "logs"}
-          SKIP_FILES = {".DS_Store", ".gitkeep", "Thumbs.db", ".env"}
-
-          def check_file(full_path, rel):
-              if not full_path.exists(): return (False, "missing")
-              if full_path.stat().st_size == 0: return (False, "empty")
-              if rel.endswith(".py"):
-                  try:
-                      code = full_path.read_text(encoding="utf-8")
-                      ast.parse(code)
-                  except SyntaxError as e: return (False, f"syntax: {e.msg}")
-                  except Exception as e: return (False, f"read: {str(e)[:30]}")
-              return (True, "ok")
-
-          # Scan
-          all_files = []
-          for root, dirs, files in os.walk(ROOT):
-              dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
-              for file in files:
-                  if file in SKIP_FILES: continue
-                  full = Path(root) / file
-                  rel = full.relative_to(ROOT)
-                  rel_str = str(rel).replace("\\", "/")
-                  ok, reason = check_file(full, rel_str)
-                  all_files.append({"path": rel_str, "ok": ok, "reason": reason})
-
-          all_files.sort(key=lambda x: x["path"])
-          total_ok = sum(1 for f in all_files if f["ok"])
-          total_fail = sum(1 for f in all_files if not f["ok"])
-          broken = [f for f in all_files if not f["ok"]]
-
-          # Build Tree
-          def build_tree(files_list):
-              tree = {}
-              for f in files_list:
-                  parts = f["path"].split("/")
-                  current = tree
-                  for i, part in enumerate(parts):
-                      if i == len(parts) - 1:
-                          if "_files" not in current: current["_files"] = []
-                          current["_files"].append({"name": part, "ok": f["ok"], "reason": f["reason"]})
-                      else:
-                          if part not in current: current[part] = {}
-                          current = current[part]
-              return tree
-
-          def render_tree(tree, prefix="", is_root=True):
-              lines = []
-              files = tree.get("_files", [])
-              folders = [(k, v) for k, v in tree.items() if k != "_files"]
-              folders.sort(key=lambda x: x[0])
-              files.sort(key=lambda x: x["name"])
-              total_items = len(files) + len(folders)
-              item_idx = 0
-              for folder_name, subtree in folders:
-                  item_idx += 1
-                  is_last_item = (item_idx == total_items)
-                  sub_files = []
-                  def count_files(t):
-                      for f in t.get("_files", []): sub_files.append(f)
-                      for k, v in t.items():
-                          if k != "_files": count_files(v)
-                  count_files(subtree)
-                  sub_ok = sum(1 for f in sub_files if f["ok"])
-                  icon = "🟢" if sub_ok == len(sub_files) else "🔴"
-                  connector = "└──" if is_last_item else "├──"
-                  lines.append(f"{prefix}{connector} {folder_name}/    {icon} {len(sub_files)}")
-                  new_prefix = prefix + ("    " if is_last_item else "│   ")
-                  lines.extend(render_tree(subtree, new_prefix, is_root=False))
-              for f in files:
-                  item_idx += 1
-                  is_last_item = (item_idx == total_items)
-                  icon = "🟢" if f["ok"] else "🔴"
-                  tail = "" if f["ok"] else f"  ← {f['reason']}"
-                  connector = "└──" if is_last_item else "├──"
-                  lines.append(f"{prefix}{connector} {f['name']}    {icon}{tail}")
-              return lines
-
-          tree = build_tree(all_files)
-          tree_lines = ["Video_Generator/"]
-          tree_lines.extend(render_tree(tree, prefix="│ "))
-
-          # Send Report
-          MAX_CHARS = 3800
-          def send_chunks(text, title):
-              if not TG_TOKEN or not TG_CHAT: return
-              lines = text.split("\n")
-              chunks, current = [], ""
-              for line in lines:
-                  add = ("\n" if current else "") + line
-                  if len(current) + len(add) > MAX_CHARS:
-                      chunks.append(current); current = line
-                  else: current += add
-              if current: chunks.append(current)
-              total = len(chunks)
-              for i, chunk in enumerate(chunks, 1):
-                  header = f"<b>{title} ({i}/{total})</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n"
-                  try:
-                      requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-                                    json={"chat_id": TG_CHAT, "text": header + chunk, "parse_mode": "HTML"}, timeout=15)
-                  except Exception: pass
-
-          now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-          report = [f"🎬 <b>Video_Generator — Health Report</b>", f"📅 {now}", "━━━━━━━━━━━━━━━━━━━━━━━", ""]
-          report.extend(tree_lines)
-          report.append("")
-          report.append("━━━━━━━━━━━━━━━━━━━━━━━")
-          report.append("📊 <b>Summary</b>")
-          report.append(f"कुल फाइलें: {total_ok + total_fail}")
-          report.append(f"🟢 सही: {total_ok}")
-          report.append(f"🔴 खराब: {total_fail}")
-          if broken:
-              report.append("")
-              report.append("🔴 <b>Fix चाहिए:</b>")
-              for b in broken[:15]: report.append(f"  • {b['path']} — {b['reason']}")
-          else:
-              report.append("")
-              report.append("✅ सब कुछ ठीक है")
-          report.append("━━━━━━━━━━━━━━━━━━━━━━━")
-          send_chunks("\n".join(report), "🩺 Health Report")
-          print("✅ Health Report Sent to Telegram")
-          PYEOF
-
-      # ═══════════════════════════════════════════════════════════════
-      # PART 2: VIDEO GENERATION
-      # ═══════════════════════════════════════════════════════════════
-      - name: 6. 🎬 Run Pipeline (Video Generation)
+      - name: 4. 🔍 Syntax जाँच
         run: |
-          cd Video_Generator/Story_Generator
-          python main.py
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/video_engine
+          python -c "import ast; ast.parse(open('audio_mixer.py').read())"
+          python -c "import ast; ast.parse(open('ffmpeg_builder.py').read())"
+          echo "✅ दोनों फाइलों का सिंटैक्स सही है"
 
-      - name: 7. 🧹 Cleanup
-        if: always()
-        run: rm -rf Video_Generator/Story_Generator/temp 2>/dev/null || true
+      - name: 5. 💾 Commit & Push
+        run: |
+          cd Workshop
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          git add Video_Generator/
+          git commit -m "🎬 Fix FFmpeg audio stream error" || echo "No changes"
+          git push origin main || echo "Push failed"
