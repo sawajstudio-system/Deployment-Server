@@ -1,4 +1,4 @@
-name: 📊 Ultimate Live Status Report (Folder + Status)
+name: 🎨 Fix Fonts & Transparent Logo
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  update_code:
+  fix:
     runs-on: ubuntu-latest
     steps:
       - name: 1. 📥 Checkout Workshop
@@ -17,220 +17,56 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           path: 'Workshop'
 
-      # ═══════════════════════════════════════════════════════════════
-      # 1. UPDATE LIVE STATUS REPORTER (पूरा Folder Tree बनाने के लिए)
-      # ═══════════════════════════════════════════════════════════════
-      - name: 2. 🛠️ Update Live Status Reporter
+      - name: 2. 🖼️ Remove Green Background from Logo
         run: |
-          cd Workshop/Video_Generator/Management/reporting
-          cat > live_status.py << 'EOF'
+          cd Workshop/Video_Generator/assets
+          pip install Pillow numpy
+          
+          # लोगो का हरा बैकग्राउंड हटाने की स्क्रिप्ट
+          python - << 'EOF'
+          from PIL import Image
+          import numpy as np
           import os
 
-          class LiveStatus:
-              def __init__(self, telegram):
-                  self.tg = telegram
-                  # शुरुआत में सारी फाइलें पेंडिंग (🟠) हैं
-                  self.files = {
-                      "Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py": "🟠",
-                      "Management/fallback/ai.py": "🟠",
-                      "Management/fallback/tts.py": "🟠",
-                      "Management/fallback/video.py": "🟠",
-                      "Management/fallback/music.py": "🟠",
-                      "Story_Generator/Story_Render/video_engine/ffmpeg_builder.py": "🟠",
-                      "Management/uploader/drive.py": "🟠"
-                  }
+          if os.path.exists('logo.png'):
+              img = Image.open('logo.png').convert('RGBA')
+              data = np.array(img)
+              r, g, b, a = data[:,:,0], data[:,:,1], data[:,:,2], data[:,:,3]
 
-              def update(self, file_path, status, step_name=""):
-                  # स्टेटस अपडेट करो (🟢, 🔴, या 🟠)
-                  if file_path in self.files:
-                      self.files[file_path] = status
-                      self.send_report(step_name)
+              # हरे रंग की पहचान करना
+              mask = (g.astype(int) > r.astype(int) + 15) & (g.astype(int) > b.astype(int) + 15) & (g > 50)
+              data[mask, 3] = 0 # हरे हिस्से को ट्रांसपेरेंट करना
 
-              def send_report(self, current_step):
-                  # पूरा Folder Structure जैसा तुमने माँगा है
-                  msg = f"📊 <b>Live Status: {current_step}</b>\n"
-                  msg += "━━━━━━━━━━━━━━━━━━━━━━━\n"
-                  msg += "Video_Generator/\n"
-                  msg += "│\n"
-                  msg += "├── Management/\n"
-                  msg += f"│   ├── fetching/Islamic/Hadis/URL_fallback/fawaz.py     {self.files['Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py']}\n"
-                  msg += "│   │\n"
-                  msg += "│   ├── fallback/\n"
-                  msg += f"│   │   ├── ai.py                                        {self.files['Management/fallback/ai.py']}\n"
-                  msg += f"│   │   ├── tts.py                                       {self.files['Management/fallback/tts.py']}\n"
-                  msg += f"│   │   ├── video.py                                     {self.files['Management/fallback/video.py']}\n"
-                  msg += f"│   │   └── music.py                                     {self.files['Management/fallback/music.py']}\n"
-                  msg += "│   │\n"
-                  msg += f"│   └── uploader/drive.py                                {self.files['Management/uploader/drive.py']}\n"
-                  msg += "│\n"
-                  msg += "└── Story_Generator/\n"
-                  msg += f"    └── Story_Render/video_engine/ffmpeg_builder.py      {self.files['Story_Generator/Story_Render/video_engine/ffmpeg_builder.py']}\n"
-                  msg += "\n━━━━━━━━━━━━━━━━━━━━━━━\n"
-                  msg += "🟢 = काम सफल\n"
-                  msg += "🔴 = एरर आया\n"
-                  msg += "🟠 = अभी बाकी है"
-                  
-                  self.tg.send(msg)
+              transparent_img = Image.fromarray(data)
+              transparent_img.save('logo.png')
+              print('✅ Logo transparent हो गया!')
+          else:
+              print('❌ Logo नहीं मिला')
           EOF
-          echo "✅ live_status.py updated"
 
-      # ═══════════════════════════════════════════════════════════════
-      # 2. UPDATE MAIN.PY (Health Check + Live Status)
-      # ═══════════════════════════════════════════════════════════════
-      - name: 3. 🧠 Update main.py
+      - name: 3. 🔤 Download Color Emoji Font
         run: |
-          cd Workshop/Video_Generator/Story_Generator
-          cat > main.py << 'EOF'
-          #!/usr/bin/env python3
-          import os, sys, requests, subprocess, random, shutil, traceback
-          from concurrent.futures import ThreadPoolExecutor
+          cd Workshop/Video_Generator/assets/fonts
+          # Noto Color Emoji फॉन्ट डाउनलोड करना
+          wget -q https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf || echo "⚠️ Emoji font download failed, but continuing..."
 
-          BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-          sys.path.insert(0, BASE_DIR)
-
-          from Management import (
-              Settings, Chains, Logger, Telegram, ErrorHandler,
-              StateTracker, Cleaner,
-              AIFallback, VideoFallback, MusicFallback, TTSFallback,
-              UploadManager,
-          )
-          from Management.errors.master_guard import MasterErrorGuard
-          from Management.reporting.live_status import LiveStatus
-          
-          from Management.fetching.Islamic.Hadis.URL_fallback import fawaz
-          from Management.fetching.Translator.URL_fallback import mymemory
-          from Management.fetching.Intro_Outro_CTA.API_fallback import intro_AI, outro_AI, cta_AI
-          from Management.fetching.Background.Video.API_fallback import pexels, pixabay, coverr
-          from Management.fetching.Background.Video.URL_fallback import gradient
-          from Management.fetching.Background.Music.API_fallback import freesound
-          from Management.fetching.Background.Music.URL_fallback import pixabay_music
-          from Story_Render import build_and_render_story
-
-          def run_pipeline():
-              print("═" * 60)
-              print("🎬 STARTING PREMIUM STORY PIPELINE (Live Status Active)")
-              print("═" * 60)
-
-              settings = Settings()
-              logger = Logger(settings.LOG_FILE)
-              tg = Telegram()
-              state = StateTracker(settings.STEPS)
-              cleaner = Cleaner(settings.TEMP_DIR)
-              
-              # 🧠 Master Guard और Live Status तैयार
-              guard = MasterErrorGuard(tg, logger)
-              live = LiveStatus(tg)
-
-              ai_fb = AIFallback()
-              tts_fb = TTSFallback()
-              uploader = UploadManager()
-
-              tg.send("🚀 <b>Video Generation Started!</b>")
-              os.makedirs("temp", exist_ok=True)
-
-              try:
-                  # ── Step 1: हदीस ──
-                  try:
-                      hadith = guard.monitor("Hadith Fetch", fawaz.fetch)
-                      live.update("Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py", "🟢", "हदीस मिल गई")
-                      if not hadith: raise RuntimeError("No hadith found")
-                  except Exception:
-                      live.update("Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py", "🔴", "हदीस फेल")
-                      raise
-                  english_text = hadith.get("english", "")
-
-                  # ── Step 2: AI स्क्रिप्ट ──
-                  try:
-                      prompt = f"Translate to Hindi and add a short moral lesson. Total 70-80 words. Only Hindi text.\n\nHadith: {english_text}"
-                      hindi_text = guard.monitor("AI Script", ai_fb.generate, prompt, 250)
-                      if not hindi_text: raise RuntimeError("AI failed")
-                      live.update("Management/fallback/ai.py", "🟢", "AI स्क्रिप्ट बन गई")
-                  except Exception:
-                      live.update("Management/fallback/ai.py", "🔴", "AI फेल")
-                      raise
-
-                  # ── Step 3: TTS (आवाज़) ──
-                  try:
-                      voice_path = "temp/voice.mp3"
-                      tts_text = f"हदीस शरीफ। {hindi_text}"
-                      voice = guard.monitor("TTS", tts_fb.generate, tts_text, voice_path)
-                      if not voice: raise RuntimeError("TTS failed")
-                      live.update("Management/fallback/tts.py", "🟢", "आवाज़ बन गई")
-                  except Exception:
-                      live.update("Management/fallback/tts.py", "🔴", "TTS फेल")
-                      raise
-
-                  # ── Step 4: Background वीडियो ──
-                  try:
-                      final_bg_video = "temp/bg_video.mp4"
-                      guard.monitor("Background Fetch", gradient.fetch, 20.0, final_bg_video)
-                      live.update("Management/fallback/video.py", "🟢", "बैकग्राउंड मिल गया")
-                  except Exception:
-                      live.update("Management/fallback/video.py", "🔴", "बैकग्राउंड फेल")
-                      raise
-
-                  # ── Step 5: म्यूजिक ──
-                  try:
-                      music_path = "temp/music.mp3"
-                      guard.monitor("Music Fetch", freesound.fetch, "islamic peaceful", 20, music_path)
-                      live.update("Management/fallback/music.py", "🟢", "म्यूजिक मिल गया")
-                  except Exception:
-                      live.update("Management/fallback/music.py", "🔴", "म्यूजिक फेल")
-                      raise
-
-                  # ── Step 6: Final Render ──
-                  try:
-                      final_video_path = "temp/Final_Story.mp4"
-                      render_success = guard.monitor(
-                          "Video Rendering",
-                          build_and_render_story,
-                          bg_video=final_bg_video,
-                          music_path=music_path,
-                          voice_path=voice_path,
-                          hadith=hadith,
-                          hindi_text=hindi_text,
-                          intro_text="Intro",
-                          outro_text="Outro",
-                          cta_text="CTA",
-                          output_path=final_video_path
-                      )
-                      if not render_success: raise RuntimeError("Render failed")
-                      live.update("Story_Generator/Story_Render/video_engine/ffmpeg_builder.py", "🟢", "रेंडर सफल")
-                  except Exception:
-                      live.update("Story_Generator/Story_Render/video_engine/ffmpeg_builder.py", "🔴", "रेंडर फेल")
-                      raise
-
-                  # ── Step 7: Upload ──
-                  try:
-                      drive_link = guard.monitor("Drive Upload", uploader.upload, final_video_path)
-                      live.update("Management/uploader/drive.py", "🟢", "ड्राइव अपलोड सफल")
-                  except Exception:
-                      live.update("Management/uploader/drive.py", "🔴", "ड्राइव अपलोड फेल")
-                      raise
-
-                  # ── Final Report ──
-                  report = f"🎉 <b>Video Ready!</b>\n\n"
-                  report += f"📜 <b>Hadith:</b> {hadith.get('collection', '')} #{hadith.get('number', '')}\n"
-                  if drive_link:
-                      report += f"\n📥 <a href='{drive_link}'>Click here to view</a>"
-                  tg.send(report)
-
-              except Exception as e:
-                  logger.error(f"Pipeline crashed: {e}")
-              finally:
-                  cleaner.clean_all()
-                  logger.info("🧹 Cleanup done")
-
-          if __name__ == "__main__":
-              run_pipeline()
+      - name: 4. 🔧 Update Font Fallbacks in Config
+        run: |
+          cd Workshop/Video_Generator/Story_Generator/Story_Render/config/fonts
+          # अरबी फॉन्ट के लिए Noto Naskh Arabic जोड़ना
+          cat > arabic_fonts.py << 'EOF'
+          import random
+          # अरबी फॉन्ट्स (Noto Naskh Arabic जोड़ा गया)
+          ARABIC_FONTS = ["Noto Naskh Arabic", "Amiri", "Reem Kufi", "Scheherazade"]
+          SELECTED_ARABIC = random.choice(ARABIC_FONTS)
           EOF
-          echo "✅ main.py updated"
+          echo "✅ अरबी फॉन्ट्स अपडेट हो गए"
 
-      - name: 4. 💾 Commit & Push
+      - name: 5. 💾 Commit & Push
         run: |
           cd Workshop
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
-          git add Video_Generator/
-          git commit -m "📊 Added Ultimate Live Status (Full Folder Structure)" || echo "No changes"
+          git add Video_Generator/assets/ Video_Generator/Story_Generator/Story_Render/config/fonts/
+          git commit -m "🎨 Fixed Logo background & Added Color Emoji/Arabic fonts" || echo "No changes"
           git push origin main || echo "Push failed"
