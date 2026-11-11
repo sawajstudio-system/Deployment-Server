@@ -1,4 +1,4 @@
-name: 🚑 Fix Everything (Final Ultimate Fix)
+name: 🚀 Full System Upgrade (Final)
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  fix_all:
+  upgrade:
     runs-on: ubuntu-latest
     steps:
       - name: 1. 📥 Checkout Workshop
@@ -18,35 +18,58 @@ jobs:
           path: 'Workshop'
 
       # ═══════════════════════════════════════════════════════════════
-      # 1. FIX FFMPEG RUNNER (Raise Real Error)
+      # 1. FIX ERROR GUARD FILE NAME
       # ═══════════════════════════════════════════════════════════════
-      - name: 2. 🎬 Fix ffmpeg_runner.py
+      - name: 2. 🛡️ Fix Error Guard File
         run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/video_engine
-          cat > ffmpeg_runner.py << 'EOF'
-          import subprocess
+          cd Workshop/Video_Generator/Management/errors
+          
+          # अगर तुमने गलती से System_error_guard.py बना दिया है, तो उसे सही नाम (master_guard.py) में बदल दो
+          if [ -f "System_error_guard.py" ]; then
+            mv System_error_guard.py master_guard.py
+          fi
 
-          def run_ffmpeg(c, t=300):
-              try:
-                  r = subprocess.run(c, capture_output=True, text=True, timeout=t)
-                  if r.returncode != 0:
-                      err_log = r.stderr[-1500:] if r.stderr else "Unknown FFmpeg Error"
-                      raise RuntimeError(f"FFmpeg Crash:\n{err_log}")
-                  return True
-              except subprocess.TimeoutExpired:
-                  raise RuntimeError("FFmpeg Timeout: रेंडरिंग में 5 मिनट से ज्यादा समय लगा।")
-              except Exception as e:
-                  raise RuntimeError(f"Runner Exception: {e}")
+          # नई और सही master_guard.py लिखो
+          cat > master_guard.py << 'EOF'
+          import sys, traceback, os
+
+          class MasterErrorGuard:
+              def __init__(self, telegram, logger):
+                  self.tg = telegram
+                  self.logger = logger
+
+              def monitor(self, step_name, func, *args, **kwargs):
+                  try:
+                      return func(*args, **kwargs)
+                  except Exception as e:
+                      tb = traceback.extract_tb(sys.exc_info()[2])
+                      last_frame = tb[-1]
+                      failed_file = os.path.basename(last_frame.filename)
+                      line_no = last_frame.lineno
+                      line_code = last_frame.line
+                      error_msg = str(e)
+
+                      self.logger.error(f"[{step_name}] {failed_file} (Line {line_no}): {error_msg}")
+
+                      msg = f"🚨 <b>System Crash Detected!</b>\n\n"
+                      msg += f"📍 <b>Step:</b> {step_name}\n"
+                      msg += f"📂 <b>File:</b> <code>{failed_file}</code>\n"
+                      msg += f"🔢 <b>Line:</b> {line_no}\n"
+                      msg += f"💻 <b>Code:</b> <code>{line_code}</code>\n\n"
+                      msg += f"❌ <b>Error:</b> {error_msg[:300]}\n\n"
+                      if "FFmpeg" in error_msg or "render" in step_name.lower():
+                          msg += f"<pre>{error_msg[:1000]}</pre>"
+                      self.tg.send(msg)
+                      raise e
           EOF
-          echo "✅ ffmpeg_runner.py fixed"
+          echo "✅ master_guard.py ready"
 
       # ═══════════════════════════════════════════════════════════════
-      # 2. FIX MAIN.PY (Active Master Guard)
+      # 2. UPDATE MAIN.PY (Active Master Guard + Google TTS)
       # ═══════════════════════════════════════════════════════════════
-      - name: 3. 🧠 Update main.py (Master Guard Active)
+      - name: 3. 🧠 Update main.py
         run: |
           cd Workshop/Video_Generator/Story_Generator
-          
           cat > main.py << 'EOF'
           #!/usr/bin/env python3
           import os, sys, requests, subprocess, random, shutil, traceback
@@ -61,7 +84,6 @@ jobs:
               AIFallback, VideoFallback, MusicFallback, TTSFallback,
               UploadManager,
           )
-          # 🧠 Master Guard Import
           from Management.errors.master_guard import MasterErrorGuard
           
           from Management.fetching.Islamic.Hadis.URL_fallback import fawaz
@@ -78,14 +100,12 @@ jobs:
               print("🎬 STARTING PREMIUM STORY PIPELINE (Master Guard Active)")
               print("═" * 60)
 
-              # ── Managers तैयार ──
               settings = Settings()
               logger = Logger(settings.LOG_FILE)
               tg = Telegram()
               state = StateTracker(settings.STEPS)
               cleaner = Cleaner(settings.TEMP_DIR)
               
-              # 🧠 Master Guard (यह खुद पहचानेगा कि एरर कहाँ है)
               guard = MasterErrorGuard(tg, logger)
 
               ai_fb = AIFallback()
@@ -134,8 +154,27 @@ jobs:
                   tg.send("4. 🎙️ आवाज़ बन रही है...")
                   voice_path = "temp/voice.mp3"
                   tts_text = f"हदीस शरीफ। {hindi_text}"
-                  voice = guard.monitor("TTS Voice", tts_fb.generate, tts_text, voice_path)
-                  if not voice: raise RuntimeError("Voice generation failed")
+                  
+                  voice = guard.monitor("TTS ElevenLabs", tts_fb.generate, tts_text, voice_path)
+                  
+                  if not voice:
+                      tg.send("⚠️ ElevenLabs failed. Trying Edge-TTS...")
+                      from Management.fetching.audio_TTS.URL_fallback import edge_tts
+                      voice = guard.monitor("TTS Edge", edge_tts.generate, tts_text, voice_path)
+                  
+                  if not voice:
+                      tg.send("⚠️ Edge-TTS failed. Trying Google TTS (Backup)...")
+                      try:
+                          from gtts import gTTS
+                          tts = gTTS(text=tts_text, lang='hi', slow=False)
+                          tts.save(voice_path)
+                          voice = voice_path
+                          tg.send("✅ Google TTS worked!")
+                      except Exception as e:
+                          raise RuntimeError(f"All TTS failed including Google: {e}")
+
+                  if not voice: 
+                      raise RuntimeError("Voice generation completely failed")
                   state.done("tts")
 
                   # ── Step 5: Background वीडियो ──
@@ -204,53 +243,24 @@ jobs:
           echo "✅ main.py updated (Master Guard Active)"
 
       # ═══════════════════════════════════════════════════════════════
-      # 3. FIX VIDEO FILTER (Safe - Prevent Crash)
+      # 3. UPDATE REQUIREMENTS (Add gTTS)
       # ═══════════════════════════════════════════════════════════════
-      - name: 4. 🎥 Fix video_filter.py (Ultra Safe)
+      - name: 4. 📦 Add gTTS to requirements
         run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/video_engine
-          cat > video_filter.py << 'EOF'
-          from .logo_processor import get_logo_filter
-          from .logo_placer import get_moving_logo_expr, get_fixed_logo_pos
-
-          def build_video_filter(has_logo, li, ci, cs):
-              # ✅ सिर्फ स्केल, क्रॉप और विनेट (ताकि क्रैश न हो)
-              f = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,vignette=PI/4[bg];"
-              cur = "bg"
-              
-              if has_logo and li != -1:
-                  lm = get_logo_filter(400, 160)
-                  lf = get_logo_filter(600, 240)
-                  f += f"[{li}:v]split[lm][lf];[lm]{lm}[lms];[lf]{lf}[lfs];"
-                  x, y = get_moving_logo_expr()
-                  f += f"[{cur}][lms]overlay=x='{x}':y='{y}':enable='lt(t,{cs})'[bg1];"
-                  fx, fy = get_fixed_logo_pos()
-                  f += f"[bg1][lfs]overlay=x='{fx}':y='{fy}':enable='gte(t,{cs})'[bg2];"
-                  cur = "bg2"
-              return f, cur
-          EOF
-          echo "✅ video_filter.py fixed"
-
-      # ═══════════════════════════════════════════════════════════════
-      # 4. ENSURE LOGO EXISTS
-      # ═══════════════════════════════════════════════════════════════
-      - name: 5. 🖼️ Check Logo
-        run: |
-          cd Workshop/Video_Generator/assets
-          if [ ! -f "logo.png" ]; then
-            echo "⚠️ Logo missing! Creating dummy..."
-            python -c "from PIL import Image; Image.new('RGBA', (400,160), (255,255,255,255)).save('logo.png')"
+          cd Workshop/Video_Generator/Story_Generator
+          if ! grep -q "gTTS" requirements.txt; then
+            echo "gTTS" >> requirements.txt
           fi
-          echo "✅ Logo check done"
+          echo "✅ requirements.txt updated"
 
       # ═══════════════════════════════════════════════════════════════
-      # 5. COMMIT & PUSH
+      # 4. COMMIT & PUSH
       # ═══════════════════════════════════════════════════════════════
-      - name: 6. 💾 Commit & Push
+      - name: 5. 💾 Commit & Push
         run: |
           cd Workshop
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
           git add Video_Generator/
-          git commit -m "🚑 Ultimate Fix: main.py with MasterGuard + Safe FFmpeg" || echo "No changes"
+          git commit -m "🚀 Full Upgrade: Error Guard Fixed + Google TTS + main.py updated" || echo "No changes"
           git push origin main || echo "Push failed"
