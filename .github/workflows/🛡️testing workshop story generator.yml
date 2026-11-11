@@ -1,4 +1,4 @@
-name: 🛡️ Setup Master Error Guard
+name: 🛡️testing workshop story generator
 
 on:
   workflow_dispatch:
