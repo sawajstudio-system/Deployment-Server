@@ -1,4 +1,4 @@
-name: 🎬 Fix FFmpeg Audio Error
+name: 📊 Live Status Report (Green/Red/Orange)
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  fix:
+  update_code:
     runs-on: ubuntu-latest
     steps:
       - name: 1. 📥 Checkout Workshop
@@ -18,78 +18,206 @@ jobs:
           path: 'Workshop'
 
       # ═══════════════════════════════════════════════════════════════
-      # 1. FIX AUDIO MIXER (सबसे बड़ी गड़बड़ी यहीं थी)
+      # 1. ADD STATUS REPORTER TOOL
       # ═══════════════════════════════════════════════════════════════
-      - name: 2. 🎙️ Fix audio_mixer.py
+      - name: 2. 🛠️ Create Live Status Reporter
         run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/video_engine
-          cat > audio_mixer.py << 'EOF'
-          def build_audio_filter(has_music):
-              # ✅ सबसे सिंपल और सेफ ऑडियो फिल्टर
-              if has_music:
-                  # Voice और Music को मिक्स करो
-                  return "[1:a]volume=1.0[a_voice];[2:a]volume=0.15[a_music];[a_voice][a_music]amix=inputs=2:duration=first[a_out]"
-              else:
-                  # सिर्फ Voice चलाओ
-                  return "[1:a]volume=1.0[a_out]"
-          EOF
-          echo "✅ audio_mixer.py fixed"
-
-      # ═══════════════════════════════════════════════════════════════
-      # 2. FIX FFMPEG BUILDER (नाम की गड़बड़ी हटाना)
-      # ═══════════════════════════════════════════════════════════════
-      - name: 3. 🎥 Fix ffmpeg_builder.py
-        run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/video_engine
-          cat > ffmpeg_builder.py << 'EOF'
+          cd Workshop/Video_Generator/Management/reporting
+          cat > live_status.py << 'EOF'
           import os
-          from .video_filter import build_video_filter
-          from .audio_mixer import build_audio_filter
 
-          def build_ffmpeg_cmd(bg, voice, music, cta, logo, ass, dur, out):
-              hm = os.path.exists(music) and os.path.getsize(music) > 0
-              hl = os.path.exists(logo)
-              c = ["ffmpeg","-y","-stream_loop","-1","-i",bg,"-i",voice]
-              
-              if hm: c += ["-i", music]
-              c += ["-loop","1","-i",cta]
-              ci = 3 if hm else 2
-              
-              li = -1
-              if hl:
-                  c += ["-i", logo]
-                  li = 4 if hm else 3
+          class LiveStatus:
+              def __init__(self, telegram):
+                  self.tg = telegram
+                  # शुरुआत में सब कुछ पेंडिंग (🟠) है
+                  self.files = {
+                      "Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py": "🟠",
+                      "Management/fallback/ai.py": "🟠",
+                      "Management/fallback/tts.py": "🟠",
+                      "Management/fallback/video.py": "🟠",
+                      "Management/fallback/music.py": "🟠",
+                      "Story_Generator/Story_Render/video_engine/ffmpeg_builder.py": "🟠",
+                      "Management/uploader/drive.py": "🟠"
+                  }
+
+              def update(self, file_path, status, step_name=""):
+                  # स्टेटस अपडेट करो (🟢, 🔴, या 🟠)
+                  if file_path in self.files:
+                      self.files[file_path] = status
+                      self.send_report(step_name)
+
+              def send_report(self, current_step):
+                  msg = f"📊 <b>Live Status: {current_step}</b>\n"
+                  msg += "━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                  for file, icon in self.files.items():
+                      msg += f"{icon} {file}\n"
                   
-              cst = max(0, dur - 5.0)
-              vf, cur = build_video_filter(hl, li, ci, cst)
-              aa = os.path.abspath(ass)
-              fo = os.path.abspath(os.path.join(os.path.dirname(__file__),"..","..","..","assets","fonts"))
-              
-              # वीडियो फिल्टर में सबटाइटल और CTA जोड़ो
-              vf += f"[{cur}]subtitles='{aa}':fontsdir='{fo}'[vs];"
-              vf += f"[vs][{ci}:v]overlay=0:0:enable='gte(t,{cst})'[v_out]"
-              
-              # ऑडियो फिल्टर लोड करो
-              af = build_audio_filter(hm)
-              
-              # फाइनल कमांड
-              c += ["-filter_complex", f"{vf}; {af}", "-map","[v_out]","-map","[a_out]","-c:v","libx264","-preset","ultrafast","-crf","30","-r","24","-c:a","aac","-b:a","128k","-t",f"{dur:.2f}","-shortest",out]
-              return c
+                  msg += "\n━━━━━━━━━━━━━━━━━━━━━━━\n"
+                  msg += "🟢 = काम सफल\n"
+                  msg += "🔴 = एरर आया\n"
+                  msg += "🟠 = अभी बाकी है"
+                  
+                  self.tg.send(msg)
           EOF
-          echo "✅ ffmpeg_builder.py fixed"
+          echo "✅ live_status.py created"
 
-      - name: 4. 🔍 Syntax जाँच
+      # ═══════════════════════════════════════════════════════════════
+      # 2. UPDATE MAIN.PY (Active Live Status)
+      # ═══════════════════════════════════════════════════════════════
+      - name: 3. 🧠 Update main.py
         run: |
-          cd Workshop/Video_Generator/Story_Generator/Story_Render/video_engine
-          python -c "import ast; ast.parse(open('audio_mixer.py').read())"
-          python -c "import ast; ast.parse(open('ffmpeg_builder.py').read())"
-          echo "✅ दोनों फाइलों का सिंटैक्स सही है"
+          cd Workshop/Video_Generator/Story_Generator
+          cat > main.py << 'EOF'
+          #!/usr/bin/env python3
+          import os, sys, requests, subprocess, random, shutil, traceback
+          from concurrent.futures import ThreadPoolExecutor
 
-      - name: 5. 💾 Commit & Push
+          BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+          sys.path.insert(0, BASE_DIR)
+
+          from Management import (
+              Settings, Chains, Logger, Telegram, ErrorHandler,
+              StateTracker, Cleaner,
+              AIFallback, VideoFallback, MusicFallback, TTSFallback,
+              UploadManager,
+          )
+          from Management.errors.master_guard import MasterErrorGuard
+          from Management.reporting.live_status import LiveStatus
+          
+          from Management.fetching.Islamic.Hadis.URL_fallback import fawaz
+          from Management.fetching.Translator.URL_fallback import mymemory
+          from Management.fetching.Intro_Outro_CTA.API_fallback import intro_AI, outro_AI, cta_AI
+          from Management.fetching.Background.Video.API_fallback import pexels, pixabay, coverr
+          from Management.fetching.Background.Video.URL_fallback import gradient
+          from Management.fetching.Background.Music.API_fallback import freesound
+          from Management.fetching.Background.Music.URL_fallback import pixabay_music
+          from Story_Render import build_and_render_story
+
+          def run_pipeline():
+              print("═" * 60)
+              print("🎬 STARTING PREMIUM STORY PIPELINE (Live Status Active)")
+              print("═" * 60)
+
+              settings = Settings()
+              logger = Logger(settings.LOG_FILE)
+              tg = Telegram()
+              state = StateTracker(settings.STEPS)
+              cleaner = Cleaner(settings.TEMP_DIR)
+              
+              # 🧠 Master Guard और Live Status तैयार
+              guard = MasterErrorGuard(tg, logger)
+              live = LiveStatus(tg)
+
+              ai_fb = AIFallback()
+              tts_fb = TTSFallback()
+              uploader = UploadManager()
+
+              tg.send("🚀 <b>Video Generation Started!</b>")
+              os.makedirs("temp", exist_ok=True)
+
+              try:
+                  # ── Step 1: हदीस ──
+                  try:
+                      hadith = guard.monitor("Hadith Fetch", fawaz.fetch)
+                      live.update("Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py", "🟢", "हदीस मिल गई")
+                      if not hadith: raise RuntimeError("No hadith found")
+                  except Exception:
+                      live.update("Management/fetching/Islamic/Hadis/URL_fallback/fawaz.py", "🔴", "हदीस फेल")
+                      raise
+                  english_text = hadith.get("english", "")
+
+                  # ── Step 2: AI स्क्रिप्ट ──
+                  try:
+                      prompt = f"Translate to Hindi and add a short moral lesson. Total 70-80 words. Only Hindi text.\n\nHadith: {english_text}"
+                      hindi_text = guard.monitor("AI Script", ai_fb.generate, prompt, 250)
+                      if not hindi_text: raise RuntimeError("AI failed")
+                      live.update("Management/fallback/ai.py", "🟢", "AI स्क्रिप्ट बन गई")
+                  except Exception:
+                      live.update("Management/fallback/ai.py", "🔴", "AI फेल")
+                      raise
+
+                  # ── Step 3: TTS (आवाज़) ──
+                  try:
+                      voice_path = "temp/voice.mp3"
+                      tts_text = f"हदीस शरीफ। {hindi_text}"
+                      voice = guard.monitor("TTS", tts_fb.generate, tts_text, voice_path)
+                      if not voice: raise RuntimeError("TTS failed")
+                      live.update("Management/fallback/tts.py", "🟢", "आवाज़ बन गई")
+                  except Exception:
+                      live.update("Management/fallback/tts.py", "🔴", "TTS फेल")
+                      raise
+
+                  # ── Step 4: Background वीडियो ──
+                  try:
+                      final_bg_video = "temp/bg_video.mp4"
+                      guard.monitor("Background Fetch", gradient.fetch, 20.0, final_bg_video)
+                      live.update("Management/fallback/video.py", "🟢", "बैकग्राउंड मिल गया")
+                  except Exception:
+                      live.update("Management/fallback/video.py", "🔴", "बैकग्राउंड फेल")
+                      raise
+
+                  # ── Step 5: म्यूजिक ──
+                  try:
+                      music_path = "temp/music.mp3"
+                      guard.monitor("Music Fetch", freesound.fetch, "islamic peaceful", 20, music_path)
+                      live.update("Management/fallback/music.py", "🟢", "म्यूजिक मिल गया")
+                  except Exception:
+                      live.update("Management/fallback/music.py", "🔴", "म्यूजिक फेल")
+                      raise
+
+                  # ── Step 6: Final Render ──
+                  try:
+                      final_video_path = "temp/Final_Story.mp4"
+                      render_success = guard.monitor(
+                          "Video Rendering",
+                          build_and_render_story,
+                          bg_video=final_bg_video,
+                          music_path=music_path,
+                          voice_path=voice_path,
+                          hadith=hadith,
+                          hindi_text=hindi_text,
+                          intro_text="Intro",
+                          outro_text="Outro",
+                          cta_text="CTA",
+                          output_path=final_video_path
+                      )
+                      if not render_success: raise RuntimeError("Render failed")
+                      live.update("Story_Generator/Story_Render/video_engine/ffmpeg_builder.py", "🟢", "रेंडर सफल")
+                  except Exception:
+                      live.update("Story_Generator/Story_Render/video_engine/ffmpeg_builder.py", "🔴", "रेंडर फेल")
+                      raise
+
+                  # ── Step 7: Upload ──
+                  try:
+                      drive_link = guard.monitor("Drive Upload", uploader.upload, final_video_path)
+                      live.update("Management/uploader/drive.py", "🟢", "ड्राइव अपलोड सफल")
+                  except Exception:
+                      live.update("Management/uploader/drive.py", "🔴", "ड्राइव अपलोड फेल")
+                      raise
+
+                  # ── Final Report ──
+                  report = f"🎉 <b>Video Ready!</b>\n\n"
+                  report += f"📜 <b>Hadith:</b> {hadith.get('collection', '')} #{hadith.get('number', '')}\n"
+                  if drive_link:
+                      report += f"\n📥 <a href='{drive_link}'>Click here to view</a>"
+                  tg.send(report)
+
+              except Exception as e:
+                  logger.error(f"Pipeline crashed: {e}")
+              finally:
+                  cleaner.clean_all()
+                  logger.info("🧹 Cleanup done")
+
+          if __name__ == "__main__":
+              run_pipeline()
+          EOF
+          echo "✅ main.py updated"
+
+      - name: 4. 💾 Commit & Push
         run: |
           cd Workshop
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
           git add Video_Generator/
-          git commit -m "🎬 Fix FFmpeg audio stream error" || echo "No changes"
+          git commit -m "📊 Added Live Status (🟢/🔴/🟠) reporting" || echo "No changes"
           git push origin main || echo "Push failed"
