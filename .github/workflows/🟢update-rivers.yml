@@ -8,8 +8,8 @@ on:
         type: choice
         default: 'Backend Update'
         options:
-          - 'Backend Update'         # Workshop ➡️ Backend
-          - 'Workshop Reverse'       # Backend ➡️ Workshop
+          - 'Backend Update'         # Diploment ➡️ Backend
+          - 'Diploment Reverse'      # Backend ➡️ Diploment
 
 permissions:
   contents: write
@@ -28,14 +28,14 @@ jobs:
       # ─────────────────────────────────────────────────────────────
       # STEP 1: CHECKOUT (दोनों रेपोज को लोड करना)
       # ─────────────────────────────────────────────────────────────
-      - name: 1. 📥 Checkout Workshop
+      - name: 1. 📥 Checkout Diploment (Testing)
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Diploment'
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'Workshop'
+          path: 'Diploment'
 
-      - name: 2. 📥 Checkout Backend
+      - name: 2. 📥 Checkout Backend (Production)
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Backend'
@@ -43,14 +43,14 @@ jobs:
           path: 'Backend'
 
       # ─────────────────────────────────────────────────────────────
-      # STEP 3A: BACKEND UPDATE (Workshop ➡️ Backend)
+      # STEP 3A: BACKEND UPDATE (Diploment ➡️ Backend)
       # ─────────────────────────────────────────────────────────────
-      - name: 3A. 🚀 Update Backend (Workshop ➡️ Backend)
+      - name: 3A. 🚀 Update Backend (Diploment ➡️ Backend)
         if: ${{ inputs.action == 'Backend Update' }}
         run: |
-          echo "🚀 Syncing Workshop code to Backend..."
-          # Workshop का सारा सही कोड Backend में डालना और एक्स्ट्रा डिलीट करना
-          rsync -av --delete --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='temp/' Workshop/Video_Generator/ Backend/Video_Generator/
+          echo "🚀 Syncing Diploment code to Backend..."
+          # Diploment का सारा सही कोड Backend में डालना और एक्स्ट्रा डिलीट करना
+          rsync -av --delete --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='temp/' Diploment/Video_Generator/ Backend/Video_Generator/
           
           cd Backend
           git config user.name "Sawaj Studio Bot"
@@ -60,37 +60,37 @@ jobs:
             echo "STATUS=No Changes (Already in sync)" >> $GITHUB_ENV
           else
             git add Video_Generator/
-            git commit -m "🚀 Production Update: Synced from Workshop"
+            git commit -m "🚀 Production Update: Synced from Diploment"
             git push origin main
             echo "STATUS=Success! Backend Updated." >> $GITHUB_ENV
           fi
 
       # ─────────────────────────────────────────────────────────────
-      # STEP 3B: WORKSHOP REVERSE (Backend ➡️ Workshop)
+      # STEP 3B: DIPLOMENT REVERSE (Backend ➡️ Diploment)
       # ─────────────────────────────────────────────────────────────
-      - name: 3B. 🛡️ Reverse Workshop (Backend ➡️ Workshop)
-        if: ${{ inputs.action == 'Workshop Reverse' }}
+      - name: 3B. 🛡️ Reverse Diploment (Backend ➡️ Diploment)
+        if: ${{ inputs.action == 'Diploment Reverse' }}
         run: |
-          echo "🚨 Deleting all files inside Workshop/Video_Generator/..."
-          # Workshop का सारा कोड पूरी तरह साफ (Wipe) करना
-          rm -rf Workshop/Video_Generator/*
+          echo "🚨 Deleting all files inside Diploment/Video_Generator/..."
+          # Diploment का सारा कोड पूरी तरह साफ (Wipe) करना
+          rm -rf Diploment/Video_Generator/*
           
           echo "🚀 Copying fresh code from Backend..."
           # Backend से नया कोड वापस लाना
-          rsync -av --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='temp/' Backend/Video_Generator/ Workshop/Video_Generator/
+          rsync -av --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='temp/' Backend/Video_Generator/ Diploment/Video_Generator/
           
-          cd Workshop
+          cd Diploment
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
           
           git add Video_Generator/
           
           if git diff-index --quiet HEAD; then
-            echo "STATUS=No Changes (Workshop already identical to Backend)" >> $GITHUB_ENV
+            echo "STATUS=No Changes (Diploment already identical to Backend)" >> $GITHUB_ENV
           else
-            git commit -m "🛡️ Workshop Restored: Wiped & Replaced with Backend code"
+            git commit -m "🛡️ Diploment Restored: Wiped & Replaced with Backend code"
             git push origin main
-            echo "STATUS=Success! Workshop Restored from Backend." >> $GITHUB_ENV
+            echo "STATUS=Success! Diploment Restored from Backend." >> $GITHUB_ENV
           fi
 
       # ─────────────────────────────────────────────────────────────
@@ -103,16 +103,22 @@ jobs:
           STATUS="${STATUS:-Failed or Cancelled}"
           
           if [ "$ACTION" = "Backend Update" ]; then
-            MSG="🚀 Backend Update Process Completed
-            📁 Folder: Video_Generator
-            📊 Status: ${STATUS}"
+            MSG="🚀 <b>Backend Update Completed</b>
+            
+            📥 <b>From:</b> Diploment (Testing)
+            📤 <b>To:</b> Backend (Production)
+            📁 <b>Folder:</b> Video_Generator
+            📊 <b>Status:</b> ${STATUS}"
           else
-            MSG="🛡️ Workshop Reverse Process Completed
-            🗑️ Action: Workshop code deleted
-            📥 Action: Backend code copied
-            📊 Status: ${STATUS}"
+            MSG="🛡️ <b>Diploment Reverse Completed</b>
+            
+            🗑️ <b>Action:</b> Diploment code deleted
+            📥 <b>Action:</b> Backend code copied
+            📁 <b>Folder:</b> Video_Generator
+            📊 <b>Status:</b> ${STATUS}"
           fi
           
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
-            --data-urlencode "text=${MSG}" || true
+            --data-urlencode "text=${MSG}" \
+            -d "parse_mode=HTML" || true
