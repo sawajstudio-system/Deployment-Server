@@ -39,7 +39,7 @@ jobs:
           cd Public
           echo "🔍 Fixing YMLs in Public Repo..."
           # सभी YML फाइलों में 'Workshop' को 'Diploment' से बदलें
-          grep -rl 'sawajstudio-system/Workshop' .github/workflows/ | xargs sed -i 's|sawajstudio-system/Workshop|sawajstudio-system/Diploment|g' || true
+          grep -rl 'sawajstudio-system/Diploment' .github/workflows/ | xargs sed -i 's|sawajstudio-system/Diploment|sawajstudio-system/Diploment|g' || true
           
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
@@ -55,7 +55,7 @@ jobs:
           cd Diploment
           echo "🔍 Fixing internal paths in Diploment Repo..."
           # अगर कहीं भी 'Workshop' शब्द बचा है, तो उसे 'Diploment' कर दें
-          grep -rl 'sawajstudio-system/Workshop' . --include="*.py" --include="*.yml" | xargs sed -i 's|sawajstudio-system/Workshop|sawajstudio-system/Diploment|g' || true
+          grep -rl 'sawajstudio-system/Diploment' . --include="*.py" --include="*.yml" | xargs sed -i 's|sawajstudio-system/Diploment|sawajstudio-system/Diploment|g' || true
           
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
@@ -70,7 +70,7 @@ jobs:
         run: |
           cd Backend
           echo "🔍 Fixing internal paths in Backend Repo..."
-          grep -rl 'sawajstudio-system/Workshop' . --include="*.py" --include="*.yml" | xargs sed -i 's|sawajstudio-system/Workshop|sawajstudio-system/Diploment|g' || true
+          grep -rl 'sawajstudio-system/Diploment' . --include="*.py" --include="*.yml" | xargs sed -i 's|sawajstudio-system/Diploment|sawajstudio-system/Diploment|g' || true
           
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
