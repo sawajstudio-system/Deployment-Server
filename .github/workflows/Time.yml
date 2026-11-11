@@ -1,0 +1,79 @@
+name: 🚑 One-Time Fix (Workshop to Diploment)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix_all_repos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. 📥 Checkout Public Repo (Firent)
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Firent'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Public'
+
+      - name: 2. 📥 Checkout Diploment Repo
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Diploment'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Diploment'
+
+      - name: 3. 📥 Checkout Backend Repo
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Backend'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Backend'
+
+      # ═══════════════════════════════════════════════════════════════
+      # FIX PUBLIC REPO YMLs
+      # ═══════════════════════════════════════════════════════════════
+      - name: 4. 🔧 Fix Paths in Public Repo Workflows
+        run: |
+          cd Public
+          echo "🔍 Fixing YMLs in Public Repo..."
+          # सभी YML फाइलों में 'Workshop' को 'Diploment' से बदलें
+          grep -rl 'sawajstudio-system/Workshop' .github/workflows/ | xargs sed -i 's|sawajstudio-system/Workshop|sawajstudio-system/Diploment|g' || true
+          
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          git add .github/workflows/
+          git commit -m "🚑 One-Time Fix: Changed Workshop to Diploment in YMLs" || echo "No changes in Public"
+          git push origin main || echo "Push failed in Public"
+
+      # ═══════════════════════════════════════════════════════════════
+      # FIX DIPLOMENT REPO (Internal code)
+      # ═══════════════════════════════════════════════════════════════
+      - name: 5. 🔧 Fix Paths inside Diploment Repo
+        run: |
+          cd Diploment
+          echo "🔍 Fixing internal paths in Diploment Repo..."
+          # अगर कहीं भी 'Workshop' शब्द बचा है, तो उसे 'Diploment' कर दें
+          grep -rl 'sawajstudio-system/Workshop' . --include="*.py" --include="*.yml" | xargs sed -i 's|sawajstudio-system/Workshop|sawajstudio-system/Diploment|g' || true
+          
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          git add .
+          git commit -m "🚑 One-Time Fix: Renamed internal references to Diploment" || echo "No changes in Diploment"
+          git push origin main || echo "Push failed in Diploment"
+
+      # ═══════════════════════════════════════════════════════════════
+      # FIX BACKEND REPO (Internal code, if any)
+      # ═══════════════════════════════════════════════════════════════
+      - name: 6. 🔧 Fix Paths inside Backend Repo
+        run: |
+          cd Backend
+          echo "🔍 Fixing internal paths in Backend Repo..."
+          grep -rl 'sawajstudio-system/Workshop' . --include="*.py" --include="*.yml" | xargs sed -i 's|sawajstudio-system/Workshop|sawajstudio-system/Diploment|g' || true
+          
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          git add .
+          git commit -m "🚑 One-Time Fix: Renamed internal references to Diploment" || echo "No changes in Backend"
+          git push origin main || echo "Push failed in Backend"
