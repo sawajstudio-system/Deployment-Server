@@ -1,4 +1,4 @@
-name: 🚑 One-Time Fix (Workshop to Diploment)
+name: 🚑 Restore Backend Production (Fix Background)
 
 on:
   workflow_dispatch:
@@ -7,24 +7,10 @@ permissions:
   contents: write
 
 jobs:
-  fix_all_repos:
+  restore_backend:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. 📥 Checkout Public Repo (Firent)
-        uses: actions/checkout@v4
-        with:
-          repository: 'sawajstudio-system/Firent'
-          token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'Public'
-
-      - name: 2. 📥 Checkout Diploment Repo
-        uses: actions/checkout@v4
-        with:
-          repository: 'sawajstudio-system/Diploment'
-          token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'Diploment'
-
-      - name: 3. 📥 Checkout Backend Repo
+      - name: 1. 📥 Checkout Backend (Production)
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Backend'
@@ -32,48 +18,77 @@ jobs:
           path: 'Backend'
 
       # ═══════════════════════════════════════════════════════════════
-      # FIX PUBLIC REPO YMLs
+      # 1. RESTORE VIDEO FILTER (Background wapas lao)
       # ═══════════════════════════════════════════════════════════════
-      - name: 4. 🔧 Fix Paths in Public Repo Workflows
+      - name: 2. 🎥 Restore video_filter.py (Fix Black Background)
         run: |
-          cd Public
-          echo "🔍 Fixing YMLs in Public Repo..."
-          # सभी YML फाइलों में 'Workshop' को 'Diploment' से बदलें
-          grep -rl 'sawajstudio-system/Diploment' .github/workflows/ | xargs sed -i 's|sawajstudio-system/Diploment|sawajstudio-system/Diploment|g' || true
-          
-          git config user.name "Sawaj Studio Bot"
-          git config user.email "bot@sawajstudio.com"
-          git add .github/workflows/
-          git commit -m "🚑 One-Time Fix: Changed Workshop to Diploment in YMLs" || echo "No changes in Public"
-          git push origin main || echo "Push failed in Public"
+          cd Backend/Video_Generator/Story_Generator/Story_Render/video_engine
+          cat > video_filter.py << 'EOF'
+          from .logo_processor import get_logo_filter
+          from .logo_placer import get_moving_logo_expr, get_fixed_logo_pos
+
+          def build_video_filter(has_logo, logo_idx, cta_idx, cta_start_time):
+              # ✅ ORIGINAL: scale + crop + vignette (Background clearly visible)
+              filters = (
+                  "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
+                  "crop=1080:1920,vignette=PI/4[bg];"
+              )
+              current_v_out = "bg"
+
+              if has_logo and logo_idx != -1:
+                  logo_filter_moving = get_logo_filter(logo_width=400, logo_height=160)
+                  logo_filter_fixed = get_logo_filter(logo_width=600, logo_height=240)
+
+                  filters += f"[{logo_idx}:v]split[logo_mov][logo_fix];"
+                  filters += f"[logo_mov]{logo_filter_moving}[logo_mov_scaled];"
+                  filters += f"[logo_fix]{logo_filter_fixed}[logo_fix_scaled];"
+
+                  x_expr, y_expr = get_moving_logo_expr()
+                  filters += (
+                      f"[{current_v_out}][logo_mov_scaled]"
+                      f"overlay=x='{x_expr}':y='{y_expr}':enable='lt(t,{cta_start_time})'"
+                      f"[bg_with_moving_logo];"
+                  )
+
+                  fx, fy = get_fixed_logo_pos()
+                  filters += (
+                      f"[bg_with_moving_logo][logo_fix_scaled]"
+                      f"overlay=x='{fx}':y='{fy}':enable='gte(t,{cta_start_time})'"
+                      f"[bg_with_logo];"
+                  )
+                  current_v_out = "bg_with_logo"
+
+              return filters, current_v_out
+          EOF
+          echo "✅ Backend video_filter.py Restored"
 
       # ═══════════════════════════════════════════════════════════════
-      # FIX DIPLOMENT REPO (Internal code)
+      # 2. RESTORE LOGO PROCESSOR
       # ═══════════════════════════════════════════════════════════════
-      - name: 5. 🔧 Fix Paths inside Diploment Repo
+      - name: 3. 🖼️ Restore logo_processor.py
         run: |
-          cd Diploment
-          echo "🔍 Fixing internal paths in Diploment Repo..."
-          # अगर कहीं भी 'Workshop' शब्द बचा है, तो उसे 'Diploment' कर दें
-          grep -rl 'sawajstudio-system/Diploment' . --include="*.py" --include="*.yml" | xargs sed -i 's|sawajstudio-system/Diploment|sawajstudio-system/Diploment|g' || true
-          
-          git config user.name "Sawaj Studio Bot"
-          git config user.email "bot@sawajstudio.com"
-          git add .
-          git commit -m "🚑 One-Time Fix: Renamed internal references to Diploment" || echo "No changes in Diploment"
-          git push origin main || echo "Push failed in Diploment"
+          cd Backend/Video_Generator/Story_Generator/Story_Render/video_engine
+          cat > logo_processor.py << 'EOF'
+          def get_logo_filter(logo_width=400, logo_height=160):
+              fb_blue_filter = (
+                  f"scale={logo_width}:{logo_height},format=rgba,"
+                  f"colorchannelmixer=rr=0.094:gg=0.466:bb=0.949:aa=1.0,"
+                  f"split[logo][shadow];"
+                  f"[shadow]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.9,boxblur=10:2[shadow_blur];"   
+                  f"[shadow_blur][logo]overlay=6:6"
+              )
+              return fb_blue_filter
+          EOF
+          echo "✅ Backend logo_processor.py Restored"
 
       # ═══════════════════════════════════════════════════════════════
-      # FIX BACKEND REPO (Internal code, if any)
+      # 3. COMMIT & PUSH
       # ═══════════════════════════════════════════════════════════════
-      - name: 6. 🔧 Fix Paths inside Backend Repo
+      - name: 4. 💾 Commit & Push to Backend
         run: |
           cd Backend
-          echo "🔍 Fixing internal paths in Backend Repo..."
-          grep -rl 'sawajstudio-system/Diploment' . --include="*.py" --include="*.yml" | xargs sed -i 's|sawajstudio-system/Diploment|sawajstudio-system/Diploment|g' || true
-          
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
-          git add .
-          git commit -m "🚑 One-Time Fix: Renamed internal references to Diploment" || echo "No changes in Backend"
-          git push origin main || echo "Push failed in Backend"
+          git add Video_Generator/Story_Generator/Story_Render/video_engine/
+          git commit -m "🚑 Restore Production: Fixed video_filter & logo_processor" || echo "No changes"
+          git push origin main || echo "Push failed"
