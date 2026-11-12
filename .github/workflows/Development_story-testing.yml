@@ -61,30 +61,20 @@ jobs:
 
       - name: 5. 🔍 Verify structure
         run: |
-          echo "📂 Factory/Management tree:"
-          find Factory/Management -maxdepth 2 -type d | sort
-          echo ""
-          echo "📄 story files:"
+          echo "📂 story files:"
           ls -la Factory/Management/story/
           echo ""
           echo "📂 assets:"
-          ls Factory/Management/assets/ 2>/dev/null
-          ls Factory/Management/assets/fonts/ 2>/dev/null
+          ls Factory/Management/assets/
+          ls Factory/Management/assets/fonts/ | head -5
 
       - name: 6. 🎬 Run Video Pipeline
         working-directory: Factory/Management/story
         env:
-          PYTHONPATH: >-
-            ${{ github.workspace }}/Factory/Management/story:
-            ${{ github.workspace }}/Factory/Management/1_Git_Tools:
-            ${{ github.workspace }}/Factory/Management/2_AI_Models:
-            ${{ github.workspace }}/Factory/Management/3_Media:
-            ${{ github.workspace }}/Factory/Management/4_Islamic:
-            ${{ github.workspace }}/Factory/Management/5_Audio_Text:
-            ${{ github.workspace }}/Factory/Management/Uploader
+          PYTHONPATH: "${{ github.workspace }}/Factory/Management/story:${{ github.workspace }}/Factory/Management/1_Git_Tools:${{ github.workspace }}/Factory/Management/2_AI_Models:${{ github.workspace }}/Factory/Management/3_Media:${{ github.workspace }}/Factory/Management/4_Islamic:${{ github.workspace }}/Factory/Management/5_Audio_Text:${{ github.workspace }}/Factory/Management/Uploader"
         run: |
-          echo "🐍 PYTHONPATH: $PYTHONPATH"
-          echo "📂 Working dir: $(pwd)"
+          echo "🐍 PYTHONPATH:"
+          echo "$PYTHONPATH" | tr ':' '\n'
           echo ""
           echo "🚀 Running main.py..."
           python -u main.py
@@ -116,7 +106,7 @@ jobs:
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_REPORT_TOKEN }}/sendMessage" \
             -d "chat_id=${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}" \
-            -d "text=❌ <b>Factory Video Failed</b>%0A<b>Check GitHub Logs</b>" \
+            -d "text=❌ <b>Video Failed</b>%0A<b>Check GitHub Logs</b>" \
             -d "parse_mode=HTML" || true
 
       - name: 10. 🧹 Cleanup
