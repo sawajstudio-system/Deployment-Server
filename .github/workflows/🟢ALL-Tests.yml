@@ -43,7 +43,7 @@ on:
           - 'History Cleaner'
           - 'Test All GDrive'
 
-      # ─── 2. ZIP FILE LIST (UPDATED FOR 3 REPOS) ───
+      # ─── 2. ZIP FILE LIST (UPDATED FOR NAYE REPOS) ───
       zip_file:
         description: 'ZIP File (Kis repo ka ZIP chahiye?)'
         type: choice
@@ -51,14 +51,14 @@ on:
         options:
           - 'None'
           - 'All 3 Repos'
-          - 'Public Only'
-          - 'Backend Only'
-          - 'Workshop Only'
-          - 'Public + Backend'
-          - 'Public + Workshop'
-          - 'Backend + Workshop'
+          - 'Hosting Only'
+          - 'Deployment-Server Only'
+          - 'Development Only'
+          - 'Hosting + Deployment-Server'
+          - 'Hosting + Development'
+          - 'Deployment-Server + Development'
 
-      # ─── 3. TXT FILE LIST (UPDATED FOR 3 REPOS) ───
+      # ─── 3. TXT FILE LIST (UPDATED FOR NAYE REPOS) ───
       txt_file:
         description: 'TXT File (Kis repo ka TXT chahiye?)'
         type: choice
@@ -66,12 +66,12 @@ on:
         options:
           - 'None'
           - 'All 3 Repos'
-          - 'Public Only'
-          - 'Backend Only'
-          - 'Workshop Only'
-          - 'Public + Backend'
-          - 'Public + Workshop'
-          - 'Backend + Workshop'
+          - 'Hosting Only'
+          - 'Deployment-Server Only'
+          - 'Development Only'
+          - 'Hosting + Deployment-Server'
+          - 'Hosting + Development'
+          - 'Deployment-Server + Development'
 
 # ══════════════════════════════════════════════════════════════════════════════
 jobs:
@@ -138,6 +138,7 @@ jobs:
           ZIP_FILE = os.environ.get("ZIP_FILE", "None")
           TXT_FILE = os.environ.get("TXT_FILE", "None")
 
+          # Paths wahi hain, bas repo ka naam naya hai
           ALL_MAP = {
               "Cloudflare":        "A_API_room/01_ai_models/cloudflare.py",
               "Anges":             "A_API_room/01_ai_models/anges.py",
@@ -209,7 +210,8 @@ jobs:
               except Exception: pass
 
           def fetch_file(rel, retries=3):
-              url = f"https://api.github.com/repos/sawajstudio-system/Backend/contents/System_room/{rel}"
+              # 🟢 YAHAN REPO KA NAAM BADAL DIYA HAI (Deployment-Server)
+              url = f"https://api.github.com/repos/sawajstudio-system/Deployment-Server/contents/System_room/{rel}"
               for attempt in range(1, retries + 1):
                   try:
                       r = requests.get(url, headers={"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.raw"}, timeout=30)
@@ -230,13 +232,13 @@ jobs:
               rel = ALL_MAP[name]
               print(f"\n[{idx}/{total}] {name}")
               
-              # 🟢 REPO_TARGET Set karna (Har test ke liye alag)
+              # 🟢 REPO_TARGET Set karna
               if name == "ZIP Generator":
                   os.environ["REPO_TARGET"] = ZIP_FILE
               elif name == "TXT Generator":
                   os.environ["REPO_TARGET"] = TXT_FILE
               else:
-                  os.environ["REPO_TARGET"] = "All 3 Repos" # Default for API Tests
+                  os.environ["REPO_TARGET"] = "All 3 Repos" 
                   
               print(f"📦 Repo Target: {os.environ.get('REPO_TARGET')}")
 
