@@ -1,0 +1,91 @@
+name: 🧪 Google Drive Upload Test
+
+on:
+  workflow_dispatch: # इसे मैन्युअली चलाने के लिए
+
+jobs:
+  test_drive_upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      # 🟢 यहाँ हम आपके GitHub Secrets का इस्तेमाल कर रहे हैं
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}       # Hosting Folder
+      GDRIVE_F_RECYCLE_ID: ${{ secrets.GDRIVE_F_RECYCLE_ID }}   # Recycle Folder
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+      - name: 🚀 Run Google Drive Test Upload
+        run: |
+          cat << 'EOF' > test_upload.py
+          import os
+          import time
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          # Environment Variables
+          CLIENT_ID = os.getenv("GDRIVE_CLIENT_ID")
+          CLIENT_SECRET = os.getenv("GDRIVE_CLIENT_SECRET")
+          REFRESH_TOKEN = os.getenv("GDRIVE_REFRESH_TOKEN")
+          HOSTING_ID = os.getenv("GDRIVE_F_STORY_ID")
+          RECYCLE_ID = os.getenv("GDRIVE_F_RECYCLE_ID")
+
+          # Authenticate
+          creds = Credentials(
+              None,
+              refresh_token=REFRESH_TOKEN,
+              client_id=CLIENT_ID,
+              client_secret=CLIENT_SECRET,
+              token_uri="https://oauth2.googleapis.com/token"
+          )
+          service = build('drive', 'v3', credentials=creds, cache_discovery=False)
+
+          def upload_test_file(file_name, folder_id, folder_name):
+              if not folder_id:
+                  print(f"⚠️ Skipping {folder_name}: ID is missing in Secrets.")
+                  return
+              
+              print(f"📤 Uploading test file to {folder_name}...")
+              
+              # Create a temporary text file
+              with open(file_name, 'w') as f:
+                  f.write(f"This is a test file for {folder_name}. Uploaded at {time.ctime()}")
+
+              file_metadata = {'name': file_name, 'parents': [folder_id]}
+              media = MediaFileUpload(file_name, mimetype='text/plain')
+
+              try:
+                  file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+                  print(f"✅ Success! {folder_name} Upload ID: {file.get('id')}")
+                  print(f"🔗 Link: {file.get('webViewLink')}\n")
+              except Exception as e:
+                  print(f"❌ Failed to upload to {folder_name}: {e}\n")
+              finally:
+                  if os.path.exists(file_name):
+                      os.remove(file_name)
+
+          # 1. Test Hosting Folder
+          upload_test_file("Test_Hosting.txt", HOSTING_ID, "Hosting")
+
+          # 2. Test Recycle Folder
+          upload_test_file("Test_Recycle.txt", RECYCLE_ID, "Recycle")
+
+          print("🏁 Test Completed!")
+          EOF
+          
+          python test_upload.py
