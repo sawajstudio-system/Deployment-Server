@@ -1,4 +1,4 @@
-name: 🟢check system 
+name: 🟢ALL-Tests
 
 on:
   workflow_dispatch:
