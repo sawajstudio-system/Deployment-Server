@@ -3,7 +3,6 @@ name: 🟢ALL-Tests
 on:
   workflow_dispatch:
     inputs:
-      # ─── 1. API LIST ───
       api_test:
         description: 'API Test (Kaunsi API chalani hai?)'
         type: choice
@@ -26,7 +25,6 @@ on:
           - 'Quran Tafsir'
           - 'Quran Foundation'
           - 'Hadees'
-          - 'Zesyn Hadees'
           - 'Hijri Date'
           - 'Pexels'
           - 'Pixabay'
@@ -43,7 +41,6 @@ on:
           - 'History Cleaner'
           - 'Test All GDrive'
 
-      # ─── 2. ZIP FILE LIST (UPDATED FOR NAYE REPOS) ───
       zip_file:
         description: 'ZIP File (Kis repo ka ZIP chahiye?)'
         type: choice
@@ -52,13 +49,9 @@ on:
           - 'None'
           - 'All 3 Repos'
           - 'Hosting Only'
-          - 'Deployment-Server Only'
           - 'Development Only'
-          - 'Hosting + Deployment-Server'
           - 'Hosting + Development'
-          - 'Deployment-Server + Development'
 
-      # ─── 3. TXT FILE LIST (UPDATED FOR NAYE REPOS) ───
       txt_file:
         description: 'TXT File (Kis repo ka TXT chahiye?)'
         type: choice
@@ -67,13 +60,9 @@ on:
           - 'None'
           - 'All 3 Repos'
           - 'Hosting Only'
-          - 'Deployment-Server Only'
           - 'Development Only'
-          - 'Hosting + Deployment-Server'
           - 'Hosting + Development'
-          - 'Deployment-Server + Development'
 
-# ══════════════════════════════════════════════════════════════════════════════
 jobs:
   run_tests:
     runs-on: ubuntu-latest
@@ -113,15 +102,16 @@ jobs:
       GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
 
     steps:
-      - name: 1. Setup Python
+      - name: 1. 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
-      - name: 2. Install requests
+      - name: 2. 📦 Install requests
         run: pip install requests
 
-      - name: 3. Execute Tests
+      - name: 3. 🚀 Execute Tests
         env:
           API_TEST: ${{ inputs.api_test }}
           ZIP_FILE: ${{ inputs.zip_file }}
@@ -138,7 +128,9 @@ jobs:
           ZIP_FILE = os.environ.get("ZIP_FILE", "None")
           TXT_FILE = os.environ.get("TXT_FILE", "None")
 
-          # Paths wahi hain, bas repo ka naam naya hai
+          # 🟢 FIXED: Repo ka naam hosting_sarvar kiya aur System_room path add kiya
+          BASE_URL = "https://api.github.com/repos/sawajstudio-system/hosting_sarvar/contents/System_room/"
+
           ALL_MAP = {
               "Cloudflare":        "A_API_room/01_ai_models/cloudflare.py",
               "Anges":             "A_API_room/01_ai_models/anges.py",
@@ -155,7 +147,6 @@ jobs:
               "Quran Tafsir":      "URL_room/Islamic/quran_tafsir.py",
               "Quran Foundation":  "A_API_room/Islamic/quran_foundation.py",
               "Hadees":            "URL_room/Islamic/hadees.py",
-              "Zesyn Hadees":      "URL_room/Islamic/zesyn_hadees.py",
               "Hijri Date":        "URL_room/Islamic/hijri_date.py",
               "Pexels":            "A_API_room/05_video_services/pexels.py",
               "Pixabay":           "A_API_room/05_video_services/pixabay.py",
@@ -170,32 +161,24 @@ jobs:
               "Telegram":          "A_API_room/03_integrations/telegram.py",
               "GitHub":            "Git_room/github.py",
               "History Cleaner":   "Git_room/history_cleaner.py",
-              "TXT Generator":     "Git_room/txt_generator.py",
-              "ZIP Generator":     "Git_room/zip_generator.py",
               "Test All GDrive":   "A_API_room/02_audio_media/test_gdrive_all.py",
           }
 
-          # ─── SMART SELECTION LOGIC ───
           selected_tests = []
 
-          # 1. API Check
           if API_TEST != "None":
               if API_TEST == "ALL Tests (Sab 33)":
                   for name in ALL_MAP.keys():
-                      if name not in ["TXT Generator", "ZIP Generator"]:
-                          selected_tests.append(name)
+                      selected_tests.append(name)
               elif API_TEST in ALL_MAP:
                   selected_tests.append(API_TEST)
 
-          # 2. ZIP Check
+          # 🟢 ZIP और TXT को सही तरीके से हैंडल किया गया
           if ZIP_FILE != "None":
               selected_tests.append("ZIP Generator")
-
-          # 3. TXT Check
           if TXT_FILE != "None":
               selected_tests.append("TXT Generator")
 
-          # Duplicate hatao
           selected_tests = list(dict.fromkeys(selected_tests))
 
           if not selected_tests:
@@ -210,15 +193,14 @@ jobs:
               except Exception: pass
 
           def fetch_file(rel, retries=3):
-              # 🟢 YAHAN REPO KA NAAM BADAL DIYA HAI (Deployment-Server)
-              url = f"https://api.github.com/repos/sawajstudio-system/Deployment-Server/contents/System_room/{rel}"
+              url = f"{BASE_URL}{rel}"
               for attempt in range(1, retries + 1):
                   try:
                       r = requests.get(url, headers={"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.raw"}, timeout=30)
                       if r.status_code == 200: return ("OK", r.content)
                       if r.status_code == 404: return ("SKIP_404", None)
                       if r.status_code == 403:
-                          time.sleep(60); continue
+                          time.sleep(10); continue
                   except Exception as e: print(f"Retry {attempt}: {e}")
                   time.sleep(2 ** attempt)
               return ("FAIL_FETCH", None)
@@ -229,23 +211,23 @@ jobs:
           start_all = time.time()
 
           for idx, name in enumerate(selected_tests, 1):
-              rel = ALL_MAP[name]
-              print(f"\n[{idx}/{total}] {name}")
+              print(f"\n[{idx}/{total}] Processing: {name}")
               
-              # 🟢 REPO_TARGET Set karna
+              # 🟢 ZIP/TXT के लिए रिपो टारगेट सेट करना और स्क्रिप्ट रन करना
               if name == "ZIP Generator":
                   os.environ["REPO_TARGET"] = ZIP_FILE
+                  fetch_status, content = fetch_file("Git_room/zip_generator.py")
               elif name == "TXT Generator":
                   os.environ["REPO_TARGET"] = TXT_FILE
+                  fetch_status, content = fetch_file("Git_room/txt_generator.py")
               else:
                   os.environ["REPO_TARGET"] = "All 3 Repos" 
-                  
-              print(f"📦 Repo Target: {os.environ.get('REPO_TARGET')}")
+                  rel = ALL_MAP[name]
+                  fetch_status, content = fetch_file(rel)
 
               t0 = time.time()
               status, duration, reason = None, 0, ""
 
-              fetch_status, content = fetch_file(rel)
               if fetch_status == "SKIP_404":
                   status, reason = "SKIP", "file not found (404)"
               elif fetch_status == "FAIL_FETCH":
@@ -257,7 +239,9 @@ jobs:
                       f.write(content)
                   sys.stdout.flush()
                   try:
-                      rc = subprocess.run([sys.executable, "/tmp/run_me.py"], timeout=180).returncode
+                      # 🟢 ज्यादा टाइमआउट दिया गया है ज़िप/टीएक्सटी के लिए
+                      timeout_sec = 300 if name in ["ZIP Generator", "TXT Generator"] else 180
+                      rc = subprocess.run([sys.executable, "/tmp/run_me.py"], timeout=timeout_sec).returncode
                       status = "PASS" if rc == 0 else "FAIL"
                   except subprocess.TimeoutExpired:
                       status = "TIMEOUT"
@@ -277,9 +261,9 @@ jobs:
           total_time = time.time() - start_all
 
           print(f"\nSUMMARY: Pass: {passed} | Fail: {failed} | Skip: {skipped} | Timeout: {timeout} | {total_time:.0f}s")
-          tg(f"🏁 Done\nPass: {passed} | Fail: {failed} | Skip: {skipped} | Timeout: {timeout}")
+          tg(f"🏁 All Tests Completed\n✅ Pass: {passed}\n❌ Fail: {failed}\n⏭️ Skip: {skipped}\n⏰ Timeout: {timeout}")
           PYEOF
 
-      - name: 4. Cleanup
+      - name: 4. 🧹 Cleanup
         if: always()
         run: rm -f /tmp/run_me.py
