@@ -1,0 +1,142 @@
+name: 📄 Full 3 Repos TXT Generator
+
+on:
+  workflow_dispatch: # आप इस बटन को दबाकर इसे कभी भी चला सकते हैं
+
+jobs:
+  generate_txt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_CHAT: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 2. 📦 Install requests
+        run: pip install requests
+
+      - name: 3. 🚀 Generate and Send TXT
+        run: |
+          python << 'PYEOF'
+          import os, requests, base64, time
+
+          GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+          TG_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+          TG_CHAT = os.environ.get("TELEGRAM_CHAT")
+          
+          # 🟢 आपकी तीनों रिपॉजिटरीज़
+          REPOS = [
+              "sawajstudio-system/admin",
+              "sawajstudio-system/hosting_sarvar",
+              "sawajstudio-system/Development"
+          ]
+
+          OUTPUT_FILE = "Combined_Export.txt"
+          
+          # इन फोल्डर्स को हम स्किप करेंगे ताकि TXT फाइल बहुत ज्यादा भारी न हो जाए
+          SKIP_DIRS = {".git", "node_modules", "__pycache__", ".github/workflows/.gitkeep", ".venv", "temp"}
+          BINARY_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".mp4", ".mp3", ".ttf", ".woff", ".pdf", ".zip", ".exe", ".pyc"}
+
+          headers = {
+              "Authorization": f"token {GITHUB_TOKEN}",
+              "Accept": "application/vnd.github.v3+json"
+          }
+
+          def fetch_repo_files(repo_name, file_obj):
+              print(f"📦 Fetching: {repo_name}...")
+              # 1. Default branch निकालें
+              r = requests.get(f"https://api.github.com/repos/{repo_name}", headers=headers)
+              if r.status_code != 200:
+                  file_obj.write(f"\n\n[ERROR] Could not fetch repo info for {repo_name}\n")
+                  return
+              branch = r.json().get("default_branch", "main")
+
+              # 2. पूरा Tree (फाइलों की लिस्ट) निकालें
+              r = requests.get(f"https://api.github.com/repos/{repo_name}/git/trees/{branch}?recursive=1", headers=headers)
+              if r.status_code != 200:
+                  file_obj.write(f"\n\n[ERROR] Could not fetch tree for {repo_name}\n")
+                  return
+              
+              tree = r.json().get("tree", [])
+              
+              file_obj.write(f"\n\n{'='*80}\n")
+              file_obj.write(f"📂 REPOSITORY: {repo_name}\n")
+              file_obj.write(f"🌿 Branch: {branch}\n")
+              file_obj.write(f"{'='*80}\n\n")
+
+              count = 0
+              for item in tree:
+                  if item["type"] != "blob":
+                      continue
+                  
+                  path = item["path"]
+                  
+                  # स्किप लॉजिक
+                  if any(skip in path.split("/") for skip in SKIP_DIRS):
+                      continue
+                  if any(path.lower().endswith(ext) for ext in BINARY_EXTS):
+                      file_obj.write(f"\n\n--- 🚫 BINARY FILE SKIPPED: {path} ---\n")
+                      continue
+
+                  # 3. फाइल का कंटेंट डाउनलोड करें
+                  raw_url = f"https://raw.githubusercontent.com/{repo_name}/{branch}/{path}"
+                  res = requests.get(raw_url)
+                  
+                  if res.status_code == 200:
+                      try:
+                          content = res.text
+                          file_obj.write(f"\n\n{'='*60}\n")
+                          file_obj.write(f"📄 FILE: {path}\n")
+                          file_obj.write(f"{'='*60}\n")
+                          file_obj.write(content)
+                          count += 1
+                      except Exception as e:
+                          file_obj.write(f"\n[ERROR reading file: {e}]\n")
+                  
+                  time.sleep(0.1) # रेट लिमिट से बचने के लिए
+
+              print(f"✅ Done: {repo_name} ({count} files added)")
+
+          # ═══════════════════════════════════════════
+          # MAIN EXECUTION
+          # ═══════════════════════════════════════════
+          with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+              f.write("╔" + "═"*68 + "╗\n")
+              f.write("║  SAWAJ STUDIO - ALL 3 REPOS COMBINED EXPORT                     ║\n")
+              f.write("╚" + "═"*68 + "╝\n")
+              
+              for repo in REPOS:
+                  fetch_repo_files(repo, f)
+
+          # ═══════════════════════════════════════════
+          # SEND TO TELEGRAM
+          # ═══════════════════════════════════════════
+          if not TG_TOKEN or not TG_CHAT:
+              print("❌ Telegram tokens missing!")
+          else:
+              print("📤 Sending file to Telegram...")
+              size_mb = os.path.getsize(OUTPUT_FILE) / (1024 * 1024)
+              
+              with open(OUTPUT_FILE, "rb") as f:
+                  r = requests.post(
+                      f"https://api.telegram.org/bot{TG_TOKEN}/sendDocument",
+                      data={
+                          "chat_id": TG_CHAT,
+                          "caption": f"📦 Full 3 Repos Combined TXT\n📊 Size: {size_mb:.2f} MB"
+                      },
+                      files={"document": f},
+                      timeout=120
+                  )
+                  
+              if r.status_code == 200:
+                  print("✅ File successfully sent to Telegram!")
+              else:
+                  print(f"❌ Failed to send: {r.text}")
+          PYEOF
