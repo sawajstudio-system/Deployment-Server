@@ -1,4 +1,4 @@
-name:  🟢🎬Story_video-hostinge.yml
+name:  🟢🎬Story_video-hostinge
 
 on:
   workflow_dispatch:
