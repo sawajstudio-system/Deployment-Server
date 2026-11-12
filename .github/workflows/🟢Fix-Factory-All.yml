@@ -1,0 +1,533 @@
+name: 🟢Fix-Factory-All
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix_all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+
+    steps:
+      - name: 1. 📥 Checkout Development
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Development'
+          token: ${{ secrets.TOKEN_GITHUB }}
+
+      - name: 2. 🔍 Verify Structure
+        run: |
+          if [ ! -d "Factory/Management/story" ]; then
+            echo "❌ Factory structure nahi mila!"
+            exit 1
+          fi
+          echo "✅ Structure mila"
+          find Factory -type f | wc -l
+
+      # ═══════════════════════════════════════════════════
+      # FIX 1: main.py
+      # ═══════════════════════════════════════════════════
+      - name: 3. 📝 Fix main.py
+        run: |
+          cat > Factory/Management/story/main.py << 'MAIN_EOF'
+          #!/usr/bin/env python3
+          import os, sys, requests, subprocess, random, shutil, traceback
+          from concurrent.futures import ThreadPoolExecutor
+
+          CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+          MGMT = os.path.dirname(CURRENT_DIR)
+          BASE_DIR = os.path.dirname(os.path.dirname(MGMT))
+
+          sys.path.insert(0, os.path.join(MGMT, "1_Git_Tools"))
+          sys.path.insert(0, os.path.join(MGMT, "2_AI_Models"))
+          sys.path.insert(0, os.path.join(MGMT, "3_Media"))
+          sys.path.insert(0, os.path.join(MGMT, "4_Islamic"))
+          sys.path.insert(0, os.path.join(MGMT, "5_Audio_Text"))
+          sys.path.insert(0, os.path.join(MGMT, "Uploader"))
+          sys.path.insert(0, CURRENT_DIR)
+
+          from ai_fallback import generate_text as ai_generate, LAST_USED_AI, FAILED_AIS
+          from fawaz import fetch as fetch_hadith
+          from mymemory import translate as translate_hindi
+          from intro_AI import generate_intro
+          from outro_AI import generate_outro
+          from cta_AI import generate_cta
+          from elevenlabs import generate as elevenlabs_tts
+          from edge_tts import generate as edge_tts_generate
+          from pexels_video import fetch as pexels_video
+          from pixabay_video import fetch as pixabay_video
+          from coverr import fetch as coverr_video
+          from gradient import fetch as gradient_video
+          from freesound import fetch as freesound_music
+          from pixabay_music import fetch as pixabay_music
+          from story_upload import upload_to_drive
+          from render_main import build_and_render_story
+
+          def send_telegram(message):
+              token = os.getenv("TELEGRAM_API_REPORT_TOKEN")
+              chat_id = os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
+              if not token or not chat_id: return
+              try:
+                  requests.post(
+                      f"https://api.telegram.org/bot{token}/sendMessage",
+                      json={"chat_id": chat_id, "text": message[:4000], "parse_mode": "HTML"},
+                      timeout=10,
+                  )
+              except Exception: pass
+
+          def download_and_normalize(args):
+              i, query, clip_duration, clip_path = args
+              temp_raw = f"temp/raw_clip_{i}.mp4"
+              api_used = "Failed"
+              try:
+                  if pexels_video(query=query, duration=clip_duration, output_path=temp_raw): api_used = "Pexels"
+                  elif pixabay_video(query=query, duration=clip_duration, output_path=temp_raw): api_used = "Pixabay"
+                  elif coverr_video(query=query, duration=clip_duration, output_path=temp_raw): api_used = "Coverr"
+                  elif gradient_video(duration=clip_duration, output_path=temp_raw): api_used = "Gradient"
+              except Exception: pass
+              if not os.path.exists(temp_raw): return (False, "Failed")
+              norm_cmd = (f'ffmpeg -y -i "{temp_raw}" -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=24,setsar=1" -an -c:v libx264 -preset ultrafast -crf 30 -threads 0 "{clip_path}"')
+              try: subprocess.run(norm_cmd, shell=True, capture_output=True, timeout=180)
+              except Exception: pass
+              if os.path.exists(temp_raw): os.remove(temp_raw)
+              ok = os.path.exists(clip_path) and os.path.getsize(clip_path) > 10000
+              return (ok, api_used)
+
+          def run_pipeline():
+              print("═" * 60)
+              print("🎬 STARTING PIPELINE")
+              print("═" * 60)
+              send_telegram("🚀 <b>Video Generation Started!</b>")
+              os.makedirs("temp", exist_ok=True)
+
+              hadith = fetch_hadith()
+              if not hadith:
+                  send_telegram("❌ Hadith fetch failed.")
+                  return
+              english_text = hadith.get("english", "")
+              send_telegram("1. 📖 हदीस मिल गई...")
+
+              send_telegram("2. 🧠 AI स्क्रिप्ट...")
+              prompt = f"Translate to Hindi and add a short moral lesson. Total 70-80 words. Only Hindi text.\n\nHadith: {english_text}"
+              hindi_text = ai_generate(prompt, max_tokens=250)
+              if hindi_text: ai_used = LAST_USED_AI
+              else:
+                  hindi_text = translate_hindi(english_text)
+                  ai_used = "MyMemory (AI failed)"
+              if not hindi_text or not any('\u0900' <= ch <= '\u097F' for ch in hindi_text):
+                  send_telegram(f"❌ Hindi failed: {(hindi_text or '')[:60]!r}")
+                  return
+              ai_failed = ", ".join(FAILED_AIS) if FAILED_AIS else "None"
+
+              send_telegram("3. ✨ Intro/Outro/CTA...")
+              base_intro = generate_intro()
+              book_name = hadith.get("collection", "Hadith")
+              hadith_num = hadith.get("number", "")
+              intro_text = f"{base_intro}\\N{book_name} - Hadith #{hadith_num}"
+              outro_text = generate_outro()
+              cta_text = generate_cta()
+
+              send_telegram("4. 🎙️ Voice...")
+              voice_path = "temp/voice.mp3"
+              tts_text = f"हदीस शरीफ। {hindi_text}"
+              voice_used = None
+              if elevenlabs_tts(tts_text, voice_path): voice_used = "ElevenLabs"
+              elif edge_tts_generate(tts_text, voice_path): voice_used = "Edge-TTS"
+              if not voice_used or not os.path.exists(voice_path):
+                  send_telegram("❌ Voice generation failed.")
+                  return
+
+              send_telegram("5. 🎥 Background videos...")
+              final_bg_video = "temp/bg_video.mp4"
+              concat_list = "temp/concat_list.txt"
+              all_queries = ["islamic mosque architecture","holy quran book pages","islamic calligraphy nature","stars night sky","ocean waves sunset","desert sand dunes","green mountains waterfall","candle light warm","rain on window","clouds moving sky","forest trees sunlight","peaceful garden flowers","old mosque minaret","kaaba mecca","madina green dome","birds flying sky","river flowing rocks","snow falling winter","lightning storm clouds","lantern light dark","prayer beads tasbih","dates fruit bowl","arabic tea coffee","sunrise golden hour","moon crescent night","beautiful sunset landscape","foggy morning forest"]
+              random.shuffle(all_queries)
+              queries = all_queries[:3]
+              clip_duration = 20.0
+              download_tasks = [(i, q, clip_duration, f"temp/clip_{i}.mp4") for i, q in enumerate(queries)]
+              with ThreadPoolExecutor(max_workers=3) as executor:
+                  results = list(executor.map(download_and_normalize, download_tasks))
+              valid_clips = []
+              video_apis_used = set()
+              with open(concat_list, "w") as f:
+                  for i, (res, api) in enumerate(results):
+                      clip_path = f"temp/clip_{i}.mp4"
+                      if res and os.path.exists(clip_path):
+                          valid_clips.append(clip_path)
+                          video_apis_used.add(api)
+                          f.write(f"file '{os.path.abspath(clip_path)}'\n")
+              video_api_str = ", ".join(video_apis_used) if video_apis_used else "None"
+              if valid_clips:
+                  merge_cmd = f'ffmpeg -y -f concat -safe 0 -i "{concat_list}" -c copy "{final_bg_video}"'
+                  try: subprocess.run(merge_cmd, shell=True, capture_output=True, timeout=60)
+                  except Exception: pass
+              if not os.path.exists(final_bg_video) or os.path.getsize(final_bg_video) < 10000:
+                  if valid_clips: final_bg_video = valid_clips[0]
+                  else:
+                      send_telegram("❌ सभी बैकग्राउंड वीडियो फेल!")
+                      return
+
+              send_telegram("6. 🎵 Music...")
+              music_path = "temp/music.mp3"
+              nature_path = "temp/nature.mp3"
+              final_audio_path = "temp/final_bg_audio.mp3"
+              if freesound_music(query="soft ambient meditation islamic peaceful", duration=60, output_path=music_path): music_used = "Freesound"
+              elif pixabay_music(duration=60, output_path=music_path): music_used = "Pixabay"
+              else:
+                  music_used = "None (silent)"
+                  music_path = ""
+              success_nature = freesound_music(query="rain soft ambience", duration=60, output_path=nature_path)
+              if music_path and success_nature:
+                  mix_cmd = (f'ffmpeg -y -i "{music_path}" -i "{nature_path}" -filter_complex "[0:a]volume=0.15[m];[1:a]volume=0.10[n];[m][n]amix=inputs=2:duration=first[out]" -map "[out]" "{final_audio_path}"')
+                  try:
+                      subprocess.run(mix_cmd, shell=True, capture_output=True, timeout=120)
+                      if os.path.exists(final_audio_path) and os.path.getsize(final_audio_path) > 1000: final_audio_path = final_audio_path
+                      else: final_audio_path = music_path
+                  except Exception: final_audio_path = music_path
+              elif music_path: final_audio_path = music_path
+              else: final_audio_path = ""
+
+              send_telegram("7. 🎬 Final Render...")
+              final_video_path = "temp/Final_Story.mp4"
+              try:
+                  import io, contextlib
+                  f = io.StringIO()
+                  with contextlib.redirect_stdout(f):
+                      render_success = build_and_render_story(
+                          bg_video=final_bg_video, music_path=final_audio_path, voice_path=voice_path,
+                          hadith=hadith, hindi_text=hindi_text, intro_text=intro_text,
+                          outro_text=outro_text, cta_text=cta_text, output_path=final_video_path
+                      )
+                  ffmpeg_log = f.getvalue()
+                  if "❌ === FFMPEG ERROR START ===" in ffmpeg_log:
+                      error_msg = ffmpeg_log.split("❌ === FFMPEG ERROR START ===")[1].split("❌ === FFMPEG ERROR END ===")[0]
+                      send_telegram(f"❌ <b>FFmpeg Error:</b>\n<pre>{error_msg[:1000]}</pre>")
+                      return
+              except Exception as e:
+                  render_success = None
+                  send_telegram(f"❌ Python Error: {e}")
+                  return
+              if not render_success or not os.path.exists(final_video_path):
+                  send_telegram("❌ Video Rendering Failed.")
+                  return
+
+              send_telegram("8. ☁️ Upload to Drive...")
+              drive_link = upload_to_drive(final_video_path)
+
+              report = f"🎉 <b>Video Ready!</b>\n\n"
+              report += f"📜 <b>Hadith:</b> {book_name} #{hadith_num}\n"
+              report += f"🧠 <b>AI:</b> {ai_used} <i>(Failed: {ai_failed})</i>\n"
+              report += f"🎙️ <b>Voice:</b> {voice_used}\n"
+              report += f"🎥 <b>Video:</b> {video_api_str}\n"
+              report += f"🎵 <b>Music:</b> {music_used}\n"
+              if drive_link: report += f"\n📥 <a href='{drive_link}'>Click here</a>"
+              else: report += f"\n❌ Drive Upload Failed."
+              send_telegram(report)
+
+              try: shutil.rmtree("temp", ignore_errors=True)
+              except Exception: pass
+
+          if __name__ == "__main__":
+              try: run_pipeline()
+              except Exception as e:
+                  tb = traceback.format_exc()
+                  print(tb)
+                  send_telegram(f"💥 <b>Crash!</b>\n<pre>{tb[-1500:]}</pre>")
+                  raise
+          MAIN_EOF
+          echo "✅ main.py fixed"
+
+      # ═══════════════════════════════════════════════════
+      # FIX 2: render_main.py
+      # ═══════════════════════════════════════════════════
+      - name: 4. 📝 Fix render_main.py
+        run: |
+          cat > Factory/Management/story/render_main.py << 'RENDER_EOF'
+          #!/usr/bin/env python3
+          import os, sys
+
+          CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+          MGMT = os.path.dirname(CURRENT_DIR)
+          sys.path.insert(0, CURRENT_DIR)
+
+          ASSETS_DIR = os.path.join(MGMT, "assets")
+          FONTS_DIR = os.path.join(ASSETS_DIR, "fonts")
+          LOGO_PATH = os.path.join(ASSETS_DIR, "logo.png")
+
+          from duration import get_audio_duration
+          from cta_maker import generate_cta_image
+          from ass_builder import create_main_subtitles, create_intro_subtitle, create_outro_subtitle
+          from ffmpeg_render import render_final_video
+
+          def merge_ass_files(file_paths, output_path):
+              master_header = (
+                  "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n"
+                  "[V4+ Styles]\n"
+                  "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+                  "Style: Arabic,Amiri,75,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,760,1\n"
+                  "Style: Hindi,Yatra One,65,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,570,1\n"
+                  "Style: English,Playfair Display,52,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,400,1\n"
+                  "Style: Intro,Playfair Display,70,&H00D7FF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,8,40,40,200,1\n"
+                  "Style: Outro,Playfair Display,80,&HFFFF00&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,8,40,40,250,1\n"
+                  "[Events]\n"
+                  "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              )
+              directory = os.path.dirname(output_path)
+              if directory: os.makedirs(directory, exist_ok=True)
+              with open(output_path, "w", encoding="utf-8") as master_file:
+                  master_file.write(master_header)
+                  for path in file_paths:
+                      if path and os.path.exists(path):
+                          with open(path, "r", encoding="utf-8") as f:
+                              for line in f:
+                                  if line.startswith("Dialogue:"): master_file.write(line)
+              return output_path
+
+          def build_and_render_story(bg_video, music_path, voice_path, hadith, hindi_text, intro_text, outro_text, cta_text, output_path="temp/Final_Story.mp4"):
+              print("🎬 [render_main] Starting...")
+              print(f"📁 FONTS_DIR: {FONTS_DIR}")
+              os.makedirs("temp", exist_ok=True)
+              duration = get_audio_duration(voice_path)
+              print(f"⏱️ Duration: {duration:.2f}s")
+              intro_ass = create_intro_subtitle(intro_text, duration=2.5, output_path="temp/part_intro.ass")
+              main_ass = create_main_subtitles(hadith, hindi_text, duration, output_path="temp/part_main.ass")
+              outro_ass = create_outro_subtitle(outro_text, duration, outro_duration=3.5, output_path="temp/part_outro.ass")
+              cta_image = generate_cta_image(output_path="temp/cta_image.png")
+              master_ass = merge_ass_files([intro_ass, main_ass, outro_ass], output_path="temp/master_subtitles.ass")
+              try:
+                  result = render_final_video(
+                      bg_video=bg_video, music_path=music_path, voice_path=voice_path,
+                      master_ass_path=master_ass, cta_image_path=cta_image, duration=duration,
+                      output_path=output_path, fonts_dir=FONTS_DIR, logo_path=LOGO_PATH,
+                  )
+              except TypeError:
+                  print("⚠️ ffmpeg_render old signature, calling without extra params")
+                  result = render_final_video(
+                      bg_video=bg_video, music_path=music_path, voice_path=voice_path,
+                      master_ass_path=master_ass, cta_image_path=cta_image,
+                      duration=duration, output_path=output_path,
+                  )
+              if result and os.path.exists(output_path):
+                  print(f"✅ Video Ready: {output_path}")
+                  return output_path
+              print("❌ Rendering Failed.")
+              return None
+          RENDER_EOF
+          echo "✅ render_main.py fixed"
+
+      # ═══════════════════════════════════════════════════
+      # FIX 3: ffmpeg_render.py
+      # ═══════════════════════════════════════════════════
+      - name: 5. 📝 Fix ffmpeg_render.py
+        run: |
+          cat > Factory/Management/story/ffmpeg_render.py << 'FFMPEG_EOF'
+          #!/usr/bin/env python3
+          import os, subprocess, sys
+
+          def render_final_video(bg_video, music_path, voice_path, master_ass_path, cta_image_path, duration,
+                                 output_path="temp/Final_Story.mp4", fonts_dir=None, logo_path=None):
+              print("🎬 [ffmpeg_render] Starting...")
+              sys.stdout.flush()
+
+              if not bg_video or not os.path.exists(bg_video) or not os.path.exists(voice_path):
+                  print("❌ Missing bg_video or voice_path")
+                  return None
+
+              # Fallback paths
+              if fonts_dir is None or not os.path.exists(fonts_dir):
+                  fonts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "fonts")
+              if logo_path is None or not os.path.exists(logo_path):
+                  logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "logo.png")
+
+              has_logo = os.path.exists(logo_path)
+              print(f"📁 fonts_dir: {fonts_dir}")
+              print(f"🖼️ logo: {logo_path} (found: {has_logo})")
+
+              cmd_list = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", bg_video, "-i", voice_path]
+              has_music = os.path.exists(music_path) and os.path.getsize(music_path) > 0 if music_path else False
+              if has_music:
+                  cmd_list.extend(["-i", music_path])
+              cmd_list.extend(["-loop", "1", "-i", cta_image_path])
+              cta_idx = 3 if has_music else 2
+              if has_logo:
+                  cmd_list.extend(["-i", logo_path])
+                  logo_idx = 4 if has_music else 3
+
+              v_filters = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,vignette=PI/4[bg];"
+              current_v_out = "bg"
+              cta_start_time = max(0, duration - 5.0)
+
+              if has_logo:
+                  v_filters += f"[{logo_idx}:v]scale=200:70,format=rgba[logo_small];"
+                  x_expr = "40+abs(mod(t*80,2*(W-w-80))-(W-w-80))"
+                  y_expr = "40+abs(mod(t*100,2*(H-h-80))-(H-h-80))"
+                  v_filters += f"[{current_v_out}][logo_small]overlay=x='{x_expr}':y='{y_expr}':enable='lt(t,{cta_start_time})'[bg_with_logo];"
+                  current_v_out = "bg_with_logo"
+
+              abs_ass_path = os.path.abspath(master_ass_path)
+              abs_fonts = os.path.abspath(fonts_dir) if fonts_dir and os.path.exists(fonts_dir) else ""
+              if abs_fonts:
+                  v_filters += f"[{current_v_out}]subtitles='{abs_ass_path}':fontsdir='{abs_fonts}'[v_sub];"
+              else:
+                  v_filters += f"[{current_v_out}]subtitles='{abs_ass_path}'[v_sub];"
+
+              v_filters += f"[v_sub][{cta_idx}:v]overlay=0:0:enable='gte(t,{cta_start_time})'[v_out]"
+
+              if has_music:
+                  a_filters = "[2:a]volume=0.15[bgm];[bgm][1:a]sidechaincompress=threshold=0.05:ratio=8:attack=50:release=500[ducked_bgm];[1:a][ducked_bgm]amix=inputs=2:duration=first[a_out]"
+              else:
+                  a_filters = "[1:a]volume=1.0[a_out]"
+
+              cmd_list.extend([
+                  "-filter_complex", f"{v_filters}; {a_filters}",
+                  "-map", "[v_out]", "-map", "[a_out]",
+                  "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-threads", "0", "-r", "24",
+                  "-c:a", "aac", "-b:a", "128k",
+                  "-t", f"{duration:.2f}", "-shortest", output_path
+              ])
+
+              print(f"🎬 Running FFmpeg...")
+              try:
+                  result = subprocess.run(cmd_list, capture_output=True, text=True, timeout=600)
+                  if result.returncode != 0:
+                      print(f"❌ FFmpeg Error:\n{result.stderr[-2000:]}")
+                      return None
+                  print(f"✅ FFmpeg done: {output_path}")
+                  return output_path
+              except Exception as e:
+                  print(f"❌ Exception: {e}")
+                  return None
+          FFMPEG_EOF
+          echo "✅ ffmpeg_render.py fixed"
+
+      # ═══════════════════════════════════════════════════
+      # FIX 4: requirements.txt
+      # ═══════════════════════════════════════════════════
+      - name: 6. 📝 Fix requirements.txt
+        run: |
+          cat > Factory/Management/story/requirements.txt << 'REQ_EOF'
+          requests
+          edge-tts
+          google-api-python-client
+          google-auth-httplib2
+          google-auth-oauthlib
+          Pillow
+          mutagen
+          REQ_EOF
+          echo "✅ requirements.txt fixed"
+
+      # ═══════════════════════════════════════════════════
+      # FIX 5: __init__.py files
+      # ═══════════════════════════════════════════════════
+      - name: 7. 📝 Fix __init__.py files
+        run: |
+          echo "" > Factory/Management/story/__init__.py
+          echo "" > Factory/Management/1_Git_Tools/__init__.py
+          echo "" > Factory/Management/2_AI_Models/__init__.py
+          echo "" > Factory/Management/3_Media/__init__.py
+          echo "" > Factory/Management/4_Islamic/__init__.py
+          echo "" > Factory/Management/5_Audio_Text/__init__.py
+          echo "" > Factory/Management/Uploader/__init__.py
+          echo "✅ __init__.py fixed"
+
+      # ═══════════════════════════════════════════════════
+      # FIX 6: AI Models — Import names fix
+      # ═══════════════════════════════════════════════════
+      - name: 8. 📝 Fix AI fallback imports
+        run: |
+          # ai_fallback.py — naye naam se import kare
+          if [ -f "Factory/Management/2_AI_Models/ai_fallback.py" ]; then
+            echo "📝 Patching ai_fallback.py..."
+            sed -i 's/import gemini_AI/import gemini as gemini_AI/g' Factory/Management/2_AI_Models/ai_fallback.py
+            sed -i 's/import groq_AI/import groq as groq_AI/g' Factory/Management/2_AI_Models/ai_fallback.py
+            sed -i 's/import cohere_AI/import cohere as cohere_AI/g' Factory/Management/2_AI_Models/ai_fallback.py
+            sed -i 's/import nvidia_AI/import nvidia as nvidia_AI/g' Factory/Management/2_AI_Models/ai_fallback.py
+            sed -i 's/import cloudflare_AI/import cloudflare as cloudflare_AI/g' Factory/Management/2_AI_Models/ai_fallback.py
+            sed -i 's/import openrouter_AI/import openrouter as openrouter_AI/g' Factory/Management/2_AI_Models/ai_fallback.py
+            sed -i 's/import anges_AI/import anges as anges_AI/g' Factory/Management/2_AI_Models/ai_fallback.py
+            echo "✅ ai_fallback patched"
+          fi
+
+      # ═══════════════════════════════════════════════════
+      # VERIFY
+      # ═══════════════════════════════════════════════════
+      - name: 9. ✅ Verify All Files
+        run: |
+          echo "════════════════════════════════════════"
+          echo "🔍 FILE CHECK:"
+          echo "════════════════════════════════════════"
+          for f in main.py render_main.py ffmpeg_render.py requirements.txt; do
+            if [ -f "Factory/Management/story/$f" ]; then
+              echo "✅ $f — $(wc -l < Factory/Management/story/$f) lines"
+            else
+              echo "❌ $f MISSING"
+            fi
+          done
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "🧪 PYTHON SYNTAX CHECK:"
+          echo "════════════════════════════════════════"
+          cd Factory/Management/story
+          for f in *.py; do
+            if python3 -m py_compile "$f" 2>/dev/null; then
+              echo "✅ $f — syntax OK"
+            else
+              echo "❌ $f — SYNTAX ERROR"
+              python3 -m py_compile "$f" 2>&1 | tail -5
+            fi
+          done
+
+      # ═══════════════════════════════════════════════════
+      # PUSH
+      # ═══════════════════════════════════════════════════
+      - name: 10. 💾 Commit + Push
+        run: |
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          git add Factory/
+
+          if git diff-index --quiet HEAD 2>/dev/null; then
+            echo "⚠️ No changes"
+          else
+            git commit -m "🔧 Fix all Factory files — working pipeline"
+            git push origin main
+            echo "✅ Pushed!"
+          fi
+
+      # ═══════════════════════════════════════════════════
+      # TELEGRAM
+      # ═══════════════════════════════════════════════════
+      - name: 11. 📤 Telegram Report
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            MSG="✅ <b>Factory Files Fixed!</b>
+
+          📝 <b>Updated:</b>
+          • main.py — naye imports + paths
+          • render_main.py — assets paths
+          • ffmpeg_render.py — fonts_dir + logo_path support
+          • requirements.txt
+          • __init__.py files
+          • ai_fallback.py — import names fixed
+
+          ⏭️ <b>Next:</b> Video test workflow chalayein"
+          else
+            MSG="❌ <b>Fix Failed</b>
+          Status: $STATUS
+          Check logs."
+          fi
+
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" \
+            -d "parse_mode=HTML" || true
