@@ -1,4 +1,4 @@
-name: 🎬Original_Story-Generator
+name: 🎬hosting_sarvar-story.yml
 
 on:
   workflow_dispatch:
