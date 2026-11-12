@@ -1,0 +1,714 @@
+name: 🟢Fix-All-Files
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+
+    steps:
+      - name: 1. 📥 Checkout Development
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Development'
+          token: ${{ secrets.TOKEN_GITHUB }}
+
+      - name: 2. 📁 Create story folder
+        run: mkdir -p Factory/Management/story
+
+      # ═══════════════════════════════════════════════════
+      # FILE 1: colors.py
+      # ═══════════════════════════════════════════════════
+      - name: 3. 📝 colors.py
+        run: |
+          cat > Factory/Management/story/colors.py << 'EOF'
+          #!/usr/bin/env python3
+          # 📄 colors.py — Premium colors + get_color_tag
+
+          PREMIUM_COLORS = [
+              "&H00D7FF&", "&HFFFF00&", "&H507FFF&", "&H90EE90&",
+              "&HD670DA&", "&HEBCE87&", "&H00FFFF&", "&H00A5FF&",
+              "&HCBC0FF&", "&HD0E040&", "&HFF00FF&", "&H00FF00&",
+          ]
+
+          BASE_COLOR = "&H00FFFFFF&"
+          HIGHLIGHT_COLOR = "&H00D7FF&"
+          ARABIC_TEXT_COLOR = "&H00FFFFFF&"
+          HINDI_TEXT_COLOR = "&H00FFFFFF&"
+          ENGLISH_TEXT_COLOR = "&H00FFFFFF&"
+          INTRO_TEXT_COLOR = "&H00D7FF&"
+          OUTRO_TEXT_COLOR = "&HFFFF00&"
+          CTA_TEXT_COLOR = "&H507FFF&"
+
+          def get_color_tag(index):
+              return PREMIUM_COLORS[index % len(PREMIUM_COLORS)]
+          EOF
+          echo "✅ colors.py"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 2: fonts.py
+      # ═══════════════════════════════════════════════════
+      - name: 4. 📝 fonts.py
+        run: |
+          cat > Factory/Management/story/fonts.py << 'EOF'
+          #!/usr/bin/env python3
+          # 📄 fonts.py — Font selection
+
+          import random
+
+          ARABIC_FONTS = ["Amiri", "Reem Kufi", "Scheherazade"]
+          HINDI_FONTS = ["Yatra One", "Rozha One", "Eczar"]
+          ENGLISH_FONTS = ["Playfair Display", "Cinzel", "Montserrat", "Lora"]
+
+          SELECTED_ARABIC = random.choice(ARABIC_FONTS)
+          SELECTED_HINDI = random.choice(HINDI_FONTS)
+          SELECTED_ENGLISH = random.choice(ENGLISH_FONTS)
+          EOF
+          echo "✅ fonts.py"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 3: sizes.py
+      # ═══════════════════════════════════════════════════
+      - name: 5. 📝 sizes.py
+        run: |
+          cat > Factory/Management/story/sizes.py << 'EOF'
+          #!/usr/bin/env python3
+          # 📄 sizes.py — Font sizes + margins
+
+          PLAY_RES_X = 1080
+          PLAY_RES_Y = 1920
+
+          ARABIC_SIZE = 75
+          HINDI_SIZE = 65
+          ENGLISH_SIZE = 52
+          INTRO_SIZE = 70
+          OUTRO_SIZE = 80
+          CTA_SIZE = 60
+
+          MARGIN_L = 40
+
+          ARABIC_MARGIN_V = 760
+          HINDI_MARGIN_V = 570
+          ENGLISH_MARGIN_V = 400
+          INTRO_MARGIN_V = 200
+          OUTRO_MARGIN_V = 250
+          CTA_MARGIN_V = 600
+          EOF
+          echo "✅ sizes.py"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 4: timing.py
+      # ═══════════════════════════════════════════════════
+      - name: 6. 📝 timing.py
+        run: |
+          cat > Factory/Management/story/timing.py << 'EOF'
+          #!/usr/bin/env python3
+          # 📄 timing.py — Time format + word timings
+
+          def ts(t):
+              h = int(t // 3600)
+              m = int((t % 3600) // 60)
+              s = int(t % 60)
+              ms = int(round((t - int(t)) * 100))
+              if ms == 100: ms = 99
+              return f"{h}:{m:02d}:{s:02d}.{ms:02d}"
+
+          def compute_word_timings(words, total_dur):
+              if not words: return []
+              weights = []
+              for w in words:
+                  if not w:
+                      weights.append(1.0)
+                      continue
+                  last = w[-1]
+                  if last in ['.', '!', '?', '।']: weights.append(2.0)
+                  elif last in [',', '،', ';', ':']: weights.append(1.5)
+                  else: weights.append(1.0)
+
+              total_weight = sum(weights) or 1.0
+              time_per_weight = total_dur / total_weight
+
+              timings = []
+              current_time = 0.0
+              for weight in weights:
+                  duration_w = weight * time_per_weight
+                  timings.append((current_time, current_time + duration_w))
+                  current_time += duration_w
+              return timings
+          EOF
+          echo "✅ timing.py"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 5: duration.py
+      # ═══════════════════════════════════════════════════
+      - name: 7. 📝 duration.py
+        run: |
+          cat > Factory/Management/story/duration.py << 'EOF'
+          #!/usr/bin/env python3
+          # 📄 duration.py — Audio duration checker
+
+          import subprocess
+          import os
+
+          def get_audio_duration(audio_path):
+              print(f"⏱️ [duration] Checking: {audio_path}")
+              if not os.path.exists(audio_path):
+                  print(f"❌ File not found: {audio_path}")
+                  return 15.0
+              try:
+                  cmd = f'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "{audio_path}"'
+                  result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                  duration = float(result.stdout.strip())
+                  print(f"✅ Duration: {duration:.2f}s")
+                  return duration
+              except Exception as e:
+                  print(f"⚠️ Error: {e}. Using 15.0s")
+                  return 15.0
+          EOF
+          echo "✅ duration.py"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 6: cta_maker.py
+      # ═══════════════════════════════════════════════════
+      - name: 8. 📝 cta_maker.py
+        run: |
+          cat > Factory/Management/story/cta_maker.py << 'EOF'
+          #!/usr/bin/env python3
+          # 📄 cta_maker.py — CTA image generator
+
+          import os
+          import random
+          from PIL import Image, ImageDraw, ImageFont
+
+          def generate_cta_image(output_path="temp/cta_image.png"):
+              img = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
+              draw = ImageDraw.Draw(img)
+
+              try:
+                  font_top = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf", 55)
+                  font_btn = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf", 65)
+                  font_bottom = ImageFont.truetype("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", 45)
+              except IOError:
+                  font_top = font_btn = font_bottom = ImageFont.load_default()
+
+              colors = ["#FFD700", "#00FFFF", "#FF007F", "#39FF14", "#FFBF00", "#9D00FF", "#00FF7F", "#FF4500"]
+              random.shuffle(colors)
+
+              glass_fill = (15, 15, 15, 150)
+              glass_border = (255, 255, 255, 80)
+              draw.rounded_rectangle([250, 1200, 830, 1700], radius=30, fill=glass_fill, outline=glass_border, width=3)
+
+              header_texts = ["Like • Share • Follow", "Support the Channel", "Join Our Community", "Spread the Knowledge"]
+              draw.text((540, 1280), random.choice(header_texts), font=font_top, fill=colors[0], anchor="mm", stroke_width=4, stroke_fill="black")
+
+              btn_texts = [
+                  ["LIKE", "SUBSCRIBE", "COMMENT", "SHARE"],
+                  ["FOLLOW", "SHARE", "LIKE", "SUBSCRIBE"],
+                  ["SUBSCRIBE", "LIKE", "FOLLOW", "COMMENT"]
+              ]
+              texts = random.choice(btn_texts)
+
+              buttons = [
+                  {"text": texts[0], "color": colors[1], "y": 1350},
+                  {"text": texts[1], "color": colors[2], "y": 1430},
+                  {"text": texts[2], "color": colors[3], "y": 1510},
+                  {"text": texts[3], "color": colors[4], "y": 1590},
+              ]
+
+              for btn in buttons:
+                  draw.rounded_rectangle([310, btn["y"], 770, btn["y"] + 65], radius=10, outline=btn["color"], width=4)
+                  draw.text((540, btn["y"] + 32), btn["text"], font=font_btn, fill=btn["color"], anchor="mm", stroke_width=3, stroke_fill="black")
+
+              draw.text((540, 1780), "Sawajstudio", font=font_bottom, fill=colors[5], anchor="mm", stroke_width=3, stroke_fill="black")
+
+              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+              img.save(output_path, "PNG")
+              return output_path
+          EOF
+          echo "✅ cta_maker.py"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 7: ass_builder.py — NO relative imports
+      # ═══════════════════════════════════════════════════
+      - name: 9. 📝 ass_builder.py
+        run: |
+          cat > Factory/Management/story/ass_builder.py << 'EOF'
+          #!/usr/bin/env python3
+          # 📄 ass_builder.py — Subtitle builder (NO relative imports)
+
+          import os
+          import re
+          from colors import get_color_tag
+
+          def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main_subtitles.ass"):
+              print("✍️ [ass_builder] Building main subtitles...")
+
+              ara_text = re.sub(r'[\n\r"]', ' ', str(hadith.get("arabic", ""))).strip()
+              hin_text = re.sub(r'[\n\r"]', ' ', str(hindi_text)).strip()
+              eng_text = re.sub(r'[\n\r"]', ' ', str(hadith.get("english", ""))).strip()
+
+              ass_content = (
+                  "[Script Info]\n"
+                  "ScriptType: v4.00+\n"
+                  "PlayResX: 1080\n"
+                  "PlayResY: 1920\n"
+                  "WrapStyle: 2\n"
+                  "\n[V4+ Styles]\n"
+                  "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+                  "Style: Arabic,Amiri,75,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,760,1\n"
+                  "Style: Hindi,Yatra One,65,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,570,1\n"
+                  "Style: English,Playfair Display,52,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,400,1\n"
+                  "\n[Events]\n"
+                  "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              )
+
+              def ts(t):
+                  h = int(t // 3600)
+                  m = int((t % 3600) // 60)
+                  s = int(t % 60)
+                  ms = int(round((t - int(t)) * 100))
+                  if ms == 100: ms = 99
+                  return f"{h}:{m:02d}:{s:02d}.{ms:02d}"
+
+              start_t = 4.0
+              end_t = max(duration - 5.5, start_t + 1.0)
+              total_dur = end_t - start_t
+
+              def process_language(text, style_name, lang_idx):
+                  words = text.split()
+                  if not words: return ""
+
+                  weights = []
+                  for w in words:
+                      if w[-1] in ['.', '!', '?', '।']: weights.append(2.0)
+                      elif w[-1] in [',', '،', ';', ':']: weights.append(1.5)
+                      else: weights.append(1.0)
+
+                  total_weight = sum(weights)
+                  time_per_weight = total_dur / total_weight
+
+                  word_timings = []
+                  current_time = 0
+                  for weight in weights:
+                      duration_w = weight * time_per_weight
+                      word_timings.append((current_time, current_time + duration_w))
+                      current_time += duration_w
+
+                  window_size = 3
+                  lines = ""
+
+                  for i in range(len(words)):
+                      w_start = start_t + word_timings[i][0]
+                      w_end = start_t + word_timings[i][1]
+
+                      start_idx = max(0, i - window_size + 1)
+                      visible_words = words[start_idx:i+1]
+
+                      dot_color = get_color_tag(i // 3 + (lang_idx * 3))
+
+                      if lang_idx == 0:
+                          karaoke_text = f"\u202B{{\\c{dot_color}}}●  "
+                      else:
+                          karaoke_text = f"{{\\c{dot_color}}}●  "
+
+                      for j, word in enumerate(visible_words):
+                          global_idx = start_idx + j
+                          color = get_color_tag(global_idx)
+
+                          if global_idx == i:
+                              cs = int((w_end - w_start) * 100)
+                              karaoke_text += f"{{\\c{color}\\k{cs}}}{word} "
+                          else:
+                              karaoke_text += f"{{\\c{color}}}{word} "
+
+                      if lang_idx == 0: karaoke_text += "\u202C"
+
+                      lines += f"Dialogue: 0,{ts(w_start)},{ts(w_end)},{style_name},,,0,0,,{karaoke_text.strip()}\n"
+
+                  return lines
+
+              if ara_text: ass_content += process_language(ara_text, "Arabic", 0)
+              if hin_text: ass_content += process_language(hin_text, "Hindi", 1)
+              if eng_text: ass_content += process_language(eng_text, "English", 2)
+
+              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+              with open(output_path, "w", encoding="utf-8") as f:
+                  f.write(ass_content)
+              return output_path
+
+          def create_intro_subtitle(intro_text, duration=3.5, output_path="temp/intro_sub.ass"):
+              if not intro_text: return None
+              clean_text = str(intro_text).strip()
+
+              ass_content = (
+                  "[Script Info]\n"
+                  "ScriptType: v4.00+\n"
+                  "PlayResX: 1080\n"
+                  "PlayResY: 1920\n"
+                  "WrapStyle: 2\n"
+                  "\n[V4+ Styles]\n"
+                  "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+                  "Style: Intro,Playfair Display,70,&H00D7FF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,8,40,40,200,1\n"
+                  "\n[Events]\n"
+                  "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              )
+
+              def ts(t):
+                  h = int(t // 3600)
+                  m = int((t % 3600) // 60)
+                  s = int(t % 60)
+                  ms = int(round((t - int(t)) * 100))
+                  if ms == 100: ms = 99
+                  return f"{h}:{m:02d}:{s:02d}.{ms:02d}"
+
+              formatted_text = f"{{\\fad(1000,1000)\\blur5\\c&H00D7FF&\\3c&H000000&}}{clean_text}"
+              ass_content += f"Dialogue: 0,{ts(0.0)},{ts(duration)},Intro,,0,0,0,,{formatted_text}\n"
+
+              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+              with open(output_path, "w", encoding="utf-8") as f: f.write(ass_content)
+              return output_path
+
+          def create_outro_subtitle(outro_text, total_duration, outro_duration=3.5, output_path="temp/outro_sub.ass"):
+              if not outro_text: return None
+              clean_text = re.sub(r'[\n\r"]', ' ', str(outro_text)).strip()
+
+              ass_content = (
+                  "[Script Info]\n"
+                  "ScriptType: v4.00+\n"
+                  "PlayResX: 1080\n"
+                  "PlayResY: 1920\n"
+                  "WrapStyle: 2\n"
+                  "\n[V4+ Styles]\n"
+                  "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+                  "Style: Outro,Playfair Display,80,&HFFFF00&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,8,40,40,250,1\n"
+                  "\n[Events]\n"
+                  "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              )
+
+              def ts(t):
+                  h = int(t // 3600)
+                  m = int((t % 3600) // 60)
+                  s = int(t % 60)
+                  ms = int(round((t - int(t)) * 100))
+                  if ms == 100: ms = 99
+                  return f"{h}:{m:02d}:{s:02d}.{ms:02d}"
+
+              start_t = max(0.0, total_duration - outro_duration)
+              formatted_text = f"{{\\fad(500,500)\\c{get_color_tag(1)}}}{clean_text}"
+              ass_content += f"Dialogue: 0,{ts(start_t)},{ts(total_duration)},Outro,,0,0,0,,{formatted_text}\n"
+
+              os.makedirs(os.path.dirname(output_path), exist_ok=True)
+              with open(output_path, "w", encoding="utf-8") as f: f.write(ass_content)
+              return output_path
+          EOF
+          echo "✅ ass_builder.py"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 8: render_main.py
+      # ═══════════════════════════════════════════════════
+      - name: 10. 📝 render_main.py
+        run: |
+          cat > Factory/Management/story/render_main.py << 'EOF'
+          #!/usr/bin/env python3
+          # 📄 render_main.py — Master render
+
+          import os
+          import sys
+
+          CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+          MGMT = os.path.dirname(CURRENT_DIR)
+
+          if CURRENT_DIR not in sys.path:
+              sys.path.insert(0, CURRENT_DIR)
+
+          ASSETS_DIR = os.path.join(MGMT, "assets")
+          FONTS_DIR = os.path.join(ASSETS_DIR, "fonts")
+          LOGO_PATH = os.path.join(ASSETS_DIR, "logo.png")
+
+          from duration import get_audio_duration
+          from cta_maker import generate_cta_image
+          from ass_builder import create_main_subtitles, create_intro_subtitle, create_outro_subtitle
+          from ffmpeg_render import render_final_video
+
+          def merge_ass_files(file_paths, output_path):
+              master_header = (
+                  "[Script Info]\n"
+                  "ScriptType: v4.00+\n"
+                  "PlayResX: 1080\n"
+                  "PlayResY: 1920\n"
+                  "WrapStyle: 2\n"
+                  "[V4+ Styles]\n"
+                  "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+                  "Style: Arabic,Amiri,75,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,760,1\n"
+                  "Style: Hindi,Yatra One,65,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,570,1\n"
+                  "Style: English,Playfair Display,52,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,400,1\n"
+                  "Style: Intro,Playfair Display,70,&H00D7FF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,8,40,40,200,1\n"
+                  "Style: Outro,Playfair Display,80,&HFFFF00&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,8,40,40,250,1\n"
+                  "[Events]\n"
+                  "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              )
+              directory = os.path.dirname(output_path)
+              if directory: os.makedirs(directory, exist_ok=True)
+              with open(output_path, "w", encoding="utf-8") as master_file:
+                  master_file.write(master_header)
+                  for path in file_paths:
+                      if path and os.path.exists(path):
+                          with open(path, "r", encoding="utf-8") as f:
+                              for line in f:
+                                  if line.startswith("Dialogue:"): master_file.write(line)
+              return output_path
+
+          def build_and_render_story(bg_video, music_path, voice_path, hadith, hindi_text, intro_text, outro_text, cta_text, output_path="temp/Final_Story.mp4"):
+              print("🎬 [render_main] Starting...")
+              print(f"📁 FONTS_DIR: {FONTS_DIR}")
+              print(f"📁 LOGO_PATH: {LOGO_PATH}")
+              os.makedirs("temp", exist_ok=True)
+
+              duration = get_audio_duration(voice_path)
+              print(f"⏱️ Duration: {duration:.2f}s")
+
+              intro_ass = create_intro_subtitle(intro_text, duration=2.5, output_path="temp/part_intro.ass")
+              main_ass = create_main_subtitles(hadith, hindi_text, duration, output_path="temp/part_main.ass")
+              outro_ass = create_outro_subtitle(outro_text, duration, outro_duration=3.5, output_path="temp/part_outro.ass")
+              cta_image = generate_cta_image(output_path="temp/cta_image.png")
+              master_ass = merge_ass_files([intro_ass, main_ass, outro_ass], output_path="temp/master_subtitles.ass")
+
+              try:
+                  result = render_final_video(
+                      bg_video=bg_video, music_path=music_path, voice_path=voice_path,
+                      master_ass_path=master_ass, cta_image_path=cta_image, duration=duration,
+                      output_path=output_path, fonts_dir=FONTS_DIR, logo_path=LOGO_PATH,
+                  )
+              except TypeError:
+                  result = render_final_video(
+                      bg_video=bg_video, music_path=music_path, voice_path=voice_path,
+                      master_ass_path=master_ass, cta_image_path=cta_image,
+                      duration=duration, output_path=output_path,
+                  )
+
+              if result and os.path.exists(output_path):
+                  print(f"✅ Video Ready: {output_path}")
+                  return output_path
+              print("❌ Rendering Failed.")
+              return None
+          EOF
+          echo "✅ render_main.py"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 9: ffmpeg_render.py
+      # ═══════════════════════════════════════════════════
+      - name: 11. 📝 ffmpeg_render.py
+        run: |
+          cat > Factory/Management/story/ffmpeg_render.py << 'EOF'
+          #!/usr/bin/env python3
+          # 📄 ffmpeg_render.py — FFmpeg final render
+
+          import os
+          import subprocess
+          import sys
+
+          def render_final_video(bg_video, music_path, voice_path, master_ass_path, cta_image_path, duration,
+                                 output_path="temp/Final_Story.mp4", fonts_dir=None, logo_path=None):
+              print("🎬 [ffmpeg_render] Starting...")
+              sys.stdout.flush()
+
+              if not bg_video or not os.path.exists(bg_video):
+                  print(f"❌ bg_video missing: {bg_video}")
+                  return None
+              if not os.path.exists(voice_path):
+                  print(f"❌ voice missing: {voice_path}")
+                  return None
+
+              if fonts_dir is None or not os.path.exists(fonts_dir):
+                  here = os.path.dirname(os.path.abspath(__file__))
+                  fonts_dir = os.path.join(here, "..", "assets", "fonts")
+              if logo_path is None or not os.path.exists(logo_path):
+                  here = os.path.dirname(os.path.abspath(__file__))
+                  logo_path = os.path.join(here, "..", "assets", "logo.png")
+
+              has_logo = os.path.exists(logo_path)
+              abs_fonts = os.path.abspath(fonts_dir) if fonts_dir and os.path.exists(fonts_dir) else ""
+
+              print(f"📁 fonts_dir: {fonts_dir}")
+              print(f"🖼️ logo: {logo_path} (has_logo: {has_logo})")
+
+              cmd = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", bg_video, "-i", voice_path]
+
+              has_music = (music_path and os.path.exists(music_path) and os.path.getsize(music_path) > 0)
+              if has_music:
+                  cmd += ["-i", music_path]
+              cmd += ["-loop", "1", "-i", cta_image_path]
+              cta_idx = 3 if has_music else 2
+              if has_logo:
+                  cmd += ["-i", logo_path]
+                  logo_idx = 4 if has_music else 3
+
+              v = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,vignette=PI/4[bg];"
+              cur = "bg"
+              cta_start = max(0, duration - 5.0)
+
+              if has_logo:
+                  v += f"[{logo_idx}:v]scale=200:70,format=rgba[logo_small];"
+                  x_expr = "40+abs(mod(t*80,2*(W-w-80))-(W-w-80))"
+                  y_expr = "40+abs(mod(t*100,2*(H-h-80))-(H-h-80))"
+                  v += f"[{cur}][logo_small]overlay=x='{x_expr}':y='{y_expr}':enable='lt(t,{cta_start})'[bg_logo];"
+                  cur = "bg_logo"
+
+              abs_ass = os.path.abspath(master_ass_path)
+              if abs_fonts:
+                  v += f"[{cur}]subtitles='{abs_ass}':fontsdir='{abs_fonts}'[v_sub];"
+              else:
+                  v += f"[{cur}]subtitles='{abs_ass}'[v_sub];"
+
+              v += f"[v_sub][{cta_idx}:v]overlay=0:0:enable='gte(t,{cta_start})'[v_out]"
+
+              if has_music:
+                  a = "[2:a]volume=0.15[bgm];[bgm][1:a]sidechaincompress=threshold=0.05:ratio=8:attack=50:release=500[ducked];[1:a][ducked]amix=inputs=2:duration=first[a_out]"
+              else:
+                  a = "[1:a]volume=1.0[a_out]"
+
+              cmd += [
+                  "-filter_complex", f"{v}; {a}",
+                  "-map", "[v_out]", "-map", "[a_out]",
+                  "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-threads", "0", "-r", "24",
+                  "-c:a", "aac", "-b:a", "128k",
+                  "-t", f"{duration:.2f}", "-shortest", output_path
+              ]
+
+              print(f"🎬 Running FFmpeg...")
+              try:
+                  result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+                  if result.returncode != 0:
+                      print("❌ FFmpeg stderr (last 2000):")
+                      print(result.stderr[-2000:])
+                      return None
+                  print(f"✅ Done: {output_path}")
+                  return output_path
+              except Exception as e:
+                  print(f"❌ Exception: {e}")
+                  return None
+          EOF
+          echo "✅ ffmpeg_render.py"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 10: __init__.py
+      # ═══════════════════════════════════════════════════
+      - name: 12. 📝 __init__.py
+        run: |
+          echo "" > Factory/Management/story/__init__.py
+          echo "✅ __init__.py"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 11: requirements.txt
+      # ═══════════════════════════════════════════════════
+      - name: 13. 📝 requirements.txt
+        run: |
+          cat > Factory/Management/story/requirements.txt << 'EOF'
+          requests
+          edge-tts
+          google-api-python-client
+          google-auth-httplib2
+          google-auth-oauthlib
+          Pillow
+          mutagen
+          EOF
+          echo "✅ requirements.txt"
+
+      # ═══════════════════════════════════════════════════
+      # FILE 12: main.py (already done — skip)
+      # ═══════════════════════════════════════════════════
+      - name: 14. ℹ️ main.py already exists
+        run: |
+          if [ -f "Factory/Management/story/main.py" ]; then
+            echo "✅ main.py already exists — $(wc -l < Factory/Management/story/main.py) lines"
+          else
+            echo "⚠️ main.py missing — Fix-Factory-Full chalao pehle"
+          fi
+
+      # ═══════════════════════════════════════════════════
+      # VERIFY: Syntax check
+      # ═══════════════════════════════════════════════════
+      - name: 15. ✅ Syntax Check
+        run: |
+          echo "════════════════════════════════════════"
+          echo "🧪 PYTHON SYNTAX CHECK:"
+          echo "════════════════════════════════════════"
+          cd Factory/Management/story
+          FAIL=0
+          for f in *.py; do
+            if python3 -m py_compile "$f" 2>/dev/null; then
+              echo "✅ $f"
+            else
+              echo "❌ $f — SYNTAX ERROR"
+              python3 -m py_compile "$f" 2>&1 | head -3
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" = "1" ]; then
+            echo "❌ Kuch files mein syntax error hai"
+            exit 1
+          fi
+          echo "✅ Sab files syntax OK"
+
+      # ═══════════════════════════════════════════════════
+      # PUSH
+      # ═══════════════════════════════════════════════════
+      - name: 16. 💾 Commit + Push
+        run: |
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          git add Factory/Management/story/
+
+          if git diff-index --quiet HEAD 2>/dev/null; then
+            echo "⚠️ No changes"
+          else
+            git commit -m "🔧 All story files fixed — no relative imports"
+            git push origin main
+            echo "✅ Pushed!"
+          fi
+
+      # ═══════════════════════════════════════════════════
+      # TELEGRAM
+      # ═══════════════════════════════════════════════════
+      - name: 17. 📤 Telegram Report
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            MSG="✅ <b>All Files Fixed!</b>
+
+          📝 <b>Files Rewritten:</b>
+          • colors.py
+          • fonts.py
+          • sizes.py
+          • timing.py
+          • duration.py
+          • cta_maker.py
+          • ass_builder.py (no relative imports)
+          • render_main.py
+          • ffmpeg_render.py
+          • __init__.py
+          • requirements.txt
+
+          🧪 <b>Syntax:</b> All OK
+          ⏭️ <b>Next:</b> Video test chalayein"
+          else
+            MSG="❌ <b>Fix Failed</b>
+          Status: $STATUS
+          Check logs."
+          fi
+
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" \
+            -d "parse_mode=HTML" || true
