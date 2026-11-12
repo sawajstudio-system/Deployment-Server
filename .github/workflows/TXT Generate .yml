@@ -10,19 +10,19 @@ on:
         type: choice
         options:
           - "All 3 Repos"
-          - "Hosting Only"
-          - "Deployment-Server Only"
-          - "Development Only"
-          - "Hosting + Deployment-Server"
-          - "Hosting + Development"
-          - "Deployment-Server + Development"
+          - "Live-hosting_sarvar"
+          - "Development-workshop"
+          - "deployment-run"
+          - "Live-hosting_sarvar + Development-workshop"
+          - "Live-hosting_sarvar + deployment-run"
+          - "Development-workshop + deployment-run"
       dry_run:
         description: "Dry run (no Telegram upload)?"
         required: false
         default: false
         type: boolean
   schedule:
-    - cron: "30 2 * * *" # Roz subah 8:00 IST
+    - cron: "30 2 * * *" # Roz subah 8:00 IST (2:30 UTC)
 
 concurrency:
   group: txt-generator
@@ -64,6 +64,7 @@ jobs:
           import base64
           import logging
           import requests
+          import zipfile
           from datetime import datetime, timezone
 
           # ── CONFIG ──────────────────────────────────────────────────────────────────
@@ -71,20 +72,23 @@ jobs:
           TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
           GITHUB_TOKEN     = os.getenv("TOKEN_GITHUB")
 
-          PUBLIC_REPO   = "sawajstudio-system/hosting"
-          BACKEND_REPO  = "sawajstudio-system/Deployment-Server"
-          WORKSHOP_REPO = "sawajstudio-system/Development"
+          # असली रिपॉजिटरी के नाम
+          REPO_HOSTING     = "sawajstudio-system/Live-hosting_sarvar"
+          REPO_DEPLOYMENT  = "sawajstudio-system/Development-workshop"
+          REPO_DEVELOPMENT = "sawajstudio-system/deployment-run"
 
           TARGET       = os.getenv("REPO_TARGET", "All 3 Repos").strip()
+          DRY_RUN      = os.getenv("DRY_RUN", "0") == "1"
           OUTPUT_FILE  = "Combined.txt"
-          TELEGRAM_MAX_BYTES = 49 * 1024 * 1024
-          DRY_RUN            = os.getenv("DRY_RUN", "0") == "1"
+          ZIP_FILE     = "Combined.zip"
+          
+          TELEGRAM_MAX_BYTES = 49 * 1024 * 1024 
 
           SKIP_SEGMENTS = {
-              ".git", ".github/workflows/.gitkeep", "node_modules", ".venv", "venv", "env",
+              ".git", ".github", "node_modules", ".venv", "venv", "env",
               "__pycache__", ".pytest_cache", ".mypy_cache", ".tox", ".idea", ".vscode",
               "dist", "build", "target", "bin", "obj", "site-packages", ".next", ".nuxt",
-              ".terraform", ".cache",
+              ".terraform", ".cache", "recycle"
           }
 
           BINARY_EXTS = {
@@ -192,7 +196,7 @@ jobs:
                   return ("empty", None)
               return ("text", content)
 
-          def write_repo_section(fo, label, repo):
+          def write_repo_section(fo, repo):
               stats = {"text": 0, "binary": 0, "empty": 0, "fail": 0}
               info = get_repo_info(repo)
               if not info:
@@ -203,7 +207,7 @@ jobs:
               desc   = info.get("description") or "—"
 
               fo.write(f"\n\n{'#'*70}\n")
-              fo.write(f"# REPO: {label}\n")
+              fo.write(f"# REPO: {repo}\n")
               fo.write(f"# URL    : https://github.com/{repo}\n")
               fo.write(f"# Branch : {branch}\n")
               fo.write(f"# Pushed : {pushed}\n")
@@ -218,7 +222,7 @@ jobs:
               binary_paths = []
               for idx, path in enumerate(selected, 1):
                   if DRY_RUN:
-                      fo.write(f"\n\n{'='*60}\nFILE: {label}/{path}\n{'='*60}\n[DRY RUN]\n")
+                      fo.write(f"\n\n{'='*60}\nFILE: {repo}/{path}\n{'='*60}\n[DRY RUN]\n")
                       stats["text"] += 1
                       continue
 
@@ -229,7 +233,7 @@ jobs:
 
                   status, content = fetch_file(repo, path, branch)
                   if status == "text":
-                      fo.write(f"\n\n{'='*60}\nFILE: {label}/{path}\n{'='*60}\n")
+                      fo.write(f"\n\n{'='*60}\nFILE: {repo}/{path}\n{'='*60}\n")
                       fo.write(content)
                       stats["text"] += 1
                   elif status == "binary":
@@ -244,86 +248,53 @@ jobs:
                       log.info(f"  {idx}/{len(selected)} (text: {stats['text']}, binary: {stats['binary']}, fail: {stats['fail']})")
 
               if binary_paths:
-                  fo.write(f"\n\n{'─'*60}\n# BINARY FILES IN {label}\n{'─'*60}\n")
+                  fo.write(f"\n\n{'─'*60}\n# BINARY FILES IN {repo}\n{'─'*60}\n")
                   for bp in binary_paths:
                       fo.write(f"#   [BINARY] {bp}\n")
 
               return stats
 
-          def split_file_for_telegram(path, max_bytes=TELEGRAM_MAX_BYTES):
-              parts = []
-              if os.path.getsize(path) <= max_bytes:
-                  return [path]
-              log.warning(f"⚠️ File > {human_size(max_bytes)}. Splitting...")
-              part_num, buf, buf_size = 1, [], 0
-              with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                  for line in f:
-                      line_b = len(line.encode("utf-8"))
-                      if buf_size + line_b > max_bytes and buf:
-                          part_path = f"/tmp/part_{part_num}.txt"
-                          with open(part_path, "w", encoding="utf-8") as pf:
-                              pf.writelines(buf)
-                          parts.append(part_path)
-                          part_num += 1
-                          buf, buf_size = [], 0
-                      buf.append(line)
-                      buf_size += line_b
-              if buf:
-                  part_path = f"/tmp/part_{part_num}.txt"
-                  with open(part_path, "w", encoding="utf-8") as pf:
-                      pf.writelines(buf)
-                  parts.append(part_path)
-              return parts
-
           def send_to_telegram(file_path, caption):
               if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-                  log.warning("⚠️ Telegram not configured.")
+                  log.warning("⚠️ Telegram not configured. Skipping upload.")
                   return
-              parts = split_file_for_telegram(file_path)
-              total = len(parts)
-              for i, part in enumerate(parts, 1):
-                  cap = caption if total == 1 else f"{caption} [Part {i}/{total}]"
-                  try:
-                      with open(part, "rb") as f:
-                          r = requests.post(
-                              f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendDocument",
-                              data={"chat_id": TELEGRAM_CHAT_ID, "caption": cap[:1024]},
-                              files={"document": (os.path.basename(part), f)},
-                              timeout=300,
-                          )
-                      if r.status_code == 200:
-                          log.info(f"✅ Telegram part {i}/{total} sent")
-                      else:
-                          log.error(f"❌ Telegram part {i}/{total} failed: {r.status_code}")
-                  except Exception as e:
-                      log.error(f"❌ Telegram error: {e}")
-                  finally:
-                      if part != file_path and os.path.exists(part):
-                          os.remove(part)
+                  
+              size = os.path.getsize(file_path)
+              if size > TELEGRAM_MAX_BYTES:
+                  log.error(f"❌ File {human_size(size)} exceeds Telegram limit of {human_size(TELEGRAM_MAX_BYTES)}.")
+                  return
+
+              log.info(f"📤 Uploading {os.path.basename(file_path)} ({human_size(size)}) to Telegram...")
+              try:
+                  with open(file_path, "rb") as f:
+                      r = requests.post(
+                          f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendDocument",
+                          data={"chat_id": TELEGRAM_CHAT_ID, "caption": caption[:1024]},
+                          files={"document": (os.path.basename(file_path), f)},
+                          timeout=300,
+                      )
+                  if r.status_code == 200:
+                      log.info(f"✅ Telegram upload successful")
+                  else:
+                      log.error(f"❌ Telegram upload failed. Response: {r.text}")
+              except Exception as e:
+                  log.error(f"❌ Telegram network error: {e}")
 
           def main():
               start = time.time()
               log.info("═" * 60)
-              log.info(f"📄 TXT Generator — 3 REPOS  |  Target: {TARGET}")
+              log.info(f"📄 TXT Generator — Target: {TARGET}")
+              log.info(f"🧪 Dry run mode: {DRY_RUN}")
               log.info("═" * 60)
-
-              valid_targets = {
-                  "All 3 Repos", "Hosting Only", "Deployment-Server Only", "Development Only",
-                  "Hosting + Deployment-Server", "Hosting + Development", "Deployment-Server + Development"
-              }
-              
-              if TARGET not in valid_targets:
-                  log.error(f"❌ Invalid REPO_TARGET: {TARGET!r}.")
-                  sys.exit(1)
 
               if not GITHUB_TOKEN:
                   log.error("❌ TOKEN_GITHUB missing!")
                   sys.exit(1)
 
               stats = {
-                  "Hosting":           {"text": 0, "binary": 0, "empty": 0, "fail": 0},
-                  "Deployment-Server": {"text": 0, "binary": 0, "empty": 0, "fail": 0},
-                  "Development":       {"text": 0, "binary": 0, "empty": 0, "fail": 0},
+                  REPO_HOSTING:     {"text": 0, "binary": 0, "empty": 0, "fail": 0},
+                  REPO_DEPLOYMENT:  {"text": 0, "binary": 0, "empty": 0, "fail": 0},
+                  REPO_DEVELOPMENT: {"text": 0, "binary": 0, "empty": 0, "fail": 0},
               }
 
               try:
@@ -336,22 +307,23 @@ jobs:
                       fo.write(f"Target    : {TARGET}\n")
                       fo.write("═" * 70 + "\n")
 
-                      if "Hosting" in TARGET or TARGET == "All 3 Repos":
-                          log.info("▶️  HOSTING repo...")
-                          stats["Hosting"] = write_repo_section(fo, "Hosting", PUBLIC_REPO)
+                      # Check if the Real Name is in the target string
+                      if TARGET == "All 3 Repos" or "Live-hosting_sarvar" in TARGET:
+                          log.info(f"▶️  Processing {REPO_HOSTING}...")
+                          stats[REPO_HOSTING] = write_repo_section(fo, REPO_HOSTING)
 
-                      if "Deployment-Server" in TARGET or TARGET == "All 3 Repos":
-                          log.info("▶️  DEPLOYMENT-SERVER repo...")
-                          stats["Deployment-Server"] = write_repo_section(fo, "Deployment-Server", BACKEND_REPO)
+                      if TARGET == "All 3 Repos" or "Development-workshop" in TARGET:
+                          log.info(f"▶️  Processing {REPO_DEPLOYMENT}...")
+                          stats[REPO_DEPLOYMENT] = write_repo_section(fo, REPO_DEPLOYMENT)
 
-                      if "Development" in TARGET or TARGET == "All 3 Repos":
-                          log.info("▶️  DEVELOPMENT repo...")
-                          stats["Development"] = write_repo_section(fo, "Development", WORKSHOP_REPO)
+                      if TARGET == "All 3 Repos" or "deployment-run" in TARGET:
+                          log.info(f"▶️  Processing {REPO_DEVELOPMENT}...")
+                          stats[REPO_DEVELOPMENT] = write_repo_section(fo, REPO_DEVELOPMENT)
 
                       fo.write(f"\n\n{'#'*70}\n# EXPORT SUMMARY\n{'#'*70}\n")
-                      for label, s in stats.items():
+                      for repo_name, s in stats.items():
                           fo.write(
-                              f"# {label:17s} → text: {s['text']:4d}  "
+                              f"# {repo_name:40s} → text: {s['text']:4d}  "
                               f"binary: {s['binary']:4d}  "
                               f"empty: {s['empty']:4d}  "
                               f"fail: {s['fail']:4d}\n"
@@ -363,22 +335,35 @@ jobs:
                   log.error(f"❌ Write failed: {e}")
                   sys.exit(1)
 
-              if os.path.exists(OUTPUT_FILE):
-                  size = os.path.getsize(OUTPUT_FILE)
-                  log.info(f"✅ Combined.txt ready: {human_size(size)}")
+              if os.path.exists(OUTPUT_FILE) and os.path.getsize(OUTPUT_FILE) > 0:
+                  txt_size = os.path.getsize(OUTPUT_FILE)
+                  log.info(f"✅ Combined.txt ready: {human_size(txt_size)}")
+
+                  log.info("🤐 Compressing to ZIP...")
+                  with zipfile.ZipFile(ZIP_FILE, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                      zipf.write(OUTPUT_FILE, arcname="Combined.txt")
+                  
+                  zip_size = os.path.getsize(ZIP_FILE)
+                  log.info(f"✅ ZIP ready: {human_size(zip_size)}")
 
                   if not DRY_RUN:
                       caption = (
                           f"📄 FULL DUMP ({TARGET})\n"
-                          f"📦 Size: {human_size(size)}\n"
-                          f"📊 Hosting: {stats['Hosting']['text']} txt + {stats['Hosting']['binary']} bin\n"
-                          f"📊 Deployment-Server: {stats['Deployment-Server']['text']} txt + {stats['Deployment-Server']['binary']} bin\n"
-                          f"📊 Development: {stats['Development']['text']} txt + {stats['Development']['binary']} bin"
+                          f"📦 Raw Size: {human_size(txt_size)} | Zipped: {human_size(zip_size)}\n"
+                          f"📊 {REPO_HOSTING}: {stats[REPO_HOSTING]['text']} txt\n"
+                          f"📊 {REPO_DEPLOYMENT}: {stats[REPO_DEPLOYMENT]['text']} txt\n"
+                          f"📊 {REPO_DEVELOPMENT}: {stats[REPO_DEVELOPMENT]['text']} txt"
                       )
-                      send_to_telegram(OUTPUT_FILE, caption)
+                      send_to_telegram(ZIP_FILE, caption)
+                  else:
+                      log.info("🧪 Dry run enabled. Skipping Telegram upload.")
 
                   os.remove(OUTPUT_FILE)
-                  log.info("🧹 Temp file removed")
+                  os.remove(ZIP_FILE)
+                  log.info("🧹 Temp files removed")
+
+              else:
+                  log.warning("⚠️ Generated file is empty or missing. Nothing to send.")
 
               log.info(f"🏁 Done in {time.time() - start:.1f}s")
               return 0
@@ -393,7 +378,7 @@ jobs:
           TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
           TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
           REPO_TARGET: ${{ inputs.repo_target || 'All 3 Repos' }}
-          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+          DRY_RUN: ${{ inputs.dry_run == true && '1' || '0' }}
         run: |
           echo "🎯 Target: $REPO_TARGET"
           echo "🧪 Dry run: $DRY_RUN"
@@ -402,7 +387,7 @@ jobs:
       - name: 🧹 Cleanup temp files
         if: always()
         run: |
-          rm -f Combined.txt txt_generator_run.py /tmp/part_*.txt || true
+          rm -f Combined.txt Combined.zip txt_generator_run.py || true
           echo "✅ Cleanup done"
 
       - name: 📊 Summary
