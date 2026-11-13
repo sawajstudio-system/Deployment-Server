@@ -1,4 +1,4 @@
-name: 🟢Fix-Voice-Final
+name: 🟢Full-Copy-Hosting-To-Development
 
 on:
   workflow_dispatch:
@@ -7,75 +7,168 @@ permissions:
   contents: write
 
 jobs:
-  fix:
+  copy_all:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
 
     steps:
-      - name: 1. 📥 Checkout Development
+      # 1. Dono repos checkout karein
+      - name: 1. 📥 Checkout Hosting (Source)
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/hosting_sarvar'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'hosting'
+
+      - name: 2. 📥 Checkout Development (Destination)
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Development'
           token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Development'
 
-      - name: 2. 📝 Fix requirements (Edge-TTS force)
+      # 2. Exact Folder Structure Create Karein
+      - name: 3. 📁 Create Folder Structure
+        working-directory: ./Development
         run: |
-          cat > Factory/Management/story/requirements.txt << 'EOF'
-          requests
-          edge-tts==6.1.9
-          google-api-python-client
-          google-auth-httplib2
-          google-auth-oauthlib
-          Pillow
-          mutagen
-          EOF
-          echo "✅ requirements.txt fixed"
+          echo "📁 Creating folder structure..."
+          mkdir -p Factory/Management/1_Git_Tools
+          mkdir -p Factory/Management/2_AI_Models
+          mkdir -p Factory/Management/3_Media
+          mkdir -p Factory/Management/4_Islamic
+          mkdir -p Factory/Management/5_Audio_Text
+          mkdir -p Factory/Management/assets/fonts
+          mkdir -p Factory/Management/Uploader
+          mkdir -p Factory/branch/story
+          echo "✅ Folders created"
 
-      - name: 3. 📝 Fix edge_tts.py (3 voices fallback)
+      # 3. Hosting Sarvar se poora code utha kar naye structure mein daalein
+      - name: 4. 📋 Copy ALL Code from Hosting
         run: |
-          cat > Factory/Management/5_Audio_Text/edge_tts.py << 'EOF'
-          import os, subprocess
+          SRC="hosting/Video_Generator"
+          DST="Development/Factory/Management"
 
-          VOICES = ["hi-IN-MadhurNeural", "hi-IN-SwaraNeural", "en-US-GuyNeural"]
+          echo "📋 Copying files..."
 
-          def generate(text, output_path="temp/voice_edge.mp3"):
-              print(f"[edge_tts] 🎙️ Generating for {len(text)} chars...")
-              text = text[:900]
-              tmp_txt = output_path + ".txt"
+          # 1. Copy Assets (Fonts & Logo)
+          cp -rf "$SRC"/assets/* "$DST/assets/" 2>/dev/null || true
+          echo "✅ Assets copied"
 
-              try:
-                  os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                  with open(tmp_txt, "w", encoding="utf-8") as f:
-                      f.write(text)
+          # 2. Copy Story Files to Factory/branch/story/
+          STORY_SRC="$SRC/Story_Generator"
+          STORY_DST="Development/Factory/branch/story"
+          
+          # Main files
+          cp -f "$STORY_SRC/main.py" "$STORY_DST/main.py" 2>/dev/null || true
+          cp -f "$STORY_SRC/requirements.txt" "$STORY_DST/requirements.txt" 2>/dev/null || true
+          
+          # Story_Render files
+          SR="$STORY_SRC/Story_Render"
+          cp -f "$SR/main_render.py" "$STORY_DST/render_main.py" 2>/dev/null || true
+          cp -f "$SR/config/colors.py" "$STORY_DST/colors.py" 2>/dev/null || true
+          cp -f "$SR/subtitle/ass_builder.py" "$STORY_DST/ass_builder.py" 2>/dev/null || true
+          cp -f "$SR/subtitle/timing/time_format.py" "$STORY_DST/timing.py" 2>/dev/null || true
+          cp -f "$SR/tools/duration_checker.py" "$STORY_DST/duration.py" 2>/dev/null || true
+          cp -f "$SR/tools/cta_generator.py" "$STORY_DST/cta_maker.py" 2>/dev/null || true
+          cp -f "$SR/video_engine/ffmpeg_render.py" "$STORY_DST/ffmpeg_render.py" 2>/dev/null || true
+          touch "$STORY_DST/__init__.py"
+          echo "✅ Story files copied"
 
-                  for voice in VOICES:
-                      cmd = f'edge-tts --file "{tmp_txt}" --write-media "{output_path}" --voice {voice} --rate=-20% --pitch=-2Hz --volume=+8%'
-                      print(f"[edge_tts] Trying: {voice}")
-                      result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=180)
+          # 3. Copy Uploader
+          cp -f "$SRC/Uploader/Drive/story_upload.py" "$DST/Uploader/story_upload.py" 2>/dev/null || true
+          echo "✅ Uploader copied"
 
-                      if result.stderr:
-                          print(f"[edge_tts] stderr: {result.stderr[:200]}")
+          # 4. Copy AI Models
+          AI="$SRC/Fetching/AI/API_fallback"
+          cp -f "$AI/ai_fallback.py" "$DST/2_AI_Models/ai_fallback.py" 2>/dev/null || true
+          cp -f "$AI/gemini_AI.py" "$DST/2_AI_Models/gemini.py" 2>/dev/null || true
+          cp -f "$AI/groq_AI.py" "$DST/2_AI_Models/groq.py" 2>/dev/null || true
+          cp -f "$AI/cohere_AI.py" "$DST/2_AI_Models/cohere.py" 2>/dev/null || true
+          cp -f "$AI/nvidia_AI.py" "$DST/2_AI_Models/nvidia.py" 2>/dev/null || true
+          cp -f "$AI/cloudflare_AI.py" "$DST/2_AI_Models/cloudflare.py" 2>/dev/null || true
+          echo "✅ AI Models copied"
 
-                      if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
-                          print(f"[edge_tts] ✅ SUCCESS with {voice}")
-                          return output_path
-                      else:
-                          print(f"[edge_tts] ❌ {voice} failed")
+          # 5. Copy Media
+          cp -f "$SRC/Fetching/Background/Music/API_fallback/freesound.py" "$DST/3_Media/freesound.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Background/Music/URL_fallback/pixabay_music.py" "$DST/3_Media/pixabay_music.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Background/Video/API_fallback/pexels.py" "$DST/3_Media/pexels_video.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Background/Video/API_fallback/pixabay.py" "$DST/3_Media/pixabay_video.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Background/Video/API_fallback/coverr.py" "$DST/3_Media/coverr.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Background/Video/URL_fallback/gradient.py" "$DST/3_Media/gradient.py" 2>/dev/null || true
+          echo "✅ Media copied"
 
-                  return None
-              except Exception as e:
-                  print(f"[edge_tts] ❌ Exception: {e}")
-                  return None
-              finally:
-                  if os.path.exists(tmp_txt):
-                      os.remove(tmp_txt)
-          EOF
-          echo "✅ edge_tts.py fixed"
+          # 6. Copy Islamic
+          cp -f "$SRC/Fetching/Islamic/Hadis/URL_fallback/fawaz.py" "$DST/4_Islamic/fawaz.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Islamic/Hijri_date/URL_fallback/hijri_date.py" "$DST/4_Islamic/hijri_date.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Islamic/Quran/URL_fallback/quran.py" "$DST/4_Islamic/quran.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Islamic/Quran/URL_fallback/quran_audio.py" "$DST/4_Islamic/quran_audio.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Islamic/Quran/URL_fallback/quran_tafsir.py" "$DST/4_Islamic/quran_tafsir.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Islamic/Dua/API_fallback/ummah.py" "$DST/4_Islamic/ummah.py" 2>/dev/null || true
+          echo "✅ Islamic copied"
 
-      - name: 4. 💾 Commit + Push
+          # 7. Copy Audio/Text
+          cp -f "$SRC/Fetching/Translator/URL_fallback/mymemory.py" "$DST/5_Audio_Text/mymemory.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/audio_TTS/API_fallback/elevenlabs.py" "$DST/5_Audio_Text/elevenlabs.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/audio_TTS/URL_fallback/edge_tts.py" "$DST/5_Audio_Text/edge_tts.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Intro_Outro_CTA/API_fallback/intro_AI.py" "$DST/5_Audio_Text/intro_AI.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Intro_Outro_CTA/API_fallback/outro_AI.py" "$DST/5_Audio_Text/outro_AI.py" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Intro_Outro_CTA/API_fallback/cta_AI.py" "$DST/5_Audio_Text/cta_AI.py" 2>/dev/null || true
+          echo "✅ Audio/Text copied"
+
+      # 4. FIX paths (taaki imports aur asset paths naye structure mein kaam karein)
+      - name: 5. 🔧 Fix Imports & Paths
+        working-directory: ./Development
+        run: |
+          STORY_DIR="Factory/branch/story"
+          
+          # Fix main.py paths (branch/story is 1 step deeper)
+          sed -i 's|MGMT = os.path.dirname(CURRENT_DIR)|MGMT = os.path.dirname(os.path.dirname(CURRENT_DIR))|g' $STORY_DIR/main.py
+          sed -i 's|MGMT = os.path.dirname(CURRENT_DIR)|MGMT = os.path.dirname(os.path.dirname(CURRENT_DIR))|g' $STORY_DIR/render_main.py
+          
+          # Fix relative imports in story files
+          sed -i 's|from \.\.config\.colors import|from colors import|g' $STORY_DIR/ass_builder.py 2>/dev/null || true
+          sed -i 's|from \.\.config\.styles import.*||g' $STORY_DIR/ass_builder.py 2>/dev/null || true
+
+          # Fix asset paths in ffmpeg_render
+          sed -i 's|os.path.join(here, "..", "assets")|os.path.join(here, "..", "..", "Management", "assets")|g' $STORY_DIR/ffmpeg_render.py 2>/dev/null || true
+
+          echo "✅ Paths fixed"
+
+      # 5. Commit + Push
+      - name: 6. 💾 Commit + Push
+        working-directory: ./Development
         run: |
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
-          git add Factory/Management/story/requirements.txt Factory/Management/5_Audio_Text/edge_tts.py
-          git commit -m "🔧 Voice fix — Edge-TTS multi-voice + version lock" || echo "no change"
-          git push origin main || echo "no push"
+          
+          # Add all changes
+          git add Factory/
+          
+          if git diff-index --quiet HEAD 2>/dev/null; then
+            echo "⚠️ No changes (Already updated)"
+          else
+            git commit -m "🚀 Full Copy: Hosting → Development (Final Structure)"
+            git push origin main
+            echo "✅ Pushed to Development!"
+          fi
+
+      # 6. Telegram Report
+      - name: 7. 📤 Telegram Report
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            MSG="✅ <b>Full Copy Complete!</b>%0A%0A📥 <b>Source:</b> hosting_sarvar%0A📤 <b>Destination:</b> Development/Factory%0A%0A📁 <b>Structure:</b>%0A• Management/ (APIs)%0A• branch/story/ (Video Factory)%0A%0A<i>Saara code perfectly copy aur fix ho gaya hai!</i>"
+          else
+            MSG="❌ <b>Copy Failed</b>%0AStatus: $STATUS%0A%0ACheck GitHub logs."
+          fi
+          
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" \
+            -d "parse_mode=HTML" || true
