@@ -1,4 +1,4 @@
-name: 📄 Full 3 Repos TXT Generator (Upgraded + Selectable)
+name: api_ sarvice
 
 on:
   workflow_dispatch:
