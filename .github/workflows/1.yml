@@ -31,17 +31,19 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           path: 'AdminRepo'
 
-      - name: 3. 🚚 Server se utha kar Admin mein dalna
+      - name: 3. 🚚 Folder Move & Rename
         run: |
+          # Admin repo ke andar jao
           cd AdminRepo
           
-          # Purana folder delete karna (chahe Service room ho ya System_room)
-          rm -rf "Service room" "System_room"
+          # Agar pehle se koi purana folder bana ho toh use delete kar do
+          rm -rf "System_room" "Service room" "API service"
           
-          # Server repo se folder uthana aur API service naam se save karna
-          cp -r "../ServerRepo/System_room" "API service"
+          # Server repo se folder utha kar Admin me 'API service' naam se copy karo
+          echo "🚚 Utha rahe hain ServerRepo/System_room ko..."
+          cp -r ../ServerRepo/System_room "API service"
           
-          echo "✅ Folder successfully moved as 'API service'"
+          echo "✅ Folder successfully copy ho gaya as 'API service'"
 
       - name: 4. 💾 Save (Commit & Push)
         run: |
@@ -52,9 +54,9 @@ jobs:
           git add .
           
           if git diff-index --quiet HEAD; then
-            echo "ℹ️ Kuch naya nahi hai."
+            echo "ℹ️ Kuch naya nahi mila."
           else
-            git commit -m "📦 Auto: Server se code uthakar API service mein dala"
+            git commit -m "📦 Auto: System_room moved and renamed to API service"
             git push origin main
-            echo "✅ Admin repo mein save ho gaya!"
+            echo "✅ Admin repo me save ho gaya!"
           fi
