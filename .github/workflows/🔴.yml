@@ -1,4 +1,4 @@
-name: 🚀 Auto-Fetch System Room Folder Only
+name: 🔴
 
 on:
   workflow_dispatch: # Manual run karne ke liye button
@@ -16,16 +16,17 @@ jobs:
       - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
 
-      # 2. Hosting Sarvar Repo se sirf System_room folder download karna
+      # 2. Hosting Server Repo se sirf System_room folder download karna
       - name: 2. 📦 Fetch System_room from hosting_sarvar
         run: |
           echo "⏳ Downloading System_room folder from hosting_sarvar..."
-          # Sparse checkout ka use karke sirf ek folder download karenge
-          git clone --no-checkout --filter=blob:none https://github.com/sawajstudio-system/hosting_sarvar.git temp_hosting
+          
+          # Sparse checkout using cone mode and safe default branch checkout
+          git clone --filter=blob:none --no-checkout https://github.com/sawajstudio-system/hosting_sarvar.git temp_hosting
           cd temp_hosting
           git sparse-checkout init --cone
           git sparse-checkout set System_room
-          git checkout main
+          git checkout
           cd ..
           
           echo "🚚 Moving folder to admin repo..."
@@ -41,7 +42,9 @@ jobs:
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
           git add System_room
-          if git diff-index --quiet HEAD; then
+          
+          # Check if there are staged changes to commit
+          if git diff --cached --quiet; then
             echo "ℹ️ Folder pehle se admin repo me hai, koi change nahi."
           else
             git commit -m "🤖 Auto-Added System_room folder (Files Only, No Run)"
