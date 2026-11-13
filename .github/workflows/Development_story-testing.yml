@@ -57,21 +57,21 @@ jobs:
       - name: 4. 📥 Install Python packages
         run: |
           python -m pip install --upgrade pip
-          pip install -r Factory/Management/story/requirements.txt
+          pip install -r Factory/branch/story/requirements.txt
 
       - name: 5. 🔍 Verify structure
         run: |
           echo "📂 story files:"
-          ls -la Factory/Management/story/
+          ls -la Factory/branch/story/
           echo ""
           echo "📂 assets:"
           ls Factory/Management/assets/
-          ls Factory/Management/assets/fonts/ | head -5
 
+      # 🟢 Yahan path aur PYTHONPATH update kiya gaya hai
       - name: 6. 🎬 Run Video Pipeline
-        working-directory: Factory/Management/story
+        working-directory: Factory/branch/story
         env:
-          PYTHONPATH: "${{ github.workspace }}/Factory/Management/story:${{ github.workspace }}/Factory/Management/1_Git_Tools:${{ github.workspace }}/Factory/Management/2_AI_Models:${{ github.workspace }}/Factory/Management/3_Media:${{ github.workspace }}/Factory/Management/4_Islamic:${{ github.workspace }}/Factory/Management/5_Audio_Text:${{ github.workspace }}/Factory/Management/Uploader"
+          PYTHONPATH: "${{ github.workspace }}/Factory/branch/story:${{ github.workspace }}/Factory/Management/2_AI_Models:${{ github.workspace }}/Factory/Management/3_Media:${{ github.workspace }}/Factory/Management/4_Islamic:${{ github.workspace }}/Factory/Management/5_Audio_Text:${{ github.workspace }}/Factory/Management/Uploader"
         run: |
           echo "🐍 PYTHONPATH:"
           echo "$PYTHONPATH" | tr ':' '\n'
@@ -82,15 +82,14 @@ jobs:
       - name: 7. 📤 Check Output
         if: always()
         run: |
-          VIDEO="Factory/Management/story/temp/Final_Story.mp4"
+          VIDEO="Factory/branch/story/temp/Final_Story.mp4"
           if [ -f "$VIDEO" ]; then
             echo "✅ VIDEO BANA!"
             du -h "$VIDEO"
             echo "VIDEO_READY=true" >> $GITHUB_ENV
           else
             echo "❌ Video nahi bana"
-            echo "📂 temp contents:"
-            ls -la Factory/Management/story/temp/ 2>/dev/null || echo "temp nahi mila"
+            ls -la Factory/branch/story/temp/ 2>/dev/null || echo "temp nahi mila"
           fi
 
       - name: 8. 📤 Upload Artifact
@@ -98,7 +97,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Factory-Video
-          path: Factory/Management/story/temp/Final_Story.mp4
+          path: Factory/branch/story/temp/Final_Story.mp4
           retention-days: 3
 
       - name: 9. 🚨 Telegram Error
@@ -111,4 +110,4 @@ jobs:
 
       - name: 10. 🧹 Cleanup
         if: always()
-        run: rm -rf Factory/Management/story/temp 2>/dev/null || true
+        run: rm -rf Factory/branch/story/temp 2>/dev/null || true
