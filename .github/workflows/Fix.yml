@@ -1,4 +1,4 @@
-name: 🟢1-Click-Full-Fix
+name: 🟢Direct-Copy-Magic
 
 on:
   workflow_dispatch:
@@ -7,197 +7,119 @@ permissions:
   contents: write
 
 jobs:
-  fix_everything:
+  magic_copy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      # 1. Hosting Sarvar Checkout (Source)
-      - name: 1. 📥 Checkout Hosting
+      - name: 1. 📥 Checkout Hosting (Sahi Code)
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/hosting_sarvar'
           token: ${{ secrets.TOKEN_GITHUB }}
           path: 'hosting'
 
-      # 2. Development Checkout (Destination)
-      - name: 2. 📥 Checkout Development
+      - name: 2. 📥 Checkout Development (Jahan Dalna Hai)
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Development'
           token: ${{ secrets.TOKEN_GITHUB }}
           path: 'Development'
 
-      # 3. Copy Code from Hosting to Development
-      - name: 3. 📋 Copy Code (Hosting → Development)
+      - name: 3. 🔍 Hosting Ki Files Padho (Scan)
+        run: |
+          echo "Hosting Story Files:"
+          ls -la hosting/Video_Generator/Story_Generator/Story_Render/
+          echo "Hosting AI Files:"
+          ls -la hosting/Video_Generator/Fetching/AI/API_fallback/
+
+      - name: 4. 📋 Copy Story Files
+        run: |
+          SRC="hosting/Video_Generator/Story_Generator"
+          DST="Development/Factory/branch/story"
+          mkdir -p $DST
+
+          # Main files copy
+          cp -f "$SRC/main.py" "$DST/main.py" 2>/dev/null || true
+          cp -f "$SRC/requirements.txt" "$DST/requirements.txt" 2>/dev/null || true
+
+          # Story_Render files copy (naam badal kar)
+          SR="$SRC/Story_Render"
+          cp -f "$SR/main_render.py" "$DST/render_main.py" 2>/dev/null || true
+          cp -f "$SR/config/colors.py" "$DST/colors.py" 2>/dev/null || true
+          cp -f "$SR/subtitle/ass_builder.py" "$DST/ass_builder.py" 2>/dev/null || true
+          cp -f "$SR/subtitle/timing/time_format.py" "$DST/timing.py" 2>/dev/null || true
+          cp -f "$SR/tools/duration_checker.py" "$DST/duration.py" 2>/dev/null || true
+          cp -f "$SR/tools/cta_generator.py" "$DST/cta_maker.py" 2>/dev/null || true
+          cp -f "$SR/video_engine/ffmpeg_render.py" "$DST/ffmpeg_render.py" 2>/dev/null || true
+          
+          # fonts.py aur sizes.py banane ke liye
+          cp -f "$SR/config/fonts/__init__.py" "$DST/fonts.py" 2>/dev/null || true
+          cp -f "$SR/config/sizes/__init__.py" "$DST/sizes.py" 2>/dev/null || true
+
+          echo "✅ Story Files Copied!"
+
+      - name: 5. 📋 Copy Management (APIs)
         run: |
           SRC="hosting/Video_Generator"
           DST="Development/Factory/Management"
-          STORY="Development/Factory/branch/story"
+          mkdir -p $DST/2_AI_Models $DST/3_Media $DST/4_Islamic $DST/5_Audio_Text $DST/Uploader $DST/assets
 
-          # Folders ensure karein
-          mkdir -p $DST/1_Git_Tools $DST/2_AI_Models $DST/3_Media $DST/4_Islamic $DST/5_Audio_Text $DST/assets/fonts $DST/Uploader $STORY
-
-          # 1. Copy APIs
+          # AI Models
           AI="$SRC/Fetching/AI/API_fallback"
-          cp -f "$AI/ai_fallback.py" "$DST/2_AI_Models/ai_fallback.py" 2>/dev/null || true
-          cp -f "$AI/gemini_AI.py" "$DST/2_AI_Models/gemini.py" 2>/dev/null || true
-          cp -f "$AI/groq_AI.py" "$DST/2_AI_Models/groq.py" 2>/dev/null || true
-          cp -f "$AI/cohere_AI.py" "$DST/2_AI_Models/cohere.py" 2>/dev/null || true
-          cp -f "$AI/nvidia_AI.py" "$DST/2_AI_Models/nvidia.py" 2>/dev/null || true
-          cp -f "$AI/cloudflare_AI.py" "$DST/2_AI_Models/cloudflare.py" 2>/dev/null || true
+          cp -f "$AI/"*.py "$DST/2_AI_Models/" 2>/dev/null || true
 
-          cp -f "$SRC/Fetching/Background/Music/API_fallback/freesound.py" "$DST/3_Media/freesound.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Background/Music/URL_fallback/pixabay_music.py" "$DST/3_Media/pixabay_music.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Background/Video/API_fallback/pexels.py" "$DST/3_Media/pexels_video.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Background/Video/API_fallback/pixabay.py" "$DST/3_Media/pixabay_video.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Background/Video/API_fallback/coverr.py" "$DST/3_Media/coverr.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Background/Video/URL_fallback/gradient.py" "$DST/3_Media/gradient.py" 2>/dev/null || true
+          # Audio & Text
+          cp -f "$SRC/Fetching/audio_TTS/API_fallback/"*.py "$DST/5_Audio_Text/" 2>/dev/null || true
+          cp -f "$SRC/Fetching/audio_TTS/URL_fallback/"*.py "$DST/5_Audio_Text/" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Translator/URL_fallback/"*.py "$DST/5_Audio_Text/" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Intro_Outro_CTA/API_fallback/"*.py "$DST/5_Audio_Text/" 2>/dev/null || true
 
-          cp -f "$SRC/Fetching/Islamic/Hadis/URL_fallback/fawaz.py" "$DST/4_Islamic/fawaz.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Islamic/Hijri_date/URL_fallback/hijri_date.py" "$DST/4_Islamic/hijri_date.py" 2>/dev/null || true
-          
-          cp -f "$SRC/Fetching/Translator/URL_fallback/mymemory.py" "$DST/5_Audio_Text/mymemory.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/audio_TTS/API_fallback/elevenlabs.py" "$DST/5_Audio_Text/elevenlabs.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Intro_Outro_CTA/API_fallback/intro_AI.py" "$DST/5_Audio_Text/intro_AI.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Intro_Outro_CTA/API_fallback/outro_AI.py" "$DST/5_Audio_Text/outro_AI.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Intro_Outro_CTA/API_fallback/cta_AI.py" "$DST/5_Audio_Text/cta_AI.py" 2>/dev/null || true
+          # Media, Islamic, Uploader
+          cp -f "$SRC/Fetching/Background/Video/API_fallback/"*.py "$DST/3_Media/" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Background/Video/URL_fallback/"*.py "$DST/3_Media/" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Background/Music/API_fallback/"*.py "$DST/3_Media/" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Background/Music/URL_fallback/"*.py "$DST/3_Media/" 2>/dev/null || true
+          cp -f "$SRC/Fetching/Islamic/Hadis/URL_fallback/"*.py "$DST/4_Islamic/" 2>/dev/null || true
+          cp -f "$SRC/Uploader/Drive/"*.py "$DST/Uploader/" 2>/dev/null || true
+          cp -rf "$SRC/assets/"* "$DST/assets/" 2>/dev/null || true
 
-          cp -f "$SRC/Uploader/Drive/story_upload.py" "$DST/Uploader/story_upload.py" 2>/dev/null || true
-          cp -rf "$SRC/assets/fonts/"* "$DST/assets/fonts/" 2>/dev/null || true
-          cp -f "$SRC/assets/logo.png" "$DST/assets/logo.png" 2>/dev/null || true
-          echo "✅ APIs Copied"
+          echo "✅ APIs Copied!"
 
-      # 4. OVERWRITE STORY FILES WITH PERFECT PATHS & FIXES
-      - name: 4. 📝 Fix Story Files (Paths, gTTS, Syntax)
+      - name: 6. 🔧 Automatic Path Fixer
         run: |
           STORY="Development/Factory/branch/story"
           
-          # ── Fix requirements.txt ──
-          cat > "$STORY/requirements.txt" << 'EOF'
-          requests
-          edge-tts==6.1.9
-          google-api-python-client
-          google-auth-httplib2
-          google-auth-oauthlib
-          Pillow
-          mutagen
-          EOF
-
-          # ── Fix gTTS (Google TTS Fallback) ──
-          cat > "Development/Factory/Management/5_Audio_Text/edge_tts.py" << 'EOF'
-          import os, requests, urllib.parse
-          def generate(text, output_path="temp/voice_edge.mp3"):
-              text = text[:900]
-              params = {"ie": "UTF-8", "q": text, "tl": "hi", "client": "tw-ob", "ttsspeed": "0.9"}
-              headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Referer": "https://translate.google.com/"}
-              try:
-                  os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                  r = requests.get("https://translate.google.com/translate_tts", params=params, headers=headers, timeout=30)
-                  if r.status_code == 200 and len(r.content) > 1000:
-                      with open(output_path, "wb") as f: f.write(r.content)
-                      return output_path
-                  os.system(f'edge-tts --text "{text}" --write-media "{output_path}"')
-                  return output_path if os.path.exists(output_path) and os.path.getsize(output_path) > 1000 else None
-              except Exception: return None
-          EOF
-
-          # ── Fix ass_builder.py (No backslash in f-string) ──
-          cat > "$STORY/ass_builder.py" << 'EOF'
-          import os, re
-          from colors import get_color_tag
-          def create_main_subtitles(hadith, hindi_text, duration, output_path="temp/main_subtitles.ass"):
-              ara_text = re.sub(r'[\n\r"]', ' ', str(hadith.get("arabic", ""))).strip()
-              hin_text = re.sub(r'[\n\r"]', ' ', str(hindi_text)).strip()
-              eng_text = re.sub(r'[\n\r"]', ' ', str(hadith.get("english", ""))).strip()
-              ass = "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Arabic,Amiri,75,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,760,1\nStyle: Hindi,Yatra One,65,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,570,1\nStyle: English,Playfair Display,52,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,400,1\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
-              def ts(t):
-                  h=int(t//3600); m=int((t%3600)//60); s=int(t%60); ms=int(round((t-int(t))*100))
-                  return f"{h}:{m:02d}:{s:02d}.{ms:02d}"
-              start, end = 4.0, max(duration - 5.5, 5.0)
-              def process(text, style, idx):
-                  words = text.split()
-                  if not words: return ""
-                  weights = [2.0 if w[-1] in '.!?।' else 1.5 if w[-1] in ',،;:' else 1.0 for w in words]
-                  tpw = (end - start) / sum(weights)
-                  curr = 0
-                  lines = ""
-                  for i, w in enumerate(words):
-                      ws = start + curr; we = ws + (weights[i] * tpw); curr += weights[i] * tpw
-                      s_idx = max(0, i - 2); vis = words[s_idx:i+1]
-                      dc = get_color_tag(i // 3 + (idx * 3))
-                      kt = f"\u202B{{\\c{dc}}}●  " if idx == 0 else f"{{\\c{dc}}}●  "
-                      for j, vw in enumerate(vis):
-                          gi = s_idx + j
-                          kt += f"{{\\c{get_color_tag(gi)}\\k{int((we-ws)*100)}}}{vw} " if gi == i else f"{{\\c{get_color_tag(gi)}}}{vw} "
-                      if idx == 0: kt += "\u202C"
-                      lines += f"Dialogue: 0,{ts(ws)},{ts(we)},{style},,,0,0,,{kt.strip()}\n"
-                  return lines
-              if ara_text: ass += process(ara_text, "Arabic", 0)
-              if hin_text: ass += process(hin_text, "Hindi", 1)
-              if eng_text: ass += process(eng_text, "English", 2)
-              os.makedirs(os.path.dirname(output_path), exist_ok=True)
-              with open(output_path, "w", encoding="utf-8") as f: f.write(ass)
-              return output_path
-
-          def create_intro_subtitle(intro_text, duration=3.5, output_path="temp/intro_sub.ass"):
-              if not intro_text: return None
-              clean = re.sub(r'[\n\r"]', ' ', str(intro_text)).strip()
-              ass = "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Intro,Playfair Display,70,&H00D7FF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,8,40,40,200,1\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
-              ts = lambda t: f"{int(t//3600)}:{int((t%3600)//60):02d}:{int(t%60):02d}.{int(round((t-int(t))*100)):02d}"
-              ass += f"Dialogue: 0,{ts(0.0)},{ts(duration)},Intro,,0,0,0,,{{\\fad(1000,1000)\\blur5\\c&H00D7FF&\\3c&H000000&}}{clean}\n"
-              os.makedirs(os.path.dirname(output_path), exist_ok=True)
-              with open(output_path, "w", encoding="utf-8") as f: f.write(ass)
-              return output_path
-
-          def create_outro_subtitle(outro_text, total_duration, outro_duration=3.5, output_path="temp/outro_sub.ass"):
-              if not outro_text: return None
-              clean = re.sub(r'[\n\r"]', ' ', str(outro_text)).strip()
-              ass = "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Outro,Playfair Display,80,&HFFFF00&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,8,40,40,250,1\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
-              ts = lambda t: f"{int(t//3600)}:{int((t%3600)//60):02d}:{int(t%60):02d}.{int(round((t-int(t))*100)):02d}"
-              st = max(0.0, total_duration - outro_duration)
-              ass += f"Dialogue: 0,{ts(st)},{ts(total_duration)},Outro,,0,0,0,,{{\\fad(500,500)\\c{get_color_tag(1)}}}{clean}\n"
-              os.makedirs(os.path.dirname(output_path), exist_ok=True)
-              with open(output_path, "w", encoding="utf-8") as f: f.write(ass)
-              return output_path
-          EOF
-          echo "✅ Story Files Fixed"
-
-      # 5. Fix Paths inside main.py & render_main.py
-      - name: 5. 🔧 Fix main.py & render_main.py Paths
-        run: |
-          STORY="Development/Factory/branch/story"
-          # main.py path fix
+          # Story main.py ka path fix
           sed -i 's|MGMT = os.path.dirname(CURRENT_DIR)|MGMT = os.path.dirname(os.path.dirname(CURRENT_DIR))|g' "$STORY/main.py" 2>/dev/null || true
-          # render_main.py path fix
           sed -i 's|MGMT = os.path.dirname(CURRENT_DIR)|MGMT = os.path.dirname(os.path.dirname(CURRENT_DIR))|g' "$STORY/render_main.py" 2>/dev/null || true
+          sed -i 's|os.path.join(here, "..", "assets")|os.path.join(here, "..", "..", "Management", "assets")|g' "$STORY/ffmpeg_render.py" 2>/dev/null || true
 
-      # 6. Commit & Push
-      - name: 6. 💾 Commit + Push
+          # Agar ass_builder.py mein backslash error hai to usko fix karo
+          sed -i 's|re.sub(r.\[\\n\\r"\].*|re.sub(r"["\\n\\r]", " ", str(intro_text)).strip()|g' "$STORY/ass_builder.py" 2>/dev/null || true
+
+          # AI Models ke naam fix (gemini_AI.py -> gemini.py)
+          for f in Development/Factory/Management/2_AI_Models/*_AI.py; do
+            if [ -f "$f" ]; then
+              newname=$(echo "$f" | sed 's/_AI\.py/\.py/')
+              mv "$f" "$newname"
+            fi
+          done
+          
+          # ai_fallback.py ke andar imports fix karo
+          sed -i 's/import gemini_AI/import gemini as gemini_AI/g' Development/Factory/Management/2_AI_Models/ai_fallback.py 2>/dev/null || true
+          sed -i 's/import groq_AI/import groq as groq_AI/g' Development/Factory/Management/2_AI_Models/ai_fallback.py 2>/dev/null || true
+          sed -i 's/import cohere_AI/import cohere as cohere_AI/g' Development/Factory/Management/2_AI_Models/ai_fallback.py 2>/dev/null || true
+          sed -i 's/import nvidia_AI/import nvidia as nvidia_AI/g' Development/Factory/Management/2_AI_Models/ai_fallback.py 2>/dev/null || true
+          sed -i 's/import cloudflare_AI/import cloudflare as cloudflare_AI/g' Development/Factory/Management/2_AI_Models/ai_fallback.py 2>/dev/null || true
+
+          echo "✅ Paths Fixed!"
+
+      - name: 7. 💾 Commit & Push
         working-directory: ./Development
         run: |
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
           git add Factory/
-          if git diff-index --quiet HEAD 2>/dev/null; then
-            echo "⚠️ No changes"
-          else
-            git commit -m "🚀 1-Click Full Fix: Hosting Sync + Paths + gTTS + Syntax"
-            git push origin main
-            echo "✅ Pushed to Development!"
-          fi
-
-      # 7. Telegram Report
-      - name: 7. 📤 Telegram Report
-        if: always()
-        run: |
-          STATUS="${{ job.status }}"
-          if [ "$STATUS" = "success" ]; then
-            MSG="✅ <b>1-Click Full Fix Complete!</b>%0A%0A📥 <b>Source:</b> hosting_sarvar%0A📤 <b>Destination:</b> Development/Factory%0A%0A🔧 <b>Fixed:</b>%0A• Saara code copy hua.%0A• Story paths set hue.%0A• Google TTS (gTTS) add hua (No Block).%0A• Syntax error fix hua.%0A%0A<i>Ab Video Test chalayein!</i>"
-          else
-            MSG="❌ <b>Failed</b>%0AStatus: $STATUS"
-          fi
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
-            --data-urlencode "text=${MSG}" \
-            -d "parse_mode=HTML" || true
+          git commit -m "🚀 Magic Copy: Hosting files synced perfectly" || echo "No changes"
+          git push origin main || echo "Push failed"
