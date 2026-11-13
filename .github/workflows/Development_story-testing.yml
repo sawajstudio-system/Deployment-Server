@@ -1,25 +1,30 @@
-name: 🎬 Development_story
+name: 🎬 Connect-Story-Pipeline
 
 on:
   workflow_dispatch:
 
 concurrency:
-  group: video-test-factory
+  group: story-pipeline
   cancel-in-progress: false
 
 jobs:
-  video:
+  run_video:
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
     env:
+      # ── 🟢 CORE & API KEYS ──
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      
+      # ── ☁️ GOOGLE DRIVE ──
       GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
       GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
       GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
       GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
+      
+      # ── 🧠 AI MODELS ──
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -30,13 +35,15 @@ jobs:
       MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
       ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
       TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
+      
+      # ── 🎬 MEDIA & AUDIO ──
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
       FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
       ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
 
     steps:
-      - name: 1. 📥 Checkout Development
+      - name: 1. 📥 Checkout Development Repo
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Development'
@@ -48,35 +55,32 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: 3. 📦 FFmpeg + Fonts
+      - name: 3. 📦 Install FFmpeg & Fonts
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg fonts-noto fonts-noto-color-emoji fontconfig
           sudo fc-cache -f -v
 
-      - name: 4. 📥 Install Python packages
+      - name: 4. 📥 Install Python Packages
         run: |
           python -m pip install --upgrade pip
           pip install -r Factory/branch/story/requirements.txt
 
-      - name: 5. 🔍 Verify structure
+      - name: 5. 🔍 Verify Structure
         run: |
-          echo "📂 story files:"
+          echo "📂 Story files:"
           ls -la Factory/branch/story/
           echo ""
-          echo "📂 assets:"
+          echo "📂 Assets:"
           ls Factory/Management/assets/
 
-      # 🟢 Yahan path aur PYTHONPATH update kiya gaya hai
-      - name: 6. 🎬 Run Video Pipeline
+      # 🟢 STEP 6: Yahan hum Story ko connect kar rahe hain
+      - name: 6. 🎬 Run Story Pipeline
         working-directory: Factory/branch/story
         env:
           PYTHONPATH: "${{ github.workspace }}/Factory/branch/story:${{ github.workspace }}/Factory/Management/2_AI_Models:${{ github.workspace }}/Factory/Management/3_Media:${{ github.workspace }}/Factory/Management/4_Islamic:${{ github.workspace }}/Factory/Management/5_Audio_Text:${{ github.workspace }}/Factory/Management/Uploader"
         run: |
-          echo "🐍 PYTHONPATH:"
-          echo "$PYTHONPATH" | tr ':' '\n'
-          echo ""
-          echo "🚀 Running main.py..."
+          echo "🚀 Connecting Story Pipeline..."
           python -u main.py
 
       - name: 7. 📤 Check Output
@@ -86,28 +90,11 @@ jobs:
           if [ -f "$VIDEO" ]; then
             echo "✅ VIDEO BANA!"
             du -h "$VIDEO"
-            echo "VIDEO_READY=true" >> $GITHUB_ENV
           else
             echo "❌ Video nahi bana"
             ls -la Factory/branch/story/temp/ 2>/dev/null || echo "temp nahi mila"
           fi
 
-      - name: 8. 📤 Upload Artifact
-        if: env.VIDEO_READY == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Factory-Video
-          path: Factory/branch/story/temp/Final_Story.mp4
-          retention-days: 3
-
-      - name: 9. 🚨 Telegram Error
-        if: failure()
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_REPORT_TOKEN }}/sendMessage" \
-            -d "chat_id=${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}" \
-            -d "text=❌ <b>Video Failed</b>%0A<b>Check GitHub Logs</b>" \
-            -d "parse_mode=HTML" || true
-
-      - name: 10. 🧹 Cleanup
+      - name: 8. 🧹 Cleanup
         if: always()
         run: rm -rf Factory/branch/story/temp 2>/dev/null || true
