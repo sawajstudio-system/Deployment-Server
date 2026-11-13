@@ -128,8 +128,8 @@ jobs:
           ZIP_FILE = os.environ.get("ZIP_FILE", "None")
           TXT_FILE = os.environ.get("TXT_FILE", "None")
 
-          # 🟢 FIXED: Repo ka naam hosting_sarvar kiya aur System_room path add kiya
-          BASE_URL = "https://api.github.com/repos/sawajstudio-system/hosting_sarvar/contents/System_room/"
+          # 🟢 FIXED: Repo ka naam hosting_sarvar kiya aur API service path add kiya
+          BASE_URL = "https://api.github.com/repos/sawajstudio-system/hosting_sarvar/contents/API%20service/"
 
           ALL_MAP = {
               "Cloudflare":        "A_API_room/01_ai_models/cloudflare.py",
