@@ -1,0 +1,60 @@
+name: 📦 Auto Move to API service
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  auto_move:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+
+    steps:
+      - name: 1. 📥 Server Repo Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/hosting_sarvar'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'ServerRepo'
+
+      - name: 2. 📥 Admin Repo Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/admin'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'AdminRepo'
+
+      - name: 3. 🚚 Server se utha kar Admin mein dalna
+        run: |
+          cd AdminRepo
+          
+          # Purana folder delete karna (chahe Service room ho ya System_room)
+          rm -rf "Service room" "System_room"
+          
+          # Server repo se folder uthana aur API service naam se save karna
+          cp -r "../ServerRepo/System_room" "API service"
+          
+          echo "✅ Folder successfully moved as 'API service'"
+
+      - name: 4. 💾 Save (Commit & Push)
+        run: |
+          cd AdminRepo
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          
+          git add .
+          
+          if git diff-index --quiet HEAD; then
+            echo "ℹ️ Kuch naya nahi hai."
+          else
+            git commit -m "📦 Auto: Server se code uthakar API service mein dala"
+            git push origin main
+            echo "✅ Admin repo mein save ho gaya!"
+          fi
