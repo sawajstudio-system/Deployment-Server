@@ -1,4 +1,4 @@
-name: 🟢Fix-Voice
+name: 🟢Fix-Voice-Final
 
 on:
   workflow_dispatch:
@@ -18,67 +18,25 @@ jobs:
           repository: 'sawajstudio-system/Development'
           token: ${{ secrets.TOKEN_GITHUB }}
 
-      - name: 2. 🔍 Check Current State
+      - name: 2. 📝 Fix requirements (Edge-TTS force)
         run: |
-          echo "📄 elevenlabs.py:"
-          head -20 Factory/Management/5_Audio_Text/elevenlabs.py 2>/dev/null || echo "❌ missing"
-          echo ""
-          echo "📄 edge_tts.py:"
-          head -20 Factory/Management/5_Audio_Text/edge_tts.py 2>/dev/null || echo "❌ missing"
-          echo ""
-          echo "📄 requirements.txt:"
-          cat Factory/Management/story/requirements.txt
-
-      - name: 3. 📝 Fix ElevenLabs (better error handling)
-        run: |
-          cat > Factory/Management/5_Audio_Text/elevenlabs.py << 'EOF'
-          import os, requests
-
-          API_KEY_ENV = "ELEVENLABS_API_KEY"
-          VOICE_ID = "pNInz6obpgDQGcFmaJgB"  # Adam voice
-          API_URL = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
-
-          def generate(text, output_path="temp/voice.mp3"):
-              api_key = os.getenv(API_KEY_ENV)
-              if not api_key:
-                  print(f"[elevenlabs] ⚠️ {API_KEY_ENV} missing")
-                  return None
-
-              print(f"[elevenlabs] 🎙️ Generating for {len(text)} chars...")
-
-              headers = {
-                  "Accept": "audio/mpeg",
-                  "Content-Type": "application/json",
-                  "xi-api-key": api_key,
-              }
-              payload = {
-                  "text": text[:1000],
-                  "model_id": "eleven_multilingual_v2",
-                  "voice_settings": {"stability": 0.42, "similarity_boost": 0.82},
-              }
-
-              try:
-                  r = requests.post(API_URL, json=payload, headers=headers, timeout=60)
-                  print(f"[elevenlabs] HTTP {r.status_code}")
-                  if r.status_code == 200 and len(r.content) > 1000:
-                      os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                      with open(output_path, "wb") as f:
-                          f.write(r.content)
-                      print(f"[elevenlabs] ✅ Saved: {output_path}")
-                      return output_path
-                  else:
-                      print(f"[elevenlabs] ❌ Response: {r.text[:300]}")
-                      return None
-              except Exception as e:
-                  print(f"[elevenlabs] ❌ Error: {e}")
-                  return None
+          cat > Factory/Management/story/requirements.txt << 'EOF'
+          requests
+          edge-tts==6.1.9
+          google-api-python-client
+          google-auth-httplib2
+          google-auth-oauthlib
+          Pillow
+          mutagen
           EOF
-          echo "✅ elevenlabs.py"
+          echo "✅ requirements.txt fixed"
 
-      - name: 4. 📝 Fix Edge-TTS (robust)
+      - name: 3. 📝 Fix edge_tts.py (3 voices fallback)
         run: |
           cat > Factory/Management/5_Audio_Text/edge_tts.py << 'EOF'
           import os, subprocess
+
+          VOICES = ["hi-IN-MadhurNeural", "hi-IN-SwaraNeural", "en-US-GuyNeural"]
 
           def generate(text, output_path="temp/voice_edge.mp3"):
               print(f"[edge_tts] 🎙️ Generating for {len(text)} chars...")
@@ -90,22 +48,20 @@ jobs:
                   with open(tmp_txt, "w", encoding="utf-8") as f:
                       f.write(text)
 
-                  cmd = (
-                      f'edge-tts --file "{tmp_txt}" --write-media "{output_path}" '
-                      f'--voice hi-IN-MadhurNeural --rate=-20% --pitch=-2Hz --volume=+8%'
-                  )
-                  print(f"[edge_tts] Running: edge-tts --file ...")
-                  result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=180)
+                  for voice in VOICES:
+                      cmd = f'edge-tts --file "{tmp_txt}" --write-media "{output_path}" --voice {voice} --rate=-20% --pitch=-2Hz --volume=+8%'
+                      print(f"[edge_tts] Trying: {voice}")
+                      result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=180)
 
-                  print(f"[edge_tts] returncode: {result.returncode}")
-                  if result.stderr:
-                      print(f"[edge_tts] stderr: {result.stderr[-500:]}")
+                      if result.stderr:
+                          print(f"[edge_tts] stderr: {result.stderr[:200]}")
 
-                  if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
-                      print(f"[edge_tts] ✅ {output_path}")
-                      return output_path
+                      if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                          print(f"[edge_tts] ✅ SUCCESS with {voice}")
+                          return output_path
+                      else:
+                          print(f"[edge_tts] ❌ {voice} failed")
 
-                  print(f"[edge_tts] ❌ rc={result.returncode}, size={os.path.getsize(output_path) if os.path.exists(output_path) else 0}")
                   return None
               except Exception as e:
                   print(f"[edge_tts] ❌ Exception: {e}")
@@ -114,18 +70,12 @@ jobs:
                   if os.path.exists(tmp_txt):
                       os.remove(tmp_txt)
           EOF
-          echo "✅ edge_tts.py"
+          echo "✅ edge_tts.py fixed"
 
-      - name: 5. 💾 Commit + Push
+      - name: 4. 💾 Commit + Push
         run: |
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
-          git add Factory/Management/5_Audio_Text/
-
-          if git diff-index --quiet HEAD 2>/dev/null; then
-            echo "⚠️ No changes"
-          else
-            git commit -m "🔧 Voice fixed — better error logging"
-            git push origin main
-            echo "✅ Pushed!"
-          fi
+          git add Factory/Management/story/requirements.txt Factory/Management/5_Audio_Text/edge_tts.py
+          git commit -m "🔧 Voice fix — Edge-TTS multi-voice + version lock" || echo "no change"
+          git push origin main || echo "no push"
