@@ -1,4 +1,4 @@
-name: 🚀 Auto-Fetch API service & System_room
+name: 🚀 Auto-Fetch Folders from Hosting
 
 on:
   workflow_dispatch: # Manual run karne ke liye button
@@ -12,43 +12,64 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      # 1. Admin Repo Checkout (Jahan aap abhi hain)
+      # 1. Admin Repo Checkout
       - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
 
-      # 2. Hosting Server Repo se dono folders download karna
+      # 2. Hosting Server Repo se folders download karna
       - name: 2. 📦 Fetch Folders from hosting_sarvar
         uses: actions/checkout@v4
         with:
           repository: sawajstudio-system/hosting_sarvar
-          token: ${{ secrets.TOKEN_GITHUB }} # 🟢 Yahan TOKEN_GITHUB use kiya gaya hai
+          token: ${{ secrets.TOKEN_GITHUB }}
           path: temp_hosting
           sparse-checkout: |
             API service
+            Video_Generator
             System_room
 
-      # 3. Move folders to root directory & clean up
+      # 3. Move folders safely (Error-proof)
       - name: 3. 🚚 Move Folders to Admin Repo
         run: |
           echo "🚚 Moving folders to admin repo..."
-          rm -rf "API service" System_room || true
-          mv "temp_hosting/API service" "./API service"
-          mv "temp_hosting/System_room" "./System_room"
+          
+          # Purane folders delete karo agar hain toh
+          rm -rf "API service" "Video_Generator" "System_room" || true
+          
+          # API service check aur move
+          if [ -d "temp_hosting/API service" ]; then
+            mv "temp_hosting/API service" "./API service"
+            echo "✅ API service moved."
+          fi
+
+          # Video_Generator check aur move
+          if [ -d "temp_hosting/Video_Generator" ]; then
+            mv "temp_hosting/Video_Generator" "./Video_Generator"
+            echo "✅ Video_Generator moved."
+          fi
+          
+          # System_room check aur move (agar future me aaye toh)
+          if [ -d "temp_hosting/System_room" ]; then
+            mv "temp_hosting/System_room" "./System_room"
+            echo "✅ System_room moved."
+          fi
+          
           rm -rf temp_hosting
-          echo "✅ Folders successfully fetched!"
+          echo "✅ All available folders moved successfully!"
 
       # 4. Admin Repo me folders ko save (Commit) karna
       - name: 4. 💾 Save Folders to Admin Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
-          git add "API service" System_room
           
-          # Check if there are staged changes to commit
+          # Sabhi folders ko add karo
+          git add . 
+          
           if git diff --cached --quiet; then
             echo "ℹ️ Folders pehle se admin repo me hain, koi change nahi."
           else
-            git commit -m "🤖 Auto-Added API service & System_room folders"
+            git commit -m "🤖 Auto-Fetched folders from hosting_sarvar"
             git push origin HEAD:${{ github.ref_name }}
-            echo "✅ Folders aur unki saari files admin repo me save ho gayi!"
+            echo "✅ Folders admin repo me save ho gaye!"
           fi
