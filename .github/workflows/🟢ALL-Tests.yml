@@ -1,4 +1,4 @@
-name: 🟢ALL-Tests
+name: 🟢ALL-Tests (Fully Upgraded)
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
         default: 'None'
         options:
           - 'None'
-          - 'ALL Tests (Sab 33)'
+          - 'ALL Tests (Sab)'
           - 'Cloudflare'
           - 'Anges'
           - 'Gemini'
@@ -49,6 +49,7 @@ on:
           - 'None'
           - 'All 3 Repos'
           - 'Hosting Only'
+          - 'Deployment-Server Only'
           - 'Development Only'
           - 'Hosting + Development'
 
@@ -60,6 +61,7 @@ on:
           - 'None'
           - 'All 3 Repos'
           - 'Hosting Only'
+          - 'Deployment-Server Only'
           - 'Development Only'
           - 'Hosting + Development'
 
@@ -128,7 +130,7 @@ jobs:
           ZIP_FILE = os.environ.get("ZIP_FILE", "None")
           TXT_FILE = os.environ.get("TXT_FILE", "None")
 
-          # 🟢 FIXED: Repo ka naam hosting_sarvar kiya aur API service path add kiya
+          # 🟢 API service Folder Path
           BASE_URL = "https://api.github.com/repos/sawajstudio-system/hosting_sarvar/contents/API%20service/"
 
           ALL_MAP = {
@@ -167,7 +169,7 @@ jobs:
           selected_tests = []
 
           if API_TEST != "None":
-              if API_TEST == "ALL Tests (Sab 33)":
+              if API_TEST == "ALL Tests (Sab)":
                   for name in ALL_MAP.keys():
                       selected_tests.append(name)
               elif API_TEST in ALL_MAP:
