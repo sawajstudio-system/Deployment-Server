@@ -1,4 +1,4 @@
-name: 🟢ALL-Tests (Fully Upgraded - Local Admin Repo)
+name: all🔗
 
 on:
   workflow_dispatch:
