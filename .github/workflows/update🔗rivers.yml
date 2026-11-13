@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 20
 
     env:
-      # 🟢 GDrive aur Telegram secrets add kiye gaye hain
+      # 🟢 GDrive aur Telegram secrets
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
@@ -37,7 +37,7 @@ jobs:
 
     steps:
       # ─────────────────────────────────────────────────────────────
-      # STEP 1: CHECKOUT (दोनों रेपोज को लोड करना)
+      # STEP 1: CHECKOUT
       # ─────────────────────────────────────────────────────────────
       - name: 1. 📥 Checkout Diploment (Testing)
         uses: actions/checkout@v4
@@ -83,11 +83,10 @@ jobs:
             mv Backend/Video_Generator "$BACKUP_DIR/Video_Generator"
             FILES_COUNT=$(find "$BACKUP_DIR/Video_Generator" -type f | wc -l)
             
-            # 🟢 GDRIVE UPLOAD KE LIYE ZIP BANAYA
+            # 🟢 GDRIVE UPLOAD KE LIYE ZIP BANAYA (Root me banega)
             echo "🗜️ Creating ZIP for Google Drive..."
-            cd "$BACKUP_DIR"
-            zip -r "../../../${VERSION}_backup.zip" "Video_Generator" > /dev/null
-            cd ../../..
+            # Yahan hum zip ko workspace ke root me save kar rahe hain taaki baad me easily mil sake
+            zip -r "${VERSION}_backup.zip" "$BACKUP_DIR/Video_Generator" > /dev/null
           else
             echo "ℹ️ No existing Video_Generator to backup (first run)."
           fi
@@ -140,11 +139,12 @@ jobs:
             echo "BACKUP_VERSION=$VERSION" >> $GITHUB_ENV
           fi
           
-          # 🟢 Environment variable set karo GDrive step ke liye
-          echo "ZIP_TO_UPLOAD=Backend/${VERSION}_backup.zip" >> $GITHUB_ENV
+          # 🟢 Environment variable set karo GDrive step ke liye (Root path)
+          echo "ZIP_TO_UPLOAD=${VERSION}_backup.zip" >> $GITHUB_ENV
 
-      # 🟢 NAYA STEP: GDRIVE RECYCLE UPLOAD (Sirf Hosting Update ke waqt chalega)
+      # 🟢 NAYA STEP: GDRIVE RECYCLE UPLOAD
       - name: 3A.1 ☁️ Upload Backup to GDrive Recycle Folder
+        # Condition check karta hai ki ZIP file exist karti hai ya nahi
         if: ${{ inputs.action == 'Hosting Update' && env.ZIP_TO_UPLOAD != '' }}
         run: |
           pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib > /dev/null
@@ -226,7 +226,6 @@ jobs:
         run: |
           INPUT_VERSION="${{ inputs.version }}"
           
-          # 1. Available versions की list निकालो
           AVAILABLE=$(ls -d Backend/recycle/v* 2>/dev/null \
                       | sed 's#.*/v##' \
                       | grep -E '^[0-9]+$' \
@@ -235,20 +234,17 @@ jobs:
           if [ -z "$AVAILABLE" ]; then
             echo "❌ recycle/ में कोई version नहीं मिला!"
             echo "STATUS=❌ Failed: No versions in recycle/" >> $GITHUB_ENV
-            echo "AVAILABLE_VERSIONS=(none)" >> $GITHUB_ENV
             exit 1
           fi
           
-          # 2. Version तय करो (manual या auto)
           if [ -n "$INPUT_VERSION" ]; then
             if [[ "$INPUT_VERSION" =~ ^v[0-9]+$ ]]; then
               VERSION="$INPUT_VERSION"
             elif [[ "$INPUT_VERSION" =~ ^[0-9]+$ ]]; then
               VERSION="v${INPUT_VERSION}"
             else
-              echo "❌ Invalid version format: $INPUT_VERSION (जैसे v4 लिखें)"
+              echo "❌ Invalid version format: $INPUT_VERSION"
               echo "STATUS=❌ Failed: Invalid version format" >> $GITHUB_ENV
-              echo "AVAILABLE_VERSIONS=$(echo "$AVAILABLE" | sed 's/^/v/' | paste -sd ', ')" >> $GITHUB_ENV
               exit 1
             fi
             RESTORE_MODE="Manual"
@@ -258,7 +254,6 @@ jobs:
             RESTORE_MODE="Auto (latest)"
           fi
           
-          # 3. Check — version में Video_Generator है?
           RESTORE_FROM="Backend/recycle/${VERSION}/Video_Generator"
           
           if [ ! -d "$RESTORE_FROM" ]; then
@@ -267,25 +262,20 @@ jobs:
             exit 1
           fi
           
-          # 5. Env variables
           echo "RESTORED_VERSION=${VERSION}" >> $GITHUB_ENV
           echo "RESTORE_MODE=${RESTORE_MODE}" >> $GITHUB_ENV
           
-          # 6. मौजूदा (गलत) code → broken_TIMESTAMP
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
           BROKEN_DIR="Backend/recycle/broken_${TIMESTAMP}"
           if [ -d "Backend/Video_Generator" ] && [ "$(ls -A Backend/Video_Generator)" ]; then
-            echo "🗑️ Saving current (broken) code → recycle/broken_${TIMESTAMP}"
             mkdir -p "$BROKEN_DIR"
             mv Backend/Video_Generator "$BROKEN_DIR/Video_Generator"
           fi
           echo "BROKEN_BACKUP=broken_${TIMESTAMP}" >> $GITHUB_ENV
           
-          # 7. recycle/vX से code वापस लाओ
           mkdir -p Backend/Video_Generator
           rsync -av "$RESTORE_FROM/" Backend/Video_Generator/
           
-          # 8. Commit + Push
           cd Backend
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
