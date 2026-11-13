@@ -1,4 +1,4 @@
-name: 🟢ALL-Tests (Fully Upgraded)
+name: 🟢ALL-Tests (Debug Mode)
 
 on:
   workflow_dispatch:
@@ -6,64 +6,11 @@ on:
       api_test:
         description: 'API Test (Kaunsi API chalani hai?)'
         type: choice
-        default: 'None'
+        default: 'ALL Tests (Sab)'
         options:
-          - 'None'
           - 'ALL Tests (Sab)'
           - 'Cloudflare'
-          - 'Anges'
-          - 'Gemini'
-          - 'Groq'
-          - 'UMMAH'
-          - 'Cohere'
-          - 'NVIDIA'
-          - 'OpenRouter'
-          - 'Magic'
-          - 'Tanvo'
-          - 'Quran'
-          - 'Quran Audio'
-          - 'Quran Tafsir'
-          - 'Quran Foundation'
-          - 'Hadees'
-          - 'Hijri Date'
-          - 'Pexels'
-          - 'Pixabay'
-          - 'Coverr'
-          - 'AI Image'
-          - 'Natural Sound'
-          - 'ElevenLabs'
-          - 'Cloudinary'
-          - 'Jokes'
-          - 'Quotes'
-          - 'Translator'
-          - 'Telegram'
           - 'GitHub'
-          - 'History Cleaner'
-          - 'Test All GDrive'
-
-      zip_file:
-        description: 'ZIP File (Kis repo ka ZIP chahiye?)'
-        type: choice
-        default: 'None'
-        options:
-          - 'None'
-          - 'All 3 Repos'
-          - 'Hosting Only'
-          - 'Deployment-Server Only'
-          - 'Development Only'
-          - 'Hosting + Development'
-
-      txt_file:
-        description: 'TXT File (Kis repo ka TXT chahiye?)'
-        type: choice
-        default: 'None'
-        options:
-          - 'None'
-          - 'All 3 Repos'
-          - 'Hosting Only'
-          - 'Deployment-Server Only'
-          - 'Development Only'
-          - 'Hosting + Development'
 
 jobs:
   run_tests:
@@ -76,192 +23,80 @@ jobs:
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      ANGES_API_KEY: ${{ secrets.ANGES_API_KEY }}
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-      MAGICHOUR_API_KEY: ${{ secrets.MAGICHOUR_API_KEY }}
-      TANVO_API_KEY: ${{ secrets.TANVO_API_KEY }}
-      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
-      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-      COVERR_API_KEY: ${{ secrets.COVERR_API_KEY }}
-      CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
-      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
-      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
-      UMMAH_API_KEY: ${{ secrets.UMMAH_API_KEY }}
-      QF_CLIENT_ID: ${{ secrets.QF_CLIENT_ID }}
-      QF_CLIENT_SECRET: ${{ secrets.QF_CLIENT_SECRET }}
-      QF_ENV: ${{ secrets.QF_ENV }}
-      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
-      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
-      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
-      GDRIVE_F_SHORT_ID: ${{ secrets.GDRIVE_F_SHORT_ID }}
-      GDRIVE_F_LONG_ID: ${{ secrets.GDRIVE_F_LONG_ID }}
-      GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
 
     steps:
       - name: 1. 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          # 🟢 cache: 'pip' hata diya gaya hai taaki error na aaye
 
       - name: 2. 📦 Install requests
         run: pip install requests
 
-      - name: 3. 🚀 Execute Tests
+      - name: 3. 🚀 Execute Tests (With Debug)
         env:
           API_TEST: ${{ inputs.api_test }}
-          ZIP_FILE: ${{ inputs.zip_file }}
-          TXT_FILE: ${{ inputs.txt_file }}
         run: |
           python << 'PYEOF'
           import os, sys, subprocess, requests, time
 
-          TOKEN       = os.environ["TOKEN_GITHUB"]
-          TG_TOKEN    = os.environ.get("TELEGRAM_API_REPORT_TOKEN")
-          TG_CHAT     = os.environ.get("TELEGRAM_API_REPORT_CHAT_ID")
-          
+          TOKEN       = os.environ.get("TOKEN_GITHUB")
           API_TEST = os.environ.get("API_TEST", "None")
-          ZIP_FILE = os.environ.get("ZIP_FILE", "None")
-          TXT_FILE = os.environ.get("TXT_FILE", "None")
 
           BASE_URL = "https://api.github.com/repos/sawajstudio-system/hosting_sarvar/contents/API%20service/"
 
           ALL_MAP = {
-              "Cloudflare":        "A_API_room/01_ai_models/cloudflare.py",
-              "Anges":             "A_API_room/01_ai_models/anges.py",
-              "Gemini":            "A_API_room/01_ai_models/gemini.py",
-              "Groq":              "A_API_room/01_ai_models/groq.py",
-              "UMMAH":             "A_API_room/Islamic/UMMAH.py",
-              "Cohere":            "A_API_room/01_ai_models/cohere.py",
-              "NVIDIA":            "A_API_room/01_ai_models/nvidia.py",
-              "OpenRouter":        "A_API_room/01_ai_models/openrouter.py",
-              "Magic":             "A_API_room/01_ai_models/magic.py",
-              "Tanvo":             "A_API_room/02_audio_media/tanvo.py",
-              "Quran":             "URL_room/Islamic/quran.py",
-              "Quran Audio":       "URL_room/Islamic/quran_audio.py",
-              "Quran Tafsir":      "URL_room/Islamic/quran_tafsir.py",
-              "Quran Foundation":  "A_API_room/Islamic/quran_foundation.py",
-              "Hadees":            "URL_room/Islamic/hadees.py",
-              "Hijri Date":        "URL_room/Islamic/hijri_date.py",
-              "Pexels":            "A_API_room/05_video_services/pexels.py",
-              "Pixabay":           "A_API_room/05_video_services/pixabay.py",
-              "Coverr":            "A_API_room/05_video_services/coverr.py",
-              "AI Image":          "URL_room/AI/ai_image.py",
-              "Natural Sound":     "A_API_room/02_audio_media/natural_sound.py",
-              "ElevenLabs":        "A_API_room/02_audio_media/elevenlabs_test.py",
-              "Cloudinary":        "A_API_room/02_audio_media/cloudinary.py",
-              "Jokes":             "URL_room/Other/jokes.py",
-              "Quotes":            "URL_room/Other/quotes.py",
-              "Translator":        "URL_room/Other/translator.py",
-              "Telegram":          "A_API_room/03_integrations/telegram.py",
-              "GitHub":            "Git_room/github.py",
-              "History Cleaner":   "Git_room/history_cleaner.py",
-              "Test All GDrive":   "A_API_room/02_audio_media/test_gdrive_all.py",
+              "Cloudflare":  "A_API_room/01_ai_models/cloudflare.py",
+              "GitHub":      "Git_room/github.py",
           }
 
-          selected_tests = []
-
-          if API_TEST != "None":
-              if API_TEST == "ALL Tests (Sab)":
-                  for name in ALL_MAP.keys():
-                      selected_tests.append(name)
-              elif API_TEST in ALL_MAP:
-                  selected_tests.append(API_TEST)
-
-          if ZIP_FILE != "None":
-              selected_tests.append("ZIP Generator")
-          if TXT_FILE != "None":
-              selected_tests.append("TXT Generator")
-
-          selected_tests = list(dict.fromkeys(selected_tests))
-
-          if not selected_tests:
-              print("⚠️ Koi option select nahi kiya. Kripya kisi box me se option chunein.")
-              sys.exit(0)
-
-          def tg(msg):
-              if not TG_TOKEN or not TG_CHAT: return
-              try:
-                  requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
-                                json={"chat_id": TG_CHAT, "text": msg[:4000]}, timeout=10)
-              except Exception: pass
-
-          def fetch_file(rel, retries=3):
+          def fetch_file(rel):
               url = f"{BASE_URL}{rel}"
-              for attempt in range(1, retries + 1):
-                  try:
-                      r = requests.get(url, headers={"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.raw"}, timeout=30)
-                      if r.status_code == 200: return ("OK", r.content)
-                      if r.status_code == 404: return ("SKIP_404", None)
-                      if r.status_code == 403:
-                          time.sleep(10); continue
-                  except Exception as e: print(f"Retry {attempt}: {e}")
-                  time.sleep(2 ** attempt)
-              return ("FAIL_FETCH", None)
+              print(f"🔍 URL: {url}")
+              try:
+                  r = requests.get(url, headers={"Authorization": f"token {TOKEN}", "Accept": "application/vnd.github.raw"}, timeout=30)
+                  
+                  if r.status_code == 200:
+                      print(f"✅ Fetched: {rel}")
+                      return ("OK", r.content)
+                  elif r.status_code == 404:
+                      print(f"❌ ERROR 404: File not found. Path is wrong OR TOKEN is invalid/expired.")
+                      return ("SKIP_404", None)
+                  elif r.status_code == 403:
+                      print(f"❌ ERROR 403: Forbidden. API Rate limit exceeded or Token has no access.")
+                      return ("FAIL_FETCH", None)
+                  else:
+                      print(f"❌ HTTP {r.status_code}: {r.text[:200]}")
+                      return ("FAIL_FETCH", None)
+              except Exception as e:
+                  print(f"❌ Exception: {e}")
+                  return ("FAIL_FETCH", None)
 
-          total = len(selected_tests)
-          tg(f"🚀 Started\nSelected Tests: {total}")
-          results = []
-          start_all = time.time()
+          selected_tests = list(ALL_MAP.keys()) if API_TEST == "ALL Tests (Sab)" else [API_TEST]
 
           for idx, name in enumerate(selected_tests, 1):
-              print(f"\n[{idx}/{total}] Processing: {name}")
-              
-              if name == "ZIP Generator":
-                  os.environ["REPO_TARGET"] = ZIP_FILE
-                  fetch_status, content = fetch_file("Git_room/zip_generator.py")
-              elif name == "TXT Generator":
-                  os.environ["REPO_TARGET"] = TXT_FILE
-                  fetch_status, content = fetch_file("Git_room/txt_generator.py")
-              else:
-                  os.environ["REPO_TARGET"] = "All 3 Repos" 
-                  rel = ALL_MAP[name]
-                  fetch_status, content = fetch_file(rel)
-
-              t0 = time.time()
-              status, duration, reason = None, 0, ""
+              print(f"\n[{idx}/{len(selected_tests)}] Processing: {name}")
+              rel = ALL_MAP[name]
+              fetch_status, content = fetch_file(rel)
 
               if fetch_status == "SKIP_404":
-                  status, reason = "SKIP", "file not found (404)"
+                  print(f"⚠️ {name}: SKIP (404 Error)")
               elif fetch_status == "FAIL_FETCH":
-                  status, reason = "FAIL", "fetch failed"
-              elif content and len(content) < 10:
-                  status, reason = "SKIP", "empty file"
+                  print(f"⚠️ {name}: SKIP (Fetch Failed)")
               else:
+                  # Save file and run it
                   with open("/tmp/run_me.py", "wb") as f:
                       f.write(content)
-                  sys.stdout.flush()
-                  try:
-                      timeout_sec = 300 if name in ["ZIP Generator", "TXT Generator"] else 180
-                      rc = subprocess.run([sys.executable, "/tmp/run_me.py"], timeout=timeout_sec).returncode
-                      status = "PASS" if rc == 0 else "FAIL"
-                  except subprocess.TimeoutExpired:
-                      status = "TIMEOUT"
-                  except Exception as e:
-                      status, reason = "FAIL", str(e)[:60]
-                  finally:
-                      if os.path.exists("/tmp/run_me.py"): os.remove("/tmp/run_me.py")
+                  
+                  print(f"🚀 Running {name}...")
+                  rc = subprocess.run([sys.executable, "/tmp/run_me.py"], timeout=60).returncode
+                  
+                  if rc == 0:
+                      print(f"✅ {name}: PASS")
+                  else:
+                      print(f"❌ {name}: FAIL (Exit code: {rc})")
+                  
+                  if os.path.exists("/tmp/run_me.py"): 
+                      os.remove("/tmp/run_me.py")
 
-              duration = time.time() - t0
-              results.append((name, status, duration, reason))
-              print(f"{name}: {status} ({duration:.1f}s)")
-
-          passed  = sum(1 for _, s, *_ in results if s == "PASS")
-          failed  = sum(1 for _, s, *_ in results if s == "FAIL")
-          skipped = sum(1 for _, s, *_ in results if s == "SKIP")
-          timeout = sum(1 for _, s, *_ in results if s == "TIMEOUT")
-          total_time = time.time() - start_all
-
-          print(f"\nSUMMARY: Pass: {passed} | Fail: {failed} | Skip: {skipped} | Timeout: {timeout} | {total_time:.0f}s")
-          tg(f"🏁 All Tests Completed\n✅ Pass: {passed}\n❌ Fail: {failed}\n⏭️ Skip: {skipped}\n⏰ Timeout: {timeout}")
           PYEOF
-
-      - name: 4. 🧹 Cleanup
-        if: always()
-        run: rm -f /tmp/run_me.py
