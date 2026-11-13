@@ -16,29 +16,27 @@ jobs:
       - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
 
-      # 2. Hosting Server Repo se sirf System_room folder download karna (Using PAT Token)
+      # 2. Hosting Server Repo se sirf System_room folder download karna (Using official action)
       - name: 2. 📦 Fetch System_room from hosting_sarvar
+        uses: actions/checkout@v4
+        with:
+          repository: sawajstudio-system/hosting_sarvar
+          token: ${{ secrets.PAT_TOKEN }}
+          path: temp_hosting
+          sparse-checkout: |
+            System_room
+
+      # 3. Move folder to root directory & clean up
+      - name: 3. 🚚 Move Folder to Admin Repo
         run: |
-          echo "⏳ Downloading System_room folder from hosting_sarvar..."
-          
-          # Clone using Personal Access Token for private repo access
-          git clone --filter=blob:none --no-checkout https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/sawajstudio-system/hosting_sarvar.git temp_hosting
-          
-          cd temp_hosting
-          git sparse-checkout init --cone
-          git sparse-checkout set System_room
-          git checkout
-          cd ..
-          
           echo "🚚 Moving folder to admin repo..."
           rm -rf System_room || true
           mv temp_hosting/System_room ./System_room
           rm -rf temp_hosting
-          
           echo "✅ Folder successfully fetched with all files!"
 
-      # 3. Admin Repo me folder ko save (Commit) karna
-      - name: 3. 💾 Save Folder to Admin Repo
+      # 4. Admin Repo me folder ko save (Commit) karna
+      - name: 4. 💾 Save Folder to Admin Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
@@ -52,3 +50,4 @@ jobs:
             git push origin HEAD:${{ github.ref_name }}
             echo "✅ Folder aur uski saari files admin repo me save ho gayi!"
           fi
+          
