@@ -1,59 +1,53 @@
-name: 📦 Auto Move to API service
+name: 🚀 Admin System Room Runner
 
 on:
+  workflow_dispatch: # Manual run ke liye
   push:
     branches:
       - main
 
-permissions:
-  contents: write
-
 jobs:
-  auto_move:
+  run-system-room:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    env:
-      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+    timeout-minutes: 30
 
     steps:
-      - name: 1. 📥 Server Repo Checkout
+      # 1. Repo Checkout
+      - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
+
+      # 2. Python Setup
+      - name: 2. 🐍 Setup Python
+        uses: actions/setup-python@v5
         with:
-          repository: 'sawajstudio-system/hosting_sarvar'
-          token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'ServerRepo'
+          python-version: '3.11'
 
-      - name: 2. 📥 Admin Repo Checkout
-        uses: actions/checkout@v4
-        with:
-          repository: 'sawajstudio-system/admin'
-          token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'AdminRepo'
-
-      - name: 3. 🚚 Move Folder to Admin
+      # 3. System_room folder check
+      - name: 3. 🔍 Verify System_room Folder
         run: |
-          # Server repo se folder utha kar Admin repo me daal rahe hain
-          mv ServerRepo/System_room AdminRepo/
-          
-          # Ab Admin repo ke andar jaakar folder ka naam badal rahe hain
-          cd AdminRepo
-          mv System_room "API service"
-          
-          echo "✅ Folder move aur rename ho gaya!"
-
-      - name: 4. 💾 Save (Commit & Push)
-        run: |
-          cd AdminRepo
-          git config user.name "Sawaj Studio Bot"
-          git config user.email "bot@sawajstudio.com"
-          
-          git add .
-          
-          if git diff-index --quiet HEAD; then
-            echo "ℹ️ Kuch naya nahi mila."
-          else
-            git commit -m "📦 Auto: System_room moved and renamed to API service"
-            git push origin main
-            echo "✅ Admin repo me save ho gaya!"
+          if [ ! -d "System_room" ]; then
+            echo "❌ ERROR: System_room folder admin repo me nahi mila!"
+            echo "Kripya pehle hosting_sarvar se System_room folder yahan copy karein."
+            exit 1
           fi
+          echo "✅ System_room folder mil gaya."
+
+      # 4. Dependencies Install (Agar requirements.txt ho toh)
+      - name: 4. 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f "System_room/requirements.txt" ]; then
+            pip install -r System_room/requirements.txt
+          else
+            echo "ℹ️ requirements.txt nahi mila, skip."
+          fi
+
+      # 5. Script Run with Secret Token
+      - name: 5. 🚀 Run txt_generator.py
+        env:
+          TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }} 
+          # Agar aapko aur bhi secrets chahiye (jaise TELEGRAM), toh yahan add karein
+        run: |
+          cd System_room
+          echo "▶️ Starting txt_generator.py..."
+          python txt_generator.py
