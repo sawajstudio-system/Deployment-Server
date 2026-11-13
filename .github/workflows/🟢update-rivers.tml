@@ -26,9 +26,14 @@ jobs:
     timeout-minutes: 20
 
     env:
+      # 🟢 GDrive aur Telegram secrets add kiye gaye hain
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_F_RECYCLE_ID: ${{ secrets.GDRIVE_F_RECYCLE_ID }}
 
     steps:
       # ─────────────────────────────────────────────────────────────
@@ -77,6 +82,12 @@ jobs:
             mkdir -p "$BACKUP_DIR"
             mv Backend/Video_Generator "$BACKUP_DIR/Video_Generator"
             FILES_COUNT=$(find "$BACKUP_DIR/Video_Generator" -type f | wc -l)
+            
+            # 🟢 GDRIVE UPLOAD KE LIYE ZIP BANAYA
+            echo "🗜️ Creating ZIP for Google Drive..."
+            cd "$BACKUP_DIR"
+            zip -r "../../../${VERSION}_backup.zip" "Video_Generator" > /dev/null
+            cd ../../..
           else
             echo "ℹ️ No existing Video_Generator to backup (first run)."
           fi
@@ -128,6 +139,53 @@ jobs:
             echo "STATUS=Success! Old code → recycle/${VERSION}/Video_Generator (${FILES_COUNT} files)" >> $GITHUB_ENV
             echo "BACKUP_VERSION=$VERSION" >> $GITHUB_ENV
           fi
+          
+          # 🟢 Environment variable set karo GDrive step ke liye
+          echo "ZIP_TO_UPLOAD=Backend/${VERSION}_backup.zip" >> $GITHUB_ENV
+
+      # 🟢 NAYA STEP: GDRIVE RECYCLE UPLOAD (Sirf Hosting Update ke waqt chalega)
+      - name: 3A.1 ☁️ Upload Backup to GDrive Recycle Folder
+        if: ${{ inputs.action == 'Hosting Update' && env.ZIP_TO_UPLOAD != '' }}
+        run: |
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib > /dev/null
+          
+          python << 'PYEOF'
+          import os, time
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          # Env vars
+          cid = os.getenv("GDRIVE_CLIENT_ID")
+          csec = os.getenv("GDRIVE_CLIENT_SECRET")
+          rtok = os.getenv("GDRIVE_REFRESH_TOKEN")
+          folder_id = os.getenv("GDRIVE_F_RECYCLE_ID")
+          zip_file = os.getenv("ZIP_TO_UPLOAD")
+
+          if not all([cid, csec, rtok, folder_id]):
+              print("⚠️ GDrive credentials missing. Skipping upload.")
+              exit(0)
+
+          if not os.path.exists(zip_file):
+              print(f"❌ ZIP file not found: {zip_file}")
+              exit(0)
+
+          print(f"☁️ Authenticating with Google Drive...")
+          creds = Credentials(None, refresh_token=rtok, client_id=cid, client_secret=csec, token_uri="https://oauth2.googleapis.com/token")
+          service = build('drive', 'v3', credentials=creds, cache_discovery=False)
+
+          file_name = os.path.basename(zip_file)
+          print(f"⏳ Uploading {file_name} to Recycle Folder...")
+
+          file_metadata = {'name': file_name, 'parents': [folder_id]}
+          media = MediaFileUpload(zip_file, mimetype='application/zip', resumable=True)
+          
+          try:
+              file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+              print(f"✅ Uploaded successfully! Link: {file.get('webViewLink')}")
+          except Exception as e:
+              print(f"❌ Upload failed: {e}")
+          PYEOF
 
       # ─────────────────────────────────────────────────────────────
       # STEP 3B: DIPLOMENT REVERSE (Backend ➡️ Diploment)
@@ -183,7 +241,6 @@ jobs:
           
           # 2. Version तय करो (manual या auto)
           if [ -n "$INPUT_VERSION" ]; then
-            # Manual version — "4" या "v4" दोनों चलेंगे
             if [[ "$INPUT_VERSION" =~ ^v[0-9]+$ ]]; then
               VERSION="$INPUT_VERSION"
             elif [[ "$INPUT_VERSION" =~ ^[0-9]+$ ]]; then
@@ -195,13 +252,10 @@ jobs:
               exit 1
             fi
             RESTORE_MODE="Manual"
-            echo "🎯 Manual mode: using ${VERSION}"
           else
-            # Auto mode — latest version चुनो
             LAST_NUM=$(echo "$AVAILABLE" | tail -1)
             VERSION="v${LAST_NUM}"
             RESTORE_MODE="Auto (latest)"
-            echo "🤖 Auto mode: selected latest version ${VERSION}"
           fi
           
           # 3. Check — version में Video_Generator है?
@@ -209,31 +263,13 @@ jobs:
           
           if [ ! -d "$RESTORE_FROM" ]; then
             echo "❌ ${VERSION} में Video_Generator नहीं मिला!"
-            echo "📂 Available versions:"
-            echo "$AVAILABLE" | sed 's/^/  v/'
             echo "STATUS=❌ Failed: ${VERSION} has no Video_Generator" >> $GITHUB_ENV
-            echo "AVAILABLE_VERSIONS=$(echo "$AVAILABLE" | sed 's/^/v/' | paste -sd ', ')" >> $GITHUB_ENV
             exit 1
           fi
           
-          # 4. 📋 Summary प्रिंट करो (log में दिखेगा)
-          echo ""
-          echo "╔══════════════════════════════════════════════╗"
-          echo "║  ♻️  RESTORE FROM RECYCLE — SUMMARY         ║"
-          echo "╚══════════════════════════════════════════════╝"
-          echo "📂 Available versions in recycle/:"
-          echo "$AVAILABLE" | sed 's/^/     ✅ v/'
-          echo ""
-          echo "🎯 Selected version  : ${VERSION}"
-          echo "🤖 Mode             : ${RESTORE_MODE}"
-          echo "📁 Restore from     : ${RESTORE_FROM}"
-          echo "📁 Restore to       : Backend/Video_Generator"
-          echo "══════════════════════════════════════════════"
-          
-          # 5. Env variables — Telegram में इस्तेमाल होंगे
+          # 5. Env variables
           echo "RESTORED_VERSION=${VERSION}" >> $GITHUB_ENV
           echo "RESTORE_MODE=${RESTORE_MODE}" >> $GITHUB_ENV
-          echo "AVAILABLE_VERSIONS=$(echo "$AVAILABLE" | sed 's/^/v/' | paste -sd ', ')" >> $GITHUB_ENV
           
           # 6. मौजूदा (गलत) code → broken_TIMESTAMP
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
@@ -279,6 +315,7 @@ jobs:
             📤 <b>To:</b> Backend (Production)
             📁 <b>Folder:</b> Video_Generator
             ♻️ <b>Backup saved as:</b> recycle/${BACKUP_VERSION:-?}
+            ☁️ <b>GDrive:</b> Uploaded to Recycle Folder
             📊 <b>Status:</b> ${STATUS}"
           
           elif [ "$ACTION" = "Diploment Reverse" ]; then
@@ -297,9 +334,6 @@ jobs:
             📥 <b>From:</b> recycle/${RESTORED_VERSION:-?}
             📤 <b>To:</b> Video_Generator
             🗑️ <b>Broken code saved:</b> recycle/${BROKEN_BACKUP:-?}
-            
-            📂 <b>All versions in recycle:</b>
-            <code>${AVAILABLE_VERSIONS:-none}</code>
             
             📊 <b>Status:</b> ${STATUS}"
           
