@@ -1,4 +1,4 @@
-name: 🟢Full-Copy-Hosting-To-Development
+name: 🟢Fix-Branch-Story
 
 on:
   workflow_dispatch:
@@ -7,168 +7,278 @@ permissions:
   contents: write
 
 jobs:
-  copy_all:
+  fix:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    env:
-      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
-      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
-      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+    timeout-minutes: 10
 
     steps:
-      # 1. Dono repos checkout karein
-      - name: 1. 📥 Checkout Hosting (Source)
-        uses: actions/checkout@v4
-        with:
-          repository: 'sawajstudio-system/hosting_sarvar'
-          token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'hosting'
-
-      - name: 2. 📥 Checkout Development (Destination)
+      - name: 1. 📥 Checkout Development
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Development'
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'Development'
 
-      # 2. Exact Folder Structure Create Karein
-      - name: 3. 📁 Create Folder Structure
-        working-directory: ./Development
+      - name: 2. 📝 Fix main.py (Absolute sys.path)
         run: |
-          echo "📁 Creating folder structure..."
-          mkdir -p Factory/Management/1_Git_Tools
-          mkdir -p Factory/Management/2_AI_Models
-          mkdir -p Factory/Management/3_Media
-          mkdir -p Factory/Management/4_Islamic
-          mkdir -p Factory/Management/5_Audio_Text
-          mkdir -p Factory/Management/assets/fonts
-          mkdir -p Factory/Management/Uploader
-          mkdir -p Factory/branch/story
-          echo "✅ Folders created"
+          cat > Factory/branch/story/main.py << 'EOF'
+          #!/usr/bin/env python3
+          import os, sys, requests, subprocess, random, shutil, traceback
+          from concurrent.futures import ThreadPoolExecutor
 
-      # 3. Hosting Sarvar se poora code utha kar naye structure mein daalein
-      - name: 4. 📋 Copy ALL Code from Hosting
+          # ── 🟢 PATH SETUP ────────────────────────────────────────
+          CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+          BRANCH_DIR = os.path.dirname(CURRENT_DIR)
+          FACTORY_DIR = os.path.dirname(BRANCH_DIR)
+          MGMT = os.path.join(FACTORY_DIR, "Management")
+
+          for sub in ["1_Git_Tools", "2_AI_Models", "3_Media", "4_Islamic", "5_Audio_Text", "Uploader"]:
+              sys.path.insert(0, os.path.join(MGMT, sub))
+
+          # ── 🟢 IMPORTS ───────────────────────────────────────────
+          from ai_fallback import generate_text as ai_generate, LAST_USED_AI, FAILED_AIS
+          from fawaz import fetch as fetch_hadith
+          from mymemory import translate as translate_hindi
+          from intro_AI import generate_intro
+          from outro_AI import generate_outro
+          from cta_AI import generate_cta
+          from elevenlabs import generate as elevenlabs_tts
+          from edge_tts import generate as edge_tts_generate
+          from pexels_video import fetch as pexels_video
+          from pixabay_video import fetch as pixabay_video
+          from coverr import fetch as coverr_video
+          from gradient import fetch as gradient_video
+          from freesound import fetch as freesound_music
+          from pixabay_music import fetch as pixabay_music
+          from story_upload import upload_to_drive
+          from render_main import build_and_render_story
+
+          def send_telegram(msg):
+              t, c = os.getenv("TELEGRAM_API_REPORT_TOKEN"), os.getenv("TELEGRAM_API_REPORT_CHAT_ID")
+              if t and c:
+                  try: requests.post(f"https://api.telegram.org/bot{t}/sendMessage", json={"chat_id": c, "text": msg[:4000], "parse_mode": "HTML"}, timeout=10)
+                  except: pass
+
+          def download_and_normalize(args):
+              i, query, clip_duration, clip_path = args
+              temp_raw = f"temp/raw_clip_{i}.mp4"
+              api_used = "Failed"
+              try:
+                  if pexels_video(query=query, duration=clip_duration, output_path=temp_raw): api_used = "Pexels"
+                  elif pixabay_video(query=query, duration=clip_duration, output_path=temp_raw): api_used = "Pixabay"
+                  elif coverr_video(query=query, duration=clip_duration, output_path=temp_raw): api_used = "Coverr"
+                  elif gradient_video(duration=clip_duration, output_path=temp_raw): api_used = "Gradient"
+              except Exception: pass
+              if not os.path.exists(temp_raw): return (False, "Failed")
+              norm_cmd = f'ffmpeg -y -i "{temp_raw}" -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=24,setsar=1" -an -c:v libx264 -preset ultrafast -crf 30 -threads 0 "{clip_path}"'
+              try: subprocess.run(norm_cmd, shell=True, capture_output=True, timeout=180)
+              except: pass
+              if os.path.exists(temp_raw): os.remove(temp_raw)
+              return (os.path.exists(clip_path) and os.path.getsize(clip_path) > 10000, api_used)
+
+          def run_pipeline():
+              print("🎬 STARTING PIPELINE")
+              send_telegram("🚀 <b>Video Generation Started!</b>")
+              os.makedirs("temp", exist_ok=True)
+              
+              hadith = fetch_hadith()
+              if not hadith: return send_telegram("❌ Hadith fetch failed.")
+              english_text = hadith.get("english", "")
+              send_telegram("1. 📖 हदीस मिल गई...")
+
+              send_telegram("2. 🧠 AI स्क्रिप्ट...")
+              prompt = f"Translate to Hindi and add a short moral lesson. Total 70-80 words. Only Hindi text.\n\nHadith: {english_text}"
+              hindi_text = ai_generate(prompt, max_tokens=250)
+              if hindi_text: ai_used = LAST_USED_AI
+              else:
+                  hindi_text = translate_hindi(english_text)
+                  ai_used = "MyMemory"
+              if not hindi_text or not any('\u0900' <= ch <= '\u097F' for ch in hindi_text):
+                  return send_telegram(f"❌ Hindi failed: {(hindi_text or '')[:60]!r}")
+              ai_failed = ", ".join(FAILED_AIS) if FAILED_AIS else "None"
+
+              send_telegram("3. ✨ Intro/Outro/CTA...")
+              base_intro = generate_intro()
+              book_name, hadith_num = hadith.get("collection", "Hadith"), hadith.get("number", "")
+              intro_text = f"{base_intro}\\N{book_name} - Hadith #{hadith_num}"
+              outro_text, cta_text = generate_outro(), generate_cta()
+
+              send_telegram("4. 🎙️ Voice...")
+              voice_path = "temp/voice.mp3"
+              tts_text = f"हदीस शरीफ। {hindi_text}"
+              voice_used = None
+              if elevenlabs_tts(tts_text, voice_path): voice_used = "ElevenLabs"
+              elif edge_tts_generate(tts_text, voice_path): voice_used = "Edge-TTS"
+              if not voice_used or not os.path.exists(voice_path):
+                  return send_telegram("❌ Voice generation failed.")
+
+              send_telegram("5. 🎥 Background videos...")
+              final_bg_video, concat_list = "temp/bg_video.mp4", "temp/concat_list.txt"
+              all_queries = ["islamic mosque architecture","holy quran book pages","islamic calligraphy nature","stars night sky","ocean waves sunset","desert sand dunes","green mountains waterfall","candle light warm","rain on window","clouds moving sky","forest trees sunlight","peaceful garden flowers","old mosque minaret","kaaba mecca","madina green dome","birds flying sky","river flowing rocks","snow falling winter","lightning storm clouds","lantern light dark","prayer beads tasbih","dates fruit bowl","arabic tea coffee","sunrise golden hour","moon crescent night","beautiful sunset landscape","foggy morning forest"]
+              random.shuffle(all_queries)
+              queries = all_queries[:3]
+              download_tasks = [(i, q, 20.0, f"temp/clip_{i}.mp4") for i, q in enumerate(queries)]
+              with ThreadPoolExecutor(max_workers=3) as executor:
+                  results = list(executor.map(download_and_normalize, download_tasks))
+              
+              valid_clips, video_apis_used = [], set()
+              with open(concat_list, "w") as f:
+                  for i, (res, api) in enumerate(results):
+                      clip_path = f"temp/clip_{i}.mp4"
+                      if res and os.path.exists(clip_path):
+                          valid_clips.append(clip_path)
+                          video_apis_used.add(api)
+                          f.write(f"file '{os.path.abspath(clip_path)}'\n")
+              video_api_str = ", ".join(video_apis_used) if video_apis_used else "None"
+              if valid_clips:
+                  merge_cmd = f'ffmpeg -y -f concat -safe 0 -i "{concat_list}" -c copy "{final_bg_video}"'
+                  try: subprocess.run(merge_cmd, shell=True, capture_output=True, timeout=60)
+                  except Exception: pass
+              if not os.path.exists(final_bg_video) or os.path.getsize(final_bg_video) < 10000:
+                  if valid_clips: final_bg_video = valid_clips[0]
+                  else: return send_telegram("❌ सभी बैकग्राउंड वीडियो फेल!")
+
+              send_telegram("6. 🎵 Music...")
+              music_path = "temp/music.mp3"
+              nature_path = "temp/nature.mp3"
+              final_audio_path = "temp/final_bg_audio.mp3"
+              if freesound_music(query="soft ambient meditation islamic peaceful", duration=60, output_path=music_path): music_used = "Freesound"
+              elif pixabay_music(duration=60, output_path=music_path): music_used = "Pixabay"
+              else:
+                  music_used = "None"
+                  music_path = ""
+              success_nature = freesound_music(query="rain soft ambience", duration=60, output_path=nature_path)
+              if music_path and success_nature:
+                  mix_cmd = f'ffmpeg -y -i "{music_path}" -i "{nature_path}" -filter_complex "[0:a]volume=0.15[m];[1:a]volume=0.10[n];[m][n]amix=inputs=2:duration=first[out]" -map "[out]" "{final_audio_path}"'
+                  try:
+                      subprocess.run(mix_cmd, shell=True, capture_output=True, timeout=120)
+                      if not os.path.exists(final_audio_path) or os.path.getsize(final_audio_path) < 1000: final_audio_path = music_path
+                  except Exception: final_audio_path = music_path
+              elif music_path: final_audio_path = music_path
+              else: final_audio_path = ""
+
+              send_telegram("7. 🎬 Final Render...")
+              final_video_path = "temp/Final_Story.mp4"
+              try:
+                  import io, contextlib
+                  f = io.StringIO()
+                  with contextlib.redirect_stdout(f):
+                      render_success = build_and_render_story(
+                          bg_video=final_bg_video, music_path=final_audio_path, voice_path=voice_path,
+                          hadith=hadith, hindi_text=hindi_text, intro_text=intro_text,
+                          outro_text=outro_text, cta_text=cta_text, output_path=final_video_path
+                      )
+                  ffmpeg_log = f.getvalue()
+                  if "❌ === FFMPEG ERROR START ===" in ffmpeg_log:
+                      error_msg = ffmpeg_log.split("❌ === FFMPEG ERROR START ===")[1].split("❌ === FFMPEG ERROR END ===")[0]
+                      send_telegram(f"❌ <b>FFmpeg Error:</b>\n<pre>{error_msg[:1000]}</pre>")
+                      return
+              except Exception as e:
+                  return send_telegram(f"❌ Python Error: {e}")
+              if not render_success or not os.path.exists(final_video_path):
+                  return send_telegram("❌ Video Rendering Failed.")
+
+              send_telegram("8. ☁️ Upload to Drive...")
+              drive_link = upload_to_drive(final_video_path)
+
+              report = f"🎉 <b>Video Ready!</b>\n\n📜 <b>Hadith:</b> {book_name} #{hadith_num}\n🧠 <b>AI:</b> {ai_used} <i>(Failed: {ai_failed})</i>\n🎙️ <b>Voice:</b> {voice_used}\n🎥 <b>Video:</b> {video_api_str}\n🎵 <b>Music:</b> {music_used}\n"
+              if drive_link: report += f"\n📥 <a href='{drive_link}'>Click here</a>"
+              else: report += f"\n❌ Drive Upload Failed."
+              send_telegram(report)
+
+              try: shutil.rmtree("temp", ignore_errors=True)
+              except Exception: pass
+
+          if __name__ == "__main__":
+              try: run_pipeline()
+              except Exception as e:
+                  tb = traceback.format_exc()
+                  print(tb)
+                  send_telegram(f"💥 <b>Crash!</b>\n<pre>{tb[-1500:]}</pre>")
+                  raise
+          EOF
+          echo "✅ main.py path fixed"
+
+      - name: 3. 📝 Fix render_main.py
         run: |
-          SRC="hosting/Video_Generator"
-          DST="Development/Factory/Management"
+          cat > Factory/branch/story/render_main.py << 'EOF'
+          #!/usr/bin/env python3
+          import os, sys
 
-          echo "📋 Copying files..."
+          CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+          BRANCH_DIR = os.path.dirname(CURRENT_DIR)
+          FACTORY_DIR = os.path.dirname(BRANCH_DIR)
+          MGMT = os.path.join(FACTORY_DIR, "Management")
 
-          # 1. Copy Assets (Fonts & Logo)
-          cp -rf "$SRC"/assets/* "$DST/assets/" 2>/dev/null || true
-          echo "✅ Assets copied"
+          sys.path.insert(0, CURRENT_DIR)
 
-          # 2. Copy Story Files to Factory/branch/story/
-          STORY_SRC="$SRC/Story_Generator"
-          STORY_DST="Development/Factory/branch/story"
-          
-          # Main files
-          cp -f "$STORY_SRC/main.py" "$STORY_DST/main.py" 2>/dev/null || true
-          cp -f "$STORY_SRC/requirements.txt" "$STORY_DST/requirements.txt" 2>/dev/null || true
-          
-          # Story_Render files
-          SR="$STORY_SRC/Story_Render"
-          cp -f "$SR/main_render.py" "$STORY_DST/render_main.py" 2>/dev/null || true
-          cp -f "$SR/config/colors.py" "$STORY_DST/colors.py" 2>/dev/null || true
-          cp -f "$SR/subtitle/ass_builder.py" "$STORY_DST/ass_builder.py" 2>/dev/null || true
-          cp -f "$SR/subtitle/timing/time_format.py" "$STORY_DST/timing.py" 2>/dev/null || true
-          cp -f "$SR/tools/duration_checker.py" "$STORY_DST/duration.py" 2>/dev/null || true
-          cp -f "$SR/tools/cta_generator.py" "$STORY_DST/cta_maker.py" 2>/dev/null || true
-          cp -f "$SR/video_engine/ffmpeg_render.py" "$STORY_DST/ffmpeg_render.py" 2>/dev/null || true
-          touch "$STORY_DST/__init__.py"
-          echo "✅ Story files copied"
+          ASSETS_DIR = os.path.join(MGMT, "assets")
+          FONTS_DIR = os.path.join(ASSETS_DIR, "fonts")
+          LOGO_PATH = os.path.join(ASSETS_DIR, "logo.png")
 
-          # 3. Copy Uploader
-          cp -f "$SRC/Uploader/Drive/story_upload.py" "$DST/Uploader/story_upload.py" 2>/dev/null || true
-          echo "✅ Uploader copied"
+          from duration import get_audio_duration
+          from cta_maker import generate_cta_image
+          from ass_builder import create_main_subtitles, create_intro_subtitle, create_outro_subtitle
+          from ffmpeg_render import render_final_video
 
-          # 4. Copy AI Models
-          AI="$SRC/Fetching/AI/API_fallback"
-          cp -f "$AI/ai_fallback.py" "$DST/2_AI_Models/ai_fallback.py" 2>/dev/null || true
-          cp -f "$AI/gemini_AI.py" "$DST/2_AI_Models/gemini.py" 2>/dev/null || true
-          cp -f "$AI/groq_AI.py" "$DST/2_AI_Models/groq.py" 2>/dev/null || true
-          cp -f "$AI/cohere_AI.py" "$DST/2_AI_Models/cohere.py" 2>/dev/null || true
-          cp -f "$AI/nvidia_AI.py" "$DST/2_AI_Models/nvidia.py" 2>/dev/null || true
-          cp -f "$AI/cloudflare_AI.py" "$DST/2_AI_Models/cloudflare.py" 2>/dev/null || true
-          echo "✅ AI Models copied"
+          def merge_ass_files(file_paths, output_path):
+              master_header = (
+                  "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\n"
+                  "[V4+ Styles]\n"
+                  "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+                  "Style: Arabic,Amiri,75,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,760,1\n"
+                  "Style: Hindi,Yatra One,65,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,570,1\n"
+                  "Style: English,Playfair Display,52,&H00FFFFFF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,1,40,40,400,1\n"
+                  "Style: Intro,Playfair Display,70,&H00D7FF&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,8,40,40,200,1\n"
+                  "Style: Outro,Playfair Display,80,&HFFFF00&,&H000000FF&,&H00000000&,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,8,40,40,250,1\n"
+                  "[Events]\n"
+                  "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+              )
+              directory = os.path.dirname(output_path)
+              if directory: os.makedirs(directory, exist_ok=True)
+              with open(output_path, "w", encoding="utf-8") as master_file:
+                  master_file.write(master_header)
+                  for path in file_paths:
+                      if path and os.path.exists(path):
+                          with open(path, "r", encoding="utf-8") as f:
+                              for line in f:
+                                  if line.startswith("Dialogue:"): master_file.write(line)
+              return output_path
 
-          # 5. Copy Media
-          cp -f "$SRC/Fetching/Background/Music/API_fallback/freesound.py" "$DST/3_Media/freesound.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Background/Music/URL_fallback/pixabay_music.py" "$DST/3_Media/pixabay_music.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Background/Video/API_fallback/pexels.py" "$DST/3_Media/pexels_video.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Background/Video/API_fallback/pixabay.py" "$DST/3_Media/pixabay_video.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Background/Video/API_fallback/coverr.py" "$DST/3_Media/coverr.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Background/Video/URL_fallback/gradient.py" "$DST/3_Media/gradient.py" 2>/dev/null || true
-          echo "✅ Media copied"
+          def build_and_render_story(bg_video, music_path, voice_path, hadith, hindi_text, intro_text, outro_text, cta_text, output_path="temp/Final_Story.mp4"):
+              print("🎬 [render_main] Starting...")
+              print(f"📁 FONTS_DIR: {FONTS_DIR}")
+              print(f"📁 LOGO_PATH: {LOGO_PATH}")
+              os.makedirs("temp", exist_ok=True)
+              duration = get_audio_duration(voice_path)
+              print(f"⏱️ Duration: {duration:.2f}s")
+              intro_ass = create_intro_subtitle(intro_text, duration=2.5, output_path="temp/part_intro.ass")
+              main_ass = create_main_subtitles(hadith, hindi_text, duration, output_path="temp/part_main.ass")
+              outro_ass = create_outro_subtitle(outro_text, duration, outro_duration=3.5, output_path="temp/part_outro.ass")
+              cta_image = generate_cta_image(output_path="temp/cta_image.png")
+              master_ass = merge_ass_files([intro_ass, main_ass, outro_ass], output_path="temp/master_subtitles.ass")
+              
+              try:
+                  result = render_final_video(
+                      bg_video=bg_video, music_path=music_path, voice_path=voice_path,
+                      master_ass_path=master_ass, cta_image_path=cta_image, duration=duration,
+                      output_path=output_path, fonts_dir=FONTS_DIR, logo_path=LOGO_PATH,
+                  )
+              except TypeError:
+                  result = render_final_video(
+                      bg_video=bg_video, music_path=music_path, voice_path=voice_path,
+                      master_ass_path=master_ass, cta_image_path=cta_image,
+                      duration=duration, output_path=output_path,
+                  )
+              if result and os.path.exists(output_path):
+                  return output_path
+              return None
+          EOF
+          echo "✅ render_main.py path fixed"
 
-          # 6. Copy Islamic
-          cp -f "$SRC/Fetching/Islamic/Hadis/URL_fallback/fawaz.py" "$DST/4_Islamic/fawaz.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Islamic/Hijri_date/URL_fallback/hijri_date.py" "$DST/4_Islamic/hijri_date.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Islamic/Quran/URL_fallback/quran.py" "$DST/4_Islamic/quran.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Islamic/Quran/URL_fallback/quran_audio.py" "$DST/4_Islamic/quran_audio.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Islamic/Quran/URL_fallback/quran_tafsir.py" "$DST/4_Islamic/quran_tafsir.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Islamic/Dua/API_fallback/ummah.py" "$DST/4_Islamic/ummah.py" 2>/dev/null || true
-          echo "✅ Islamic copied"
-
-          # 7. Copy Audio/Text
-          cp -f "$SRC/Fetching/Translator/URL_fallback/mymemory.py" "$DST/5_Audio_Text/mymemory.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/audio_TTS/API_fallback/elevenlabs.py" "$DST/5_Audio_Text/elevenlabs.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/audio_TTS/URL_fallback/edge_tts.py" "$DST/5_Audio_Text/edge_tts.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Intro_Outro_CTA/API_fallback/intro_AI.py" "$DST/5_Audio_Text/intro_AI.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Intro_Outro_CTA/API_fallback/outro_AI.py" "$DST/5_Audio_Text/outro_AI.py" 2>/dev/null || true
-          cp -f "$SRC/Fetching/Intro_Outro_CTA/API_fallback/cta_AI.py" "$DST/5_Audio_Text/cta_AI.py" 2>/dev/null || true
-          echo "✅ Audio/Text copied"
-
-      # 4. FIX paths (taaki imports aur asset paths naye structure mein kaam karein)
-      - name: 5. 🔧 Fix Imports & Paths
-        working-directory: ./Development
-        run: |
-          STORY_DIR="Factory/branch/story"
-          
-          # Fix main.py paths (branch/story is 1 step deeper)
-          sed -i 's|MGMT = os.path.dirname(CURRENT_DIR)|MGMT = os.path.dirname(os.path.dirname(CURRENT_DIR))|g' $STORY_DIR/main.py
-          sed -i 's|MGMT = os.path.dirname(CURRENT_DIR)|MGMT = os.path.dirname(os.path.dirname(CURRENT_DIR))|g' $STORY_DIR/render_main.py
-          
-          # Fix relative imports in story files
-          sed -i 's|from \.\.config\.colors import|from colors import|g' $STORY_DIR/ass_builder.py 2>/dev/null || true
-          sed -i 's|from \.\.config\.styles import.*||g' $STORY_DIR/ass_builder.py 2>/dev/null || true
-
-          # Fix asset paths in ffmpeg_render
-          sed -i 's|os.path.join(here, "..", "assets")|os.path.join(here, "..", "..", "Management", "assets")|g' $STORY_DIR/ffmpeg_render.py 2>/dev/null || true
-
-          echo "✅ Paths fixed"
-
-      # 5. Commit + Push
-      - name: 6. 💾 Commit + Push
-        working-directory: ./Development
+      - name: 4. 💾 Commit + Push
         run: |
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
-          
-          # Add all changes
-          git add Factory/
-          
-          if git diff-index --quiet HEAD 2>/dev/null; then
-            echo "⚠️ No changes (Already updated)"
-          else
-            git commit -m "🚀 Full Copy: Hosting → Development (Final Structure)"
-            git push origin main
-            echo "✅ Pushed to Development!"
-          fi
-
-      # 6. Telegram Report
-      - name: 7. 📤 Telegram Report
-        if: always()
-        run: |
-          STATUS="${{ job.status }}"
-          if [ "$STATUS" = "success" ]; then
-            MSG="✅ <b>Full Copy Complete!</b>%0A%0A📥 <b>Source:</b> hosting_sarvar%0A📤 <b>Destination:</b> Development/Factory%0A%0A📁 <b>Structure:</b>%0A• Management/ (APIs)%0A• branch/story/ (Video Factory)%0A%0A<i>Saara code perfectly copy aur fix ho gaya hai!</i>"
-          else
-            MSG="❌ <b>Copy Failed</b>%0AStatus: $STATUS%0A%0ACheck GitHub logs."
-          fi
-          
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
-            --data-urlencode "text=${MSG}" \
-            -d "parse_mode=HTML" || true
+          git add Factory/branch/story/
+          git commit -m "🔧 Fixed absolute paths for branch/story" || echo "No changes"
+          git push origin main || echo "Push failed"
