@@ -108,7 +108,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
+          # 🟢 cache: 'pip' hata diya gaya hai taaki error na aaye
 
       - name: 2. 📦 Install requests
         run: pip install requests
@@ -130,7 +130,6 @@ jobs:
           ZIP_FILE = os.environ.get("ZIP_FILE", "None")
           TXT_FILE = os.environ.get("TXT_FILE", "None")
 
-          # 🟢 API service Folder Path
           BASE_URL = "https://api.github.com/repos/sawajstudio-system/hosting_sarvar/contents/API%20service/"
 
           ALL_MAP = {
@@ -175,7 +174,6 @@ jobs:
               elif API_TEST in ALL_MAP:
                   selected_tests.append(API_TEST)
 
-          # 🟢 ZIP और TXT को सही तरीके से हैंडल किया गया
           if ZIP_FILE != "None":
               selected_tests.append("ZIP Generator")
           if TXT_FILE != "None":
@@ -215,7 +213,6 @@ jobs:
           for idx, name in enumerate(selected_tests, 1):
               print(f"\n[{idx}/{total}] Processing: {name}")
               
-              # 🟢 ZIP/TXT के लिए रिपो टारगेट सेट करना और स्क्रिप्ट रन करना
               if name == "ZIP Generator":
                   os.environ["REPO_TARGET"] = ZIP_FILE
                   fetch_status, content = fetch_file("Git_room/zip_generator.py")
@@ -241,7 +238,6 @@ jobs:
                       f.write(content)
                   sys.stdout.flush()
                   try:
-                      # 🟢 ज्यादा टाइमआउट दिया गया है ज़िप/टीएक्सटी के लिए
                       timeout_sec = 300 if name in ["ZIP Generator", "TXT Generator"] else 180
                       rc = subprocess.run([sys.executable, "/tmp/run_me.py"], timeout=timeout_sec).returncode
                       status = "PASS" if rc == 0 else "FAIL"
