@@ -22,24 +22,24 @@ jobs:
         with:
           repository: 'sawajstudio-system/hosting_sarvar'
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'ServerRepo'
+          path: 'workspace/ServerRepo'
 
       - name: 2. 📥 Admin Repo Checkout
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/admin'
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'AdminRepo'
+          path: 'workspace/AdminRepo'
 
       - name: 3. 🚚 Folder Move & Rename
         run: |
-          # Admin repo ke andar jao
-          cd AdminRepo
+          # Dono repos ek hi workspace folder me hain
+          cd workspace/AdminRepo
           
-          # Agar pehle se koi purana folder bana ho toh use delete kar do
+          # Pehle se koi folder ho toh delete karo
           rm -rf "System_room" "Service room" "API service"
           
-          # Server repo se folder utha kar Admin me 'API service' naam se copy karo
+          # Server se utha kar Admin me copy karo
           echo "🚚 Utha rahe hain ServerRepo/System_room ko..."
           cp -r ../ServerRepo/System_room "API service"
           
@@ -47,7 +47,7 @@ jobs:
 
       - name: 4. 💾 Save (Commit & Push)
         run: |
-          cd AdminRepo
+          cd workspace/AdminRepo
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
           
