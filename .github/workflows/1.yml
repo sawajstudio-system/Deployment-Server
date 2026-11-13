@@ -1,53 +1,50 @@
-name: 🚀 Admin System Room Runner
+name: 🚀 Auto-Fetch System Room Folder Only
 
 on:
-  workflow_dispatch: # Manual run ke liye
-  push:
-    branches:
-      - main
+  workflow_dispatch: # Manual run karne ke liye button
+
+permissions:
+  contents: write # Repo me file save karne ki permission
 
 jobs:
-  run-system-room:
+  fetch-only:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     steps:
-      # 1. Repo Checkout
+      # 1. Admin Repo Checkout (Jahan aap abhi hain)
       - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
 
-      # 2. Python Setup
-      - name: 2. 🐍 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      # 3. System_room folder check
-      - name: 3. 🔍 Verify System_room Folder
+      # 2. Hosting Sarvar Repo se sirf System_room folder download karna
+      - name: 2. 📦 Fetch System_room from hosting_sarvar
         run: |
-          if [ ! -d "System_room" ]; then
-            echo "❌ ERROR: System_room folder admin repo me nahi mila!"
-            echo "Kripya pehle hosting_sarvar se System_room folder yahan copy karein."
-            exit 1
-          fi
-          echo "✅ System_room folder mil gaya."
+          echo "⏳ Downloading System_room folder from hosting_sarvar..."
+          # Sparse checkout ka use karke sirf ek folder download karenge
+          git clone --no-checkout --filter=blob:none https://github.com/sawajstudio-system/hosting_sarvar.git temp_hosting
+          cd temp_hosting
+          git sparse-checkout init --cone
+          git sparse-checkout set System_room
+          git checkout main
+          cd ..
+          
+          echo "🚚 Moving folder to admin repo..."
+          rm -rf System_room || true
+          mv temp_hosting/System_room ./System_room
+          rm -rf temp_hosting
+          
+          echo "✅ Folder successfully fetched with all files!"
 
-      # 4. Dependencies Install (Agar requirements.txt ho toh)
-      - name: 4. 📦 Install Dependencies
+      # 3. Admin Repo me folder ko save (Commit) karna
+      - name: 3. 💾 Save Folder to Admin Repo
         run: |
-          python -m pip install --upgrade pip
-          if [ -f "System_room/requirements.txt" ]; then
-            pip install -r System_room/requirements.txt
+          git config --global user.name "Sawaj Studio Bot"
+          git config --global user.email "bot@sawajstudio.com"
+          git add System_room
+          if git diff-index --quiet HEAD; then
+            echo "ℹ️ Folder pehle se admin repo me hai, koi change nahi."
           else
-            echo "ℹ️ requirements.txt nahi mila, skip."
+            git commit -m "🤖 Auto-Added System_room folder (Files Only, No Run)"
+            git push origin HEAD:${{ github.ref_name }}
+            echo "✅ Folder aur uski saari files admin repo me save ho gayi!"
           fi
-
-      # 5. Script Run with Secret Token
-      - name: 5. 🚀 Run txt_generator.py
-        env:
-          TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }} 
-          # Agar aapko aur bhi secrets chahiye (jaise TELEGRAM), toh yahan add karein
-        run: |
-          cd System_room
-          echo "▶️ Starting txt_generator.py..."
-          python txt_generator.py
