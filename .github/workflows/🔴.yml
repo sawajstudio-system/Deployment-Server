@@ -1,4 +1,4 @@
-name: 🚀 Auto-Fetch API service Folder Only
+name: 🚀 Auto-Fetch API service & System_room
 
 on:
   workflow_dispatch: # Manual run karne ke liye button
@@ -7,7 +7,7 @@ permissions:
   contents: write # Repo me file save karne ki permission
 
 jobs:
-  fetch-api-service:
+  fetch-folders:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -16,37 +16,39 @@ jobs:
       - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
 
-      # 2. Hosting Server Repo se sirf API service folder download karna
-      - name: 2. 📦 Fetch API service from hosting_sarvar
+      # 2. Hosting Server Repo se dono folders download karna
+      - name: 2. 📦 Fetch Folders from hosting_sarvar
         uses: actions/checkout@v4
         with:
           repository: sawajstudio-system/hosting_sarvar
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ secrets.TOKEN_GITHUB }} # 🟢 Yahan TOKEN_GITHUB use kiya gaya hai
           path: temp_hosting
           sparse-checkout: |
             API service
+            System_room
 
-      # 3. Move folder to root directory & clean up
-      - name: 3. 🚚 Move Folder to Admin Repo
+      # 3. Move folders to root directory & clean up
+      - name: 3. 🚚 Move Folders to Admin Repo
         run: |
-          echo "🚚 Moving API service folder to admin repo..."
-          rm -rf "API service" || true
+          echo "🚚 Moving folders to admin repo..."
+          rm -rf "API service" System_room || true
           mv "temp_hosting/API service" "./API service"
+          mv "temp_hosting/System_room" "./System_room"
           rm -rf temp_hosting
-          echo "✅ Folder successfully fetched with all files!"
+          echo "✅ Folders successfully fetched!"
 
-      # 4. Admin Repo me folder ko save (Commit) karna
-      - name: 4. 💾 Save Folder to Admin Repo
+      # 4. Admin Repo me folders ko save (Commit) karna
+      - name: 4. 💾 Save Folders to Admin Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
-          git add "API service"
+          git add "API service" System_room
           
           # Check if there are staged changes to commit
           if git diff --cached --quiet; then
-            echo "ℹ️ Folder pehle se admin repo me hai, koi change nahi."
+            echo "ℹ️ Folders pehle se admin repo me hain, koi change nahi."
           else
-            git commit -m "🤖 Auto-Added API service folder (Files Only, No Run)"
+            git commit -m "🤖 Auto-Added API service & System_room folders"
             git push origin HEAD:${{ github.ref_name }}
-            echo "✅ Folder aur uski saari files admin repo me save ho gayi!"
+            echo "✅ Folders aur unki saari files admin repo me save ho gayi!"
           fi
