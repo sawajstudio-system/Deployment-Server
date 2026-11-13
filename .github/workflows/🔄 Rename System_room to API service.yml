@@ -1,0 +1,120 @@
+name: 🔄 Rename System_room to API service
+
+on:
+  workflow_dispatch: # Manual run button
+
+permissions:
+  contents: write
+
+jobs:
+  rename_and_fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+
+    steps:
+      # ─────────────────────────────────────────────────────────────
+      # STEP 1: Checkout Hosting Repo
+      # ─────────────────────────────────────────────────────────────
+      - name: 1. 📥 Checkout Hosting_Sarvar
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/hosting_sarvar'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Hosting'
+
+      - name: 2. 📁 Rename Folder (System_room ➡️ API service)
+        run: |
+          cd Hosting
+          if [ -d "System_room" ]; then
+            echo "🔄 Renaming System_room to 'API service'..."
+            git mv "System_room" "API service"
+            echo "✅ Folder renamed successfully"
+          else
+            echo "⚠️ System_room not found (maybe already renamed)."
+          fi
+
+      - name: 3. 💾 Push to Hosting_Sarvar
+        run: |
+          cd Hosting
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          
+          if git diff-index --quiet HEAD; then
+            echo "ℹ️ No changes to commit in Hosting."
+          else
+            git commit -m "🔄 Refactor: Renamed System_room to 'API service'"
+            git push origin main
+            echo "✅ Hosting Repo updated!"
+          fi
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 4: Checkout Admin Repo (To fix YML paths)
+      # ─────────────────────────────────────────────────────────────
+      - name: 4. 📥 Checkout Admin Repo
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/admin'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Admin'
+
+      - name: 5. 🔧 Fix ALL-Tests.yml Paths
+        run: |
+          cd Admin
+          FILE=".github/workflows/🟢ALL-Tests.yml"
+          
+          if [ -f "$FILE" ]; then
+            echo "🔍 Fixing paths in $FILE..."
+            
+            # URL encode space for API calls (%20)
+            sed -i 's|System_room/|API%20service/|g' "$FILE"
+            
+            # Fix normal text references (if any)
+            sed -i 's|System_room|API service|g' "$FILE"
+            
+            echo "✅ Paths updated in Admin YML"
+          else
+            echo "❌ File $FILE not found!"
+          fi
+
+      - name: 6. 💾 Push to Admin Repo
+        run: |
+          cd Admin
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          git add .
+          
+          if git diff-index --quiet HEAD; then
+            echo "ℹ️ No changes to commit in Admin."
+            echo "STATUS=ℹ️ No changes needed" >> $GITHUB_ENV
+          else
+            git commit -m "🔧 Fix: Updated ALL-Tests.yml paths to 'API service'"
+            git push origin main
+            echo "STATUS=✅ Both Hosting and Admin repos updated successfully!" >> $GITHUB_ENV
+          fi
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 7: Telegram Report
+      # ─────────────────────────────────────────────────────────────
+      - name: 7. 📤 Telegram Report
+        if: always()
+        run: |
+          STATUS="${STATUS:-❌ Failed or Cancelled}"
+          MSG="🔄 <b>Folder Rename Operation</b>
+          
+          <b>Status:</b> ${STATUS}
+          
+          📁 <b>Hosting Repo:</b>
+          <code>System_room</code> ➡️ <code>API service</code>
+          
+          🛠️ <b>Admin Repo:</b>
+          <code>ALL-Tests.yml</code> paths updated."
+          
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" \
+            -d "parse_mode=HTML" || true
