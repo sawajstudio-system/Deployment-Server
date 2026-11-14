@@ -16,54 +16,59 @@ jobs:
       - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
 
-      # 2. Hosting Server Repo se API service download karna
-      - name: 2. 📦 Fetch API service from hosting_sarvar
+      # 2. Hosting Server Repo se download (Bina sparse-checkout ke, taaki pura structure mile)
+      - name: 2. 📦 Fetch from hosting_sarvar
         uses: actions/checkout@v4
         with:
           repository: sawajstudio-system/hosting_sarvar
           token: ${{ secrets.TOKEN_GITHUB }}
           path: temp_hosting
-          sparse-checkout: |
-            API service
 
-      # 3. Root Directory Cleanup & Perfect Structure
-      - name: 3. 🚚 Clean Root & Move Git_room
+      # 3. Smart Cleanup & Move
+      - name: 3. 🚚 Clean Root & Move Folders
         run: |
           echo "🧹 Deleting wrong folders from Root..."
+          rm -rf "A_API_room" "URL_room" "Git_room" "Video_Generator" "System_room" "API service" "API_service" || true
           
-          # 🟢 Yahan hum un sabhi folders ko delete kar rahe hain jo root me nahi hone chahiye
-          rm -rf "A_API_room" "URL_room" "Git_room" "Video_Generator" "System_room" || true
+          echo "🔍 Searching for 'API service' folder..."
           
-          # Purana API service bhi delete karo taaki naya fresh aaye
-          rm -rf "API service" || true
+          # 🟢 SMART SEARCH: Exact naam na mile toh dhundh lega
+          API_FOLDER=$(find temp_hosting -maxdepth 2 -type d -iname "*api*service*" | head -n 1)
           
-          echo "📂 Moving fresh API service to root..."
-          mv "temp_hosting/API service" "./API service"
+          if [ -z "$API_FOLDER" ]; then
+            echo "❌ ERROR: 'API service' folder nahi mila temp_hosting ke andar!"
+            echo "Yahan kya kya hai:"
+            ls -la temp_hosting/
+            exit 1
+          fi
+          
+          echo "✅ Found API folder at: $API_FOLDER"
+          
+          # Folder ko API service naam se root me move karo
+          mv "$API_FOLDER" "./API service"
           
           echo "🚚 Extracting Git_room to root..."
-          # API service ke andar se sirf Git_room ko bahar nikalo
           if [ -d "API service/Git_room" ]; then
             mv "API service/Git_room" "./Git_room"
             echo "✅ Git_room moved to root."
+          else
+            echo "⚠️ Git_room nahi mila API service ke andar."
           fi
           
           rm -rf temp_hosting
-          echo "✅ Master Cleanup Done! Root is now perfect."
+          echo "✅ Master Cleanup Done!"
 
       # 4. Commit and Push
       - name: 4. 💾 Save to Admin Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
-          
-          # Saare changes add karo (Delete + New folders)
           git add -A
           
           if git diff --cached --quiet; then
             echo "ℹ️ No changes to commit."
           else
-            git commit -m "🧹 Master Cleanup: Root folders fixed (API service + Git_room only)"
-            # 🟢 Yahan typo theek kar diya gaya hai
+            git commit -m "🧹 Master Cleanup: Root folders fixed smartly"
             git push origin HEAD:${{ github.ref_name }}
             echo "✅ Admin Repo root is now perfectly clean!"
           fi
