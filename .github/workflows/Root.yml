@@ -1,71 +1,71 @@
-name: 🚀 Auto-Fetch Folders to Root
+name: 🚑 Final Exact Folder Restore
 
 on:
-  workflow_dispatch: # Manual run karne ke liye button
+  workflow_dispatch: 
 
 permissions:
-  contents: write # Repo me file save karne ki permission
+  contents: write 
 
 jobs:
-  fetch-folders:
+  exact-restore:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
     steps:
-      # 1. Admin Repo Checkout
-      - name: 1. 📥 Checkout Admin Repo
-        uses: actions/checkout@v4
-
-      # 2. Hosting Server Repo se download karna
-      - name: 2. 📦 Fetch from hosting_sarvar
+      - name: 1. 📥 Checkout Full History
         uses: actions/checkout@v4
         with:
-          repository: sawajstudio-system/hosting_sarvar
+          fetch-depth: 0
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: temp_hosting
-          sparse-checkout: |
-            API service
-            Video_Generator
 
-      # 3. Folders ko Root me move karna (API service ke andar se bahar nikalna)
-      - name: 3. 🚚 Move Folders to Admin Repo Root
+      - name: 2. 🔍 Find Exact Commit & Restore API service
         run: |
-          echo "🚚 Moving folders to admin repo root..."
+          echo "🔍 Searching history for the exact 'API service' folder..."
           
-          # Purane folders delete karo agar hain toh
-          rm -rf "API service" "Video_Generator" "A_API_room" "Git_room" "URL_room" || true
+          # Yeh command history ki gehraayi mein jaakar exact 'API service' folder wala commit dhundhegi
+          GOOD_COMMIT=$(git log --all --format="%H" -- "API service" | head -n 1)
           
-          # 1. Video_Generator ko bahar nikalo
-          if [ -d "temp_hosting/Video_Generator" ]; then
-            mv "temp_hosting/Video_Generator" "./Video_Generator"
-            echo "✅ Video_Generator moved to root."
+          if [ -z "$GOOD_COMMIT" ]; then
+            echo "❌ Direct path nahi mila. History ke 50 commits mein dhundh rahe hain..."
+            # Agar folder ka naam thoda alag tha, toh purane commits check karo
+            GOOD_COMMIT=$(git log --all --format="%H" | head -n 50 | while read commit; do 
+              if git ls-tree -r --name-only $commit | grep -qi "A_API_room"; then 
+                echo $commit; break; 
+              fi; 
+            done)
           fi
 
-          # 2. API service ke andar ki cheezein root me nikalo
-          if [ -d "temp_hosting/API service" ]; then
-            # A_API_room, Git_room, URL_room ko root me move karo
-            mv "temp_hosting/API service/A_API_room" ./
-            mv "temp_hosting/API service/Git_room" ./
-            mv "temp_hosting/API service/URL_room" ./
-            echo "✅ A_API_room, Git_room, URL_room moved to root."
+          if [ -z "$GOOD_COMMIT" ]; then
+             echo "⚠️ Purani history mein folder nahi mila. Sabse purana commit utha rahe hain."
+             GOOD_COMMIT=$(git log --all --format="%H" | tail -n 1)
           fi
           
-          # Temp folder saaf karo
-          rm -rf temp_hosting
-          echo "✅ Cleanup done!"
+          echo "✅ Found exact commit: $GOOD_COMMIT"
+          echo "📂 Restoring ALL files from this commit..."
+          
+          # Saari files wapas laao
+          git checkout $GOOD_COMMIT -- .
+          
+          # Confirm karo ki file aa gayi hai
+          if [ -d "API service" ]; then
+            echo "🎉 SUCCESS: API service folder is back!"
+          elif [ -d "A_API_room" ]; then
+            echo "🎉 SUCCESS: A_API_room folder is back!"
+          else
+            echo "⚠️ Files toh aayi hain, par folder name alag ho sakta hai."
+            ls -la
+          fi
 
-      # 4. Admin Repo me save (Commit) karna
-      - name: 4. 💾 Save to Admin Repo
+      - name: 3. 🚀 Force Push to Save
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
           
-          git add . 
+          git add . -f
           
           if git diff --cached --quiet; then
-            echo "ℹ️ Koi change nahi mila, folders pehle se root me hain."
+            echo "ℹ️ No changes to commit."
           else
-            git commit -m "🤖 Auto-Fetched: Moved API folders (A_API_room, Git_room, URL_room) to Root"
-            git push origin HEAD:${{ github.ref_name }}
-            echo "✅ Folders successfully admin repo root me save ho gaye!"
+            git commit -m "🚑 EXACT RESTORE: Brought back the actual API service folder"
+            git push origin HEAD:${{ github.ref_name }} --force
+            echo "✅ Successfully restored!"
           fi
