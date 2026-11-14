@@ -104,7 +104,7 @@ jobs:
       GDRIVE_F_STORY_ID: ${{ secrets.GDRIVE_F_STORY_ID }}
 
     steps:
-      # 🟢 1. Admin Repo Checkout (Yeh sabse zaroori step hai)
+      # 🟢 1. Admin Repo Checkout
       - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
 
@@ -135,37 +135,38 @@ jobs:
           # 🟢 LOCAL PATH (Kyunki admin repo checkout ho chuka hai)
           BASE_DIR = os.getcwd() 
 
+          # 🟢 FIXED PATHS: A_API_room -> AAPI aur Git_room -> Git
           ALL_MAP = {
-              "Cloudflare":        "API service/A_API_room/01_ai_models/cloudflare.py",
-              "Anges":             "API service/A_API_room/01_ai_models/anges.py",
-              "Gemini":            "API service/A_API_room/01_ai_models/gemini.py",
-              "Groq":              "API service/A_API_room/01_ai_models/groq.py",
-              "UMMAH":             "API service/A_API_room/Islamic/UMMAH.py",
-              "Cohere":            "API service/A_API_room/01_ai_models/cohere.py",
-              "NVIDIA":            "API service/A_API_room/01_ai_models/nvidia.py",
-              "OpenRouter":        "API service/A_API_room/01_ai_models/openrouter.py",
-              "Magic":             "API service/A_API_room/01_ai_models/magic.py",
-              "Tanvo":             "API service/A_API_room/02_audio_media/tanvo.py",
-              "Quran":             "API service/URL_room/Islamic/quran.py",
-              "Quran Audio":       "API service/URL_room/Islamic/quran_audio.py",
-              "Quran Tafsir":      "API service/URL_room/Islamic/quran_tafsir.py",
-              "Quran Foundation":  "API service/A_API_room/Islamic/quran_foundation.py",
-              "Hadees":            "API service/URL_room/Islamic/hadees.py",
-              "Hijri Date":        "API service/URL_room/Islamic/hijri_date.py",
-              "Pexels":            "API service/A_API_room/05_video_services/pexels.py",
-              "Pixabay":           "API service/A_API_room/05_video_services/pixabay.py",
-              "Coverr":            "API service/A_API_room/05_video_services/coverr.py",
-              "AI Image":          "API service/URL_room/AI/ai_image.py",
-              "Natural Sound":     "API service/A_API_room/02_audio_media/natural_sound.py",
-              "ElevenLabs":        "API service/A_API_room/02_audio_media/elevenlabs_test.py",
-              "Cloudinary":        "API service/A_API_room/02_audio_media/cloudinary.py",
-              "Jokes":             "API service/URL_room/Other/jokes.py",
-              "Quotes":            "API service/URL_room/Other/quotes.py",
-              "Translator":        "API service/URL_room/Other/translator.py",
-              "Telegram":          "API service/A_API_room/03_integrations/telegram.py",
-              "GitHub":            "API service/Git_room/github.py",
-              "History Cleaner":   "API service/Git_room/history_cleaner.py",
-              "Test All GDrive":   "API service/A_API_room/02_audio_media/test_gdrive_all.py",
+              "Cloudflare":        "API service/AAPI/01_ai_models/cloudflare.py",
+              "Anges":             "API service/AAPI/01_ai_models/anges.py",
+              "Gemini":            "API service/AAPI/01_ai_models/gemini.py",
+              "Groq":              "API service/AAPI/01_ai_models/groq.py",
+              "UMMAH":             "API service/AAPI/Islamic/UMMAH.py",
+              "Cohere":            "API service/AAPI/01_ai_models/cohere.py",
+              "NVIDIA":            "API service/AAPI/01_ai_models/nvidia.py",
+              "OpenRouter":        "API service/AAPI/01_ai_models/openrouter.py",
+              "Magic":             "API service/AAPI/01_ai_models/magic.py",
+              "Tanvo":             "API service/AAPI/02_audio_media/tanvo.py",
+              "Quran":             "API service/URL/Islamic/quran.py",
+              "Quran Audio":       "API service/URL/Islamic/quran_audio.py",
+              "Quran Tafsir":      "API service/URL/Islamic/quran_tafsir.py",
+              "Quran Foundation":  "API service/AAPI/Islamic/quran_foundation.py",
+              "Hadees":            "API service/URL/Islamic/hadees.py",
+              "Hijri Date":        "API service/URL/Islamic/hijri_date.py",
+              "Pexels":            "API service/AAPI/05_video_services/pexels.py",
+              "Pixabay":           "API service/AAPI/05_video_services/pixabay.py",
+              "Coverr":            "API service/AAPI/05_video_services/coverr.py",
+              "AI Image":          "API service/URL/AI/ai_image.py",
+              "Natural Sound":     "API service/AAPI/02_audio_media/natural_sound.py",
+              "ElevenLabs":        "API service/AAPI/02_audio_media/elevenlabs_test.py",
+              "Cloudinary":        "API service/AAPI/02_audio_media/cloudinary.py",
+              "Jokes":             "API service/URL/Other/jokes.py",
+              "Quotes":            "API service/URL/Other/quotes.py",
+              "Translator":        "API service/URL/Other/translator.py",
+              "Telegram":          "API service/AAPI/03_integrations/telegram.py",
+              "GitHub":            "Git/github.py",
+              "History Cleaner":   "Git/history_cleaner.py",
+              "Test All GDrive":   "API service/AAPI/02_audio_media/test_gdrive_all.py",
           }
 
           selected_tests = []
@@ -205,10 +206,10 @@ jobs:
               
               if name == "ZIP Generator":
                   os.environ["REPO_TARGET"] = ZIP_FILE
-                  file_path = os.path.join(BASE_DIR, "API service", "Git_room", "zip_generator.py")
+                  file_path = os.path.join(BASE_DIR, "Git", "zip_generator.py")
               elif name == "TXT Generator":
                   os.environ["REPO_TARGET"] = TXT_FILE
-                  file_path = os.path.join(BASE_DIR, "API service", "Git_room", "txt_generator.py")
+                  file_path = os.path.join(BASE_DIR, "Git", "txt_generator.py")
               else:
                   os.environ["REPO_TARGET"] = "All 3 Repos" 
                   rel_path = ALL_MAP[name]
