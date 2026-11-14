@@ -1,4 +1,4 @@
-name: 👍update🔗rivers
+name: update🔗rivers testing 
 
 on:
   workflow_dispatch:
@@ -144,7 +144,7 @@ jobs:
           if [ -z "$AVAILABLE" ]; then echo "STATUS=❌ Failed: No versions" >> $GITHUB_ENV; exit 1; fi
           
           if [ -n "$INPUT_VERSION" ]; then
-            VERSION="v${INPUT_VERSION#v}" # v hata kar add kar dega taaki format same rahe
+            VERSION="v${INPUT_VERSION#v}"
             RESTORE_MODE="Manual"
           else
             VERSION="v$(echo "$AVAILABLE" | tail -1)"
