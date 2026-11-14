@@ -1,4 +1,4 @@
-name: 🔄 Emergency Restore Project
+name: 🔄 EmergencyRestore Project
 on:
   workflow_dispatch:
 permissions:
