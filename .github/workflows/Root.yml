@@ -16,7 +16,7 @@ jobs:
       - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
 
-      # 2. Hosting Server Repo se sirf API service folder download karna
+      # 2. Hosting Server Repo se API service download karna
       - name: 2. 📦 Fetch API service from hosting_sarvar
         uses: actions/checkout@v4
         with:
@@ -26,38 +26,44 @@ jobs:
           sparse-checkout: |
             API service
 
-      # 3. Fix Structure & Extract Git_room
-      - name: 3. 🚚 Fix Folders & Move Git_room
+      # 3. Root Directory Cleanup & Perfect Structure
+      - name: 3. 🚚 Clean Root & Move Git_room
         run: |
-          echo "🧹 Cleaning up wrong root folders..."
-          # Pichli galti ke folders ko root se delete karo
-          rm -rf A_API_room URL_room Git_room || true
+          echo "🧹 Deleting wrong folders from Root..."
           
-          echo "📂 Creating fresh API service folder..."
+          # 🟢 Yahan hum un sabhi folders ko delete kar rahe hain jo root me nahi hone chahiye
+          rm -rf "A_API_room" "URL_room" "Git_room" "Video_Generator" "System_room" || true
+          
+          # Purana API service bhi delete karo taaki naya fresh aaye
           rm -rf "API service" || true
+          
+          echo "📂 Moving fresh API service to root..."
           mv "temp_hosting/API service" "./API service"
           
           echo "🚚 Extracting Git_room to root..."
-          # Ab sirf Git_room ko API service ke andar se bahar nikalo
+          # API service ke andar se sirf Git_room ko bahar nikalo
           if [ -d "API service/Git_room" ]; then
             mv "API service/Git_room" "./Git_room"
             echo "✅ Git_room moved to root."
           fi
           
           rm -rf temp_hosting
-          echo "✅ Structure fixed successfully!"
+          echo "✅ Master Cleanup Done! Root is now perfect."
 
       # 4. Commit and Push
       - name: 4. 💾 Save to Admin Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
-          git add .
+          
+          # Saare changes add karo (Delete + New folders)
+          git add -A
           
           if git diff --cached --quiet; then
             echo "ℹ️ No changes to commit."
           else
-            git commit -m "🔧 Fix: Restored API service structure and extracted Git_room to root"
-            git push origin HEAD:${{ git_ref_name || github.ref_name }}
-            echo "✅ Changes pushed successfully!"
+            git commit -m "🧹 Master Cleanup: Root folders fixed (API service + Git_room only)"
+            # 🟢 Yahan typo theek kar diya gaya hai
+            git push origin HEAD:${{ github.ref_name }}
+            echo "✅ Admin Repo root is now perfectly clean!"
           fi
