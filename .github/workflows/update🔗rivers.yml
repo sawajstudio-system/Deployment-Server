@@ -1,4 +1,4 @@
-name: update🔗rivers testing 
+name: update🔗rivers
 
 on:
   workflow_dispatch:
