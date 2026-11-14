@@ -1,4 +1,4 @@
-name: 🚀 Recover & Setup Folders
+name: 🚑 Emergency Restore Repo
 
 on:
   workflow_dispatch: 
@@ -7,62 +7,53 @@ permissions:
   contents: write 
 
 jobs:
-  fetch-folders:
+  restore-repo:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
     steps:
-      # 1. Admin Repo Checkout
-      - name: 1. 📥 Checkout Admin Repo
-        uses: actions/checkout@v4
-
-      # 2. Hosting Server Repo Download
-      - name: 2. 📦 Fetch from hosting_sarvar
+      # 1. Pura History checkout karein (Fetch Depth 0 matlab saari purani history)
+      - name: 1. 📥 Checkout Full History
         uses: actions/checkout@v4
         with:
-          repository: sawajstudio-system/hosting_sarvar
+          fetch-depth: 0
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: temp_hosting
 
-      # 3. Copy Folders (No Delete)
-      - name: 3. 🚚 Recover & Setup Folders
+      # 2. History se purani files wapas laayein
+      - name: 2. 🚑 Restore Deleted Files
         run: |
-          echo "📂 1. Copying fresh folders from hosting_sarvar..."
+          echo "🔍 Finding the last commit where files existed..."
           
-          # Forcefully copy folders
-          if [ -d "temp_hosting/API service" ]; then
-            cp -rf "temp_hosting/API service" "./API service"
-            echo "✅ API service recovered to root."
+          # Pichle 10 commits mein se dhundho jahan API service ya System_room folder tha
+          # (Aapke screenshot ke anusar files pichle kisi commit me thi)
+          GOOD_COMMIT=$(git log --all --format="%H" -- "API service" "System_room" "Video_Generator" | head -n 1)
+          
+          if [ -z "$GOOD_COMMIT" ]; then
+            echo "⚠️ Direct folder nahi mila, thoda aur peeche check kar rahe hain..."
+            # Agar naam alag tha, toh sabse purana commit utha lo
+            GOOD_COMMIT=$(git log --all --format="%H" | head -n 10 | tail -n 1)
           fi
           
-          if [ -d "temp_hosting/Video_Generator" ]; then
-            cp -rf "temp_hosting/Video_Generator" "./Video_Generator"
-            echo "✅ Video_Generator recovered to root."
-          fi
+          echo "✅ Found commit: $GOOD_COMMIT"
+          echo "📂 Restoring all files from this commit..."
           
-          echo "🚚 2. Extracting Git_room to root..."
-          # Copy Git_room out of API service instead of moving
-          if [ -d "API service/Git_room" ]; then
-            cp -rf "API service/Git_room" "./Git_room"
-            echo "✅ Git_room successfully copied to root!"
-          fi
+          # Us commit se saari files wapas laao (delete kiye bina)
+          git checkout $GOOD_COMMIT -- .
           
-          rm -rf temp_hosting
-          echo "✅ Recovery complete!"
+          echo "✅ Files successfully restored from history!"
 
-      # 4. Commit and Push
-      - name: 4. 💾 Save to Admin Repo
+      # 3. Wapas GitHub par save karein
+      - name: 3. 💾 Save Restored Files
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
           
-          # Sirf new/modified files add karo (deletes ignore karo)
+          # Changes add karein
           git add .
           
           if git diff --cached --quiet; then
-            echo "ℹ️ Koi change nahi mila."
+            echo "ℹ️ Files pehle se hi sahi hain."
           else
-            git commit -m "🔄 Recovered folders: API service, Video_Generator, Git_room"
+            git commit -m "🚑 EMERGENCY RESTORE: Recovered all files from git history"
             git push origin HEAD:${{ github.ref_name }}
             echo "✅ Successfully recovered to Admin Repo!"
           fi
