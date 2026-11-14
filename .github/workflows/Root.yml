@@ -1,13 +1,13 @@
-name: 🚀 Fetch API service & Extract Git_room
+name: 🚀 Auto-Fetch Folders to Root
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch: # Manual run karne ke liye button
 
 permissions:
-  contents: write 
+  contents: write # Repo me file save karne ki permission
 
 jobs:
-  fetch-and-fix:
+  fetch-folders:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -16,7 +16,7 @@ jobs:
       - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
 
-      # 2. Hosting Server Repo se download (Bina sparse-checkout ke, taaki pura structure mile)
+      # 2. Hosting Server Repo se download karna (Bina sparse-checkout ke)
       - name: 2. 📦 Fetch from hosting_sarvar
         uses: actions/checkout@v4
         with:
@@ -24,51 +24,48 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           path: temp_hosting
 
-      # 3. Smart Cleanup & Move
-      - name: 3. 🚚 Clean Root & Move Folders
+      # 3. Folders ko Root me move karna
+      - name: 3. 🚚 Move Folders to Admin Repo Root
         run: |
-          echo "🧹 Deleting wrong folders from Root..."
-          rm -rf "A_API_room" "URL_room" "Git_room" "Video_Generator" "System_room" "API service" "API_service" || true
+          echo "🚚 Moving folders to admin repo root..."
           
-          echo "🔍 Searching for 'API service' folder..."
+          # Purane folders delete karo agar hain toh
+          rm -rf "API service" "Video_Generator" "A_API_room" "Git_room" "URL_room" || true
           
-          # 🟢 SMART SEARCH: Exact naam na mile toh dhundh lega
-          API_FOLDER=$(find temp_hosting -maxdepth 2 -type d -iname "*api*service*" | head -n 1)
-          
-          if [ -z "$API_FOLDER" ]; then
-            echo "❌ ERROR: 'API service' folder nahi mila temp_hosting ke andar!"
-            echo "Yahan kya kya hai:"
-            ls -la temp_hosting/
-            exit 1
+          # 1. Video_Generator ko bahar nikalo
+          if [ -d "temp_hosting/Video_Generator" ]; then
+            mv "temp_hosting/Video_Generator" "./Video_Generator"
+            echo "✅ Video_Generator moved to root."
           fi
-          
-          echo "✅ Found API folder at: $API_FOLDER"
-          
-          # Folder ko API service naam se root me move karo
-          mv "$API_FOLDER" "./API service"
-          
-          echo "🚚 Extracting Git_room to root..."
-          if [ -d "API service/Git_room" ]; then
-            mv "API service/Git_room" "./Git_room"
-            echo "✅ Git_room moved to root."
-          else
-            echo "⚠️ Git_room nahi mila API service ke andar."
-          fi
-          
-          rm -rf temp_hosting
-          echo "✅ Master Cleanup Done!"
 
-      # 4. Commit and Push
+          # 2. API service folder ko root me move karo
+          if [ -d "temp_hosting/API service" ]; then
+            mv "temp_hosting/API service" "./API service"
+            echo "✅ API service folder moved to root."
+            
+            # 3. Ab API service ke andar se Git_room ko bahar nikalo
+            if [ -d "API service/Git_room" ]; then
+              mv "API service/Git_room" "./Git_room"
+              echo "✅ Git_room extracted to root."
+            fi
+          fi
+          
+          # Temp folder saaf karo
+          rm -rf temp_hosting
+          echo "✅ Cleanup done!"
+
+      # 4. Admin Repo me save (Commit) karna
       - name: 4. 💾 Save to Admin Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
-          git add -A
+          
+          git add . 
           
           if git diff --cached --quiet; then
-            echo "ℹ️ No changes to commit."
+            echo "ℹ️ Koi change nahi mila, folders pehle se root me hain."
           else
-            git commit -m "🧹 Master Cleanup: Root folders fixed smartly"
+            git commit -m "🤖 Auto-Fetched: Moved folders to Root (API service, Video_Generator, Git_room)"
             git push origin HEAD:${{ github.ref_name }}
-            echo "✅ Admin Repo root is now perfectly clean!"
+            echo "✅ Folders successfully admin repo root me save ho gaye!"
           fi
