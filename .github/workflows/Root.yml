@@ -1,4 +1,4 @@
-name: 🚑 Force Restore Folders 
+name: 🚑 Recover API Service from History
 
 on:
   workflow_dispatch: 
@@ -7,62 +7,61 @@ permissions:
   contents: write 
 
 jobs:
-  force-restore:
+  recover-folder:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Admin Repo Checkout
-      - name: 1. 📥 Checkout Admin Repo
+      # 1. Pura History Checkout karein
+      - name: 1. 📥 Checkout Full History
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.TOKEN_GITHUB }}
           fetch-depth: 0
-
-      # 2. Hosting Repo se Files Lao
-      - name: 2. 📦 Fetch from hosting_sarvar
-        uses: actions/checkout@v4
-        with:
-          repository: sawajstudio-system/hosting_sarvar
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: temp_hosting
 
-      # 3. Folders Copy karo aur Git_room bahar nikalo
-      - name: 3. 🚚 Move Folders & Setup
+      # 2. History mein API service folder dhundhein
+      - name: 2. 🔍 Find and Restore API Service
         run: |
-          echo "📂 Copying folders..."
+          echo "🔍 API service folder ki history check kar rahe hain..."
           
-          # API service folder ko lao (with quotes for space)
-          if [ -d "temp_hosting/API service" ]; then
-            cp -rf "temp_hosting/API service" "./API service"
-            echo "✅ API service copied."
+          # Pichle 100 commits mein dhundho jahan API service folder tha
+          GOOD_COMMIT=$(git log --all --format="%H" -- "API service" | head -n 1)
+          
+          if [ -z "$GOOD_COMMIT" ]; then
+            echo "❌ Direct history nahi mili, poore repo ki sabse badi commit dhundh rahe hain..."
+            GOOD_COMMIT=$(git rev-list --all --max-count=50 --objects | grep -i "api service" | head -n 1 | awk '{print $1}')
           fi
-          
-          # Video_Generator lao
-          if [ -d "temp_hosting/Video_Generator" ]; then
-            cp -rf "temp_hosting/Video_Generator" "./Video_Generator"
-            echo "✅ Video_Generator copied."
-          fi
-          
-          # Git_room ko bahar nikalo
-          if [ -d "API service/Git_room" ]; then
-            cp -rf "API service/Git_room" "./Git_room"
-            echo "✅ Git_room moved to root."
-          fi
-          
-          rm -rf temp_hosting
-          echo "✅ Folders ready!"
 
-      # 4. Commit aur Force Push
-      - name: 4. 🚀 Force Push to Admin Repo
+          # Agar phir bhi na mile toh sabse purani commit uthao
+          if [ -z "$GOOD_COMMIT" ]; then
+            GOOD_COMMIT=$(git log --all --format="%H" | tail -n 1)
+          fi
+          
+          echo "✅ Target Commit: $GOOD_COMMIT"
+          echo "📂 Restoring files from this commit..."
+          
+          # Saari files wapas laao (Overwrite safe mode)
+          git checkout $GOOD_COMMIT -- .
+          
+          # Check karo ki API service aa gaya ya nahi
+          if [ -d "API service" ]; then
+            echo "🎉 BINGO! 'API service' folder successfully recovered!"
+          else
+            echo "⚠️ Direct 'API service' nahi mila, par baaki files restore ho gayi hain."
+          fi
+
+      # 3. Wapas GitHub par push karein
+      - name: 3. 🚀 Save and Force Push
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
           
-          # Sab kuch force add karo
-          git add -A -f
+          # Naye files add karo
+          git add . -f
           
-          git commit -m "🚑 Force Restored: Brought API service & Git_room from hosting_sarvar" || echo "No changes"
-          
-          # 🟢 Force push taaki purani khaali history override ho jaye
-          git push origin HEAD:${{ github.ref_name }} --force
-          echo "✅ Successfully force-pushed to Admin Repo!"
+          if git diff --cached --quiet; then
+            echo "ℹ️ Files pehle se hi theek hain."
+          else
+            git commit -m "🚑 RECOVERY: Restored deleted files from history"
+            git push origin HEAD:${{ github.ref_name }} --force
+            echo "✅ Successfully pushed to Admin Repo!"
+          fi
