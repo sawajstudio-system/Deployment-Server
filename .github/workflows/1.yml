@@ -1,4 +1,4 @@
-name: update🔗rivers xsss
+name: 👍update🔗rivers
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ on:
         options:
           - 'Hosting Update'              # Development ➡️ hosting_sarvar
           - 'Diploment Reverse'           # hosting_sarvar ➡️ Development
-          - 'Restore from Recycle'        # ♻️ recycle/vX ➡️ Video_Generator
+          - 'Restore from Recycle'        # ♻️ recycle/vX ➡️ Main Repo
       version:
         description: 'Version (जैसे v3) — खाली छोड़ने पर LATEST अपने आप restore होगा'
         type: string
@@ -26,7 +26,6 @@ jobs:
     timeout-minutes: 20
 
     env:
-      # 🟢 GDrive aur Telegram secrets
       TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
       TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
@@ -37,254 +36,145 @@ jobs:
 
     steps:
       # ─────────────────────────────────────────────────────────────
-      # STEP 1: CHECKOUT
+      # STEP 1: CHECKOUT (Dono Repos Download)
       # ─────────────────────────────────────────────────────────────
-      - name: 1. 📥 Checkout Development (Testing)
+      - name: 1. 📥 Checkout Development
         uses: actions/checkout@v4
         with:
-          repository: 'sawajstudio-system/Development'  # 🟢 नाम बदल गया
+          repository: 'sawajstudio-system/Development'
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'Development'                           # 🟢 नाम बदल गया
+          path: 'Development'
 
-      - name: 2. 📥 Checkout hosting_sarvar (Production)
+      - name: 2. 📥 Checkout hosting_sarvar
         uses: actions/checkout@v4
         with:
-          repository: 'sawajstudio-system/hosting_sarvar' # 🟢 नाम बदल गया
+          repository: 'sawajstudio-system/hosting_sarvar'
           token: ${{ secrets.TOKEN_GITHUB }}
-          path: 'hosting_sarvar'                          # 🟢 नाम बदल गया
+          path: 'hosting_sarvar'
 
       # ─────────────────────────────────────────────────────────────
-      # STEP 3A: HOSTING UPDATE (Development ➡️ hosting_sarvar) + RECYCLE
+      # STEP 3A: HOSTING UPDATE (Auto-Sync Full Repo)
       # ─────────────────────────────────────────────────────────────
-      - name: 3A. 🚀 Update hosting_sarvar (Development ➡️ hosting_sarvar) + Recycle
+      - name: 3A. 🚀 Auto Update hosting_sarvar + Recycle
         if: ${{ inputs.action == 'Hosting Update' }}
         run: |
-          echo "🚀 Starting hosting_sarvar update with recycle backup..."
-          
           mkdir -p hosting_sarvar/recycle
           
-          # 1. अगला version नंबर निकालो
-          LAST_NUM=$(ls -d hosting_sarvar/recycle/v* 2>/dev/null \
-                     | sed 's#.*/v##' \
-                     | grep -E '^[0-9]+$' \
-                     | sort -n | tail -1)
+          # Version Number Nikalo
+          LAST_NUM=$(ls -d hosting_sarvar/recycle/v* 2>/dev/null | sed 's#.*/v##' | grep -E '^[0-9]+$' | sort -n | tail -1)
           NEXT_NUM=$(( ${LAST_NUM:-0} + 1 ))
           VERSION="v${NEXT_NUM}"
-          TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
           BACKUP_DIR="hosting_sarvar/recycle/$VERSION"
           
-          echo "📦 Backup version: $VERSION (at $TIMESTAMP)"
-          
-          # 2. पुराना Video_Generator → recycle/vX/Video_Generator
-          FILES_COUNT=0
-          if [ -d "hosting_sarvar/Video_Generator" ] && [ "$(ls -A hosting_sarvar/Video_Generator 2>/dev/null)" ]; then
-            echo "♻️ Backing up old Video_Generator → recycle/$VERSION/Video_Generator"
-            mkdir -p "$BACKUP_DIR"
-            mv hosting_sarvar/Video_Generator "$BACKUP_DIR/Video_Generator"
-            FILES_COUNT=$(find "$BACKUP_DIR/Video_Generator" -type f | wc -l)
-            
-            # 🟢 GDRIVE UPLOAD KE LIYE ZIP BANAYA (Root me banega)
-            echo "🗜️ Creating ZIP for Google Drive..."
-            zip -r "${VERSION}_backup.zip" "$BACKUP_DIR/Video_Generator" > /dev/null
-          else
-            echo "ℹ️ No existing Video_Generator to backup (first run)."
-          fi
-          
-          # 3. 📝 info.txt बनाओ
+          # Purane Code ka Backup (Git aur Recycle ko chhod kar)
           mkdir -p "$BACKUP_DIR"
-          cat > "$BACKUP_DIR/info.txt" <<EOF
-          ═══════════════════════════════════════════════
-          📦 RECYCLE BACKUP REPORT
-          ═══════════════════════════════════════════════
-          Version      : $VERSION
-          Date         : $TIMESTAMP
-          Action       : Hosting Update
-          Source       : Development (Testing)
-          Destination  : hosting_sarvar (Production)
-          Backup Path  : recycle/$VERSION/Video_Generator/
-          Files Backed : $FILES_COUNT
-          Triggered By : Sawaj Studio Bot
-          Workflow Run : $GITHUB_RUN_ID
-          Repo         : $GITHUB_REPOSITORY
-          Actor        : $GITHUB_ACTOR
-          ═══════════════════════════════════════════════
-          EOF
+          rsync -a --exclude='.git' --exclude='recycle' --exclude='.github' hosting_sarvar/ "$BACKUP_DIR/"
           
-          echo "📝 Report saved: $BACKUP_DIR/info.txt"
+          # GDrive ke liye Zip
+          zip -r "${VERSION}_backup.zip" "$BACKUP_DIR" > /dev/null
           
-          # 4. नया code → Video_Generator
-          echo "🚀 Copying fresh code from Development..."
-          mkdir -p hosting_sarvar/Video_Generator
-          rsync -av \
-            --exclude='.git' \
-            --exclude='__pycache__' \
-            --exclude='*.pyc' \
-            --exclude='temp/' \
-            Development/Video_Generator/ hosting_sarvar/Video_Generator/
+          # Info file
+          echo -e "Version: $VERSION\nDate: $(date)\nAction: Full Repo Sync" > "$BACKUP_DIR/info.txt"
           
-          # 5. Commit + Push
+          # Naya Code Copy karo (Purane files ko delete karke sync karega)
+          rsync -a --delete --exclude='.git' --exclude='recycle' --exclude='.github' Development/ hosting_sarvar/
+          
           cd hosting_sarvar
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
-          git add Video_Generator/ recycle/
+          git add .
           
-          if git diff-index --quiet HEAD && [ -z "$(git ls-files --others --exclude-standard)" ]; then
-            echo "STATUS=No Changes (Already in sync)" >> $GITHUB_ENV
-            echo "BACKUP_VERSION=$VERSION" >> $GITHUB_ENV
+          if git diff-index --quiet HEAD; then
+            echo "STATUS=No Changes" >> $GITHUB_ENV
           else
-            git commit -m "🚀 Update: old code archived as recycle/${VERSION} (${FILES_COUNT} files)"
+            git commit -m "🚀 Auto Update: Full Sync (Backup: ${VERSION})"
             git push origin main
-            echo "STATUS=Success! Old code → recycle/${VERSION}/Video_Generator (${FILES_COUNT} files)" >> $GITHUB_ENV
-            echo "BACKUP_VERSION=$VERSION" >> $GITHUB_ENV
+            echo "STATUS=Success! Full Repo Synced. Backup: ${VERSION}" >> $GITHUB_ENV
           fi
-          
-          # 🟢 Environment variable set karo GDrive step ke liye (Root path)
+          echo "BACKUP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "ZIP_TO_UPLOAD=${VERSION}_backup.zip" >> $GITHUB_ENV
 
-      # 🟢 NAYA STEP: GDRIVE RECYCLE UPLOAD
-      - name: 3A.1 ☁️ Upload Backup to GDrive Recycle Folder
+      - name: 3A.1 ☁️ Upload to GDrive
         if: ${{ inputs.action == 'Hosting Update' && env.ZIP_TO_UPLOAD != '' }}
         run: |
           pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib > /dev/null
-          
           python << 'PYEOF'
-          import os, time
+          import os
           from google.oauth2.credentials import Credentials
           from googleapiclient.discovery import build
           from googleapiclient.http import MediaFileUpload
-
-          cid = os.getenv("GDRIVE_CLIENT_ID")
-          csec = os.getenv("GDRIVE_CLIENT_SECRET")
-          rtok = os.getenv("GDRIVE_REFRESH_TOKEN")
-          folder_id = os.getenv("GDRIVE_F_RECYCLE_ID")
+          cid, csec, rtok, folder_id = os.getenv("GDRIVE_CLIENT_ID"), os.getenv("GDRIVE_CLIENT_SECRET"), os.getenv("GDRIVE_REFRESH_TOKEN"), os.getenv("GDRIVE_F_RECYCLE_ID")
           zip_file = os.getenv("ZIP_TO_UPLOAD")
-
-          if not all([cid, csec, rtok, folder_id]):
-              print("⚠️ GDrive credentials missing. Skipping upload.")
-              exit(0)
-
-          if not os.path.exists(zip_file):
-              print(f"❌ ZIP file not found: {zip_file}")
-              exit(0)
-
-          print(f"☁️ Authenticating with Google Drive...")
+          if not all([cid, csec, rtok, folder_id]) or not os.path.exists(zip_file): exit(0)
           creds = Credentials(None, refresh_token=rtok, client_id=cid, client_secret=csec, token_uri="https://oauth2.googleapis.com/token")
-          service = build('drive', 'v3', credentials=creds, cache_discovery=False)
-
-          file_name = os.path.basename(zip_file)
-          print(f"⏳ Uploading {file_name} to Recycle Folder...")
-
-          file_metadata = {'name': file_name, 'parents': [folder_id]}
+          service = build('drive', 'v3', credentials=creds)
           media = MediaFileUpload(zip_file, mimetype='application/zip', resumable=True)
-          
-          try:
-              file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
-              print(f"✅ Uploaded successfully! Link: {file.get('webViewLink')}")
-          except Exception as e:
-              print(f"❌ Upload failed: {e}")
+          file = service.files().create(body={'name': os.path.basename(zip_file), 'parents': [folder_id]}, media_body=media, fields='webViewLink').execute()
+          print(f"✅ Uploaded: {file.get('webViewLink')}")
           PYEOF
 
       # ─────────────────────────────────────────────────────────────
-      # STEP 3B: DIPLOMENT REVERSE (hosting_sarvar ➡️ Development)
+      # STEP 3B: DIPLOMENT REVERSE (Auto-Sync Full Repo)
       # ─────────────────────────────────────────────────────────────
-      - name: 3B. 🛡️ Reverse Development (hosting_sarvar ➡️ Development)
+      - name: 3B. 🛡️ Reverse to Development
         if: ${{ inputs.action == 'Diploment Reverse' }}
         run: |
-          echo "🚨 Deleting all files inside Development/Video_Generator/..."
-          rm -rf Development/Video_Generator/*
-          
-          echo "🚀 Copying fresh code from hosting_sarvar..."
-          rsync -av \
-            --exclude='.git' \
-            --exclude='__pycache__' \
-            --exclude='*.pyc' \
-            --exclude='temp/' \
-            hosting_sarvar/Video_Generator/ Development/Video_Generator/
-          
+          rsync -a --delete --exclude='.git' --exclude='recycle' --exclude='.github' hosting_sarvar/ Development/
           cd Development
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
-          
-          git add Video_Generator/
-          
+          git add .
           if git diff-index --quiet HEAD; then
-            echo "STATUS=No Changes (Development already identical to hosting_sarvar)" >> $GITHUB_ENV
+            echo "STATUS=No Changes" >> $GITHUB_ENV
           else
-            git commit -m "🛡️ Development Restored: Wiped & Replaced with hosting_sarvar code"
+            git commit -m "🛡️ Auto Reverse: Full Sync from hosting_sarvar"
             git push origin main
             echo "STATUS=Success! Development Restored from hosting_sarvar." >> $GITHUB_ENV
           fi
 
       # ─────────────────────────────────────────────────────────────
-      # STEP 3C: RESTORE FROM RECYCLE (auto-detect latest if empty)
+      # STEP 3C: RESTORE FROM RECYCLE (Auto-Sync Full Repo)
       # ─────────────────────────────────────────────────────────────
-      - name: 3C. ♻️ Restore from Recycle (Auto-Detect)
+      - name: 3C. ♻️ Restore from Recycle
         if: ${{ inputs.action == 'Restore from Recycle' }}
         run: |
           INPUT_VERSION="${{ inputs.version }}"
+          AVAILABLE=$(ls -d hosting_sarvar/recycle/v* 2>/dev/null | sed 's#.*/v##' | grep -E '^[0-9]+$' | sort -n)
           
-          AVAILABLE=$(ls -d hosting_sarvar/recycle/v* 2>/dev/null \
-                      | sed 's#.*/v##' \
-                      | grep -E '^[0-9]+$' \
-                      | sort -n)
-          
-          if [ -z "$AVAILABLE" ]; then
-            echo "❌ recycle/ में कोई version नहीं मिला!"
-            echo "STATUS=❌ Failed: No versions in recycle/" >> $GITHUB_ENV
-            exit 1
-          fi
+          if [ -z "$AVAILABLE" ]; then echo "STATUS=❌ Failed: No versions" >> $GITHUB_ENV; exit 1; fi
           
           if [ -n "$INPUT_VERSION" ]; then
-            if [[ "$INPUT_VERSION" =~ ^v[0-9]+$ ]]; then
-              VERSION="$INPUT_VERSION"
-            elif [[ "$INPUT_VERSION" =~ ^[0-9]+$ ]]; then
-              VERSION="v${INPUT_VERSION}"
-            else
-              echo "❌ Invalid version format: $INPUT_VERSION"
-              echo "STATUS=❌ Failed: Invalid version format" >> $GITHUB_ENV
-              exit 1
-            fi
+            VERSION="v${INPUT_VERSION#v}" # v hata kar add kar dega taaki format same rahe
             RESTORE_MODE="Manual"
           else
-            LAST_NUM=$(echo "$AVAILABLE" | tail -1)
-            VERSION="v${LAST_NUM}"
+            VERSION="v$(echo "$AVAILABLE" | tail -1)"
             RESTORE_MODE="Auto (latest)"
           fi
           
-          RESTORE_FROM="hosting_sarvar/recycle/${VERSION}/Video_Generator"
+          RESTORE_FROM="hosting_sarvar/recycle/${VERSION}"
+          if [ ! -d "$RESTORE_FROM" ]; then echo "STATUS=❌ Failed: ${VERSION} missing" >> $GITHUB_ENV; exit 1; fi
           
-          if [ ! -d "$RESTORE_FROM" ]; then
-            echo "❌ ${VERSION} में Video_Generator नहीं मिला!"
-            echo "STATUS=❌ Failed: ${VERSION} has no Video_Generator" >> $GITHUB_ENV
-            exit 1
-          fi
-          
-          echo "RESTORED_VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "RESTORE_MODE=${RESTORE_MODE}" >> $GITHUB_ENV
-          
+          # Current code ko broken backup me dalo
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-          BROKEN_DIR="hosting_sarvar/recycle/broken_${TIMESTAMP}"
-          if [ -d "hosting_sarvar/Video_Generator" ] && [ "$(ls -A hosting_sarvar/Video_Generator)" ]; then
-            mkdir -p "$BROKEN_DIR"
-            mv hosting_sarvar/Video_Generator "$BROKEN_DIR/Video_Generator"
-          fi
-          echo "BROKEN_BACKUP=broken_${TIMESTAMP}" >> $GITHUB_ENV
+          mkdir -p "hosting_sarvar/recycle/broken_${TIMESTAMP}"
+          rsync -a --exclude='.git' --exclude='recycle' hosting_sarvar/ "hosting_sarvar/recycle/broken_${TIMESTAMP}/"
           
-          mkdir -p hosting_sarvar/Video_Generator
-          rsync -av "$RESTORE_FROM/" hosting_sarvar/Video_Generator/
+          # Restore karo
+          rsync -a --delete --exclude='.git' --exclude='recycle' --exclude='.github' "$RESTORE_FROM/" hosting_sarvar/
           
           cd hosting_sarvar
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
-          git add Video_Generator/ recycle/
-          
-          if git diff-index --quiet HEAD && [ -z "$(git ls-files --others --exclude-standard)" ]; then
-            echo "STATUS=No Changes (already same)" >> $GITHUB_ENV
+          git add .
+          if git diff-index --quiet HEAD; then
+            echo "STATUS=No Changes" >> $GITHUB_ENV
           else
-            git commit -m "♻️ Restore: ${VERSION} → Video_Generator (${RESTORE_MODE})"
+            git commit -m "♻️ Restore: ${VERSION}"
             git push origin main
-            echo "STATUS=✅ Success! Restored ${VERSION} → Video_Generator" >> $GITHUB_ENV
+            echo "STATUS=✅ Success! Restored ${VERSION}" >> $GITHUB_ENV
           fi
+          echo "RESTORED_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "RESTORE_MODE=$RESTORE_MODE" >> $GITHUB_ENV
 
       # ─────────────────────────────────────────────────────────────
       # STEP 4: TELEGRAM REPORT
@@ -296,34 +186,22 @@ jobs:
           STATUS="${STATUS:-Failed or Cancelled}"
           
           if [ "$ACTION" = "Hosting Update" ]; then
-            MSG="🚀 <b>Hosting Update Completed</b>
-            
-            📥 <b>From:</b> Development (Testing)
-            📤 <b>To:</b> hosting_sarvar (Production)
-            📁 <b>Folder:</b> Video_Generator
-            ♻️ <b>Backup saved as:</b> recycle/${BACKUP_VERSION:-?}
-            ☁️ <b>GDrive:</b> Uploaded to Recycle Folder
+            MSG="🚀 <b>Auto Update Completed</b>
+            📥 <b>From:</b> Development
+            📤 <b>To:</b> hosting_sarvar
+            📁 <b>Folder:</b> Full Repo
+            ♻️ <b>Backup:</b> recycle/${BACKUP_VERSION:-?}
             📊 <b>Status:</b> ${STATUS}"
-          
           elif [ "$ACTION" = "Diploment Reverse" ]; then
-            MSG="🛡️ <b>Development Reverse Completed</b>
-            
-            🗑️ <b>Action:</b> Development code wiped
-            📥 <b>Action:</b> hosting_sarvar code copied
-            📁 <b>Folder:</b> Video_Generator
+            MSG="🛡️ <b>Auto Reverse Completed</b>
+            📥 <b>From:</b> hosting_sarvar
+            📤 <b>To:</b> Development
+            📁 <b>Folder:</b> Full Repo
             📊 <b>Status:</b> ${STATUS}"
-          
           elif [ "$ACTION" = "Restore from Recycle" ]; then
-            MSG="♻️ <b>Restore from Recycle</b>
-            
-            🤖 <b>Mode:</b> ${RESTORE_MODE:-Manual}
-            🎯 <b>Restored Version:</b> ${RESTORED_VERSION:-?}
-            📥 <b>From:</b> recycle/${RESTORED_VERSION:-?}
-            📤 <b>To:</b> Video_Generator
-            🗑️ <b>Broken code saved:</b> recycle/${BROKEN_BACKUP:-?}
-            
+            MSG="♻️ <b>Auto Restore Completed</b>
+            🎯 <b>Version:</b> ${RESTORED_VERSION:-?}
             📊 <b>Status:</b> ${STATUS}"
-          
           else
             MSG="ℹ️ <b>Unknown Action</b>
             📊 <b>Status:</b> ${STATUS}"
