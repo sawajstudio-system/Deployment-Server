@@ -1,4 +1,4 @@
-name: 💬Comment_Restore
+name: 💬 Comment Restore
 
 on:
   workflow_dispatch:
@@ -7,7 +7,13 @@ on:
         description: '🔢 Kaunsa comment number restore karna hai? (1 = latest, 2 = second, 3 = third...)'
         required: true
         type: number
-        default: 1
+        default: 2
+
+      force_run:
+        description: '⚡ Force run? (true = agar kuch change nahi bhi hai toh marker commit karega)'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -16,9 +22,9 @@ jobs:
   restore:
     runs-on: ubuntu-latest
     steps:
-      # ─────────────────────────────────────────
-      # STEP 1: Checkout Admin Repo (root folder mein)
-      # ─────────────────────────────────────────
+      # ═════════════════════════════════════════
+      # STEP 1: Checkout Admin Repo
+      # ═════════════════════════════════════════
       - name: 📥 Checkout Admin Repo
         uses: actions/checkout@v4
         with:
@@ -27,96 +33,250 @@ jobs:
           path: 'Admin'
           fetch-depth: 0
 
-      # ─────────────────────────────────────────
-      # STEP 2: Find the commit by number
-      # ─────────────────────────────────────────
+      # ═════════════════════════════════════════
+      # STEP 2: Environment Info
+      # ═════════════════════════════════════════
+      - name: 🖥️ Environment Info
+        working-directory: Admin
+        run: |
+          echo "════════════════════════════════════════"
+          echo "🖥️ ENVIRONMENT INFO"
+          echo "════════════════════════════════════════"
+          echo "📅 Date        : $(date)"
+          echo "👤 Runner      : ${{ runner.os }}"
+          echo "🔢 Comment #   : ${{ inputs.comment_number }}"
+          echo "⚡ Force run   : ${{ inputs.force_run }}"
+          echo "📂 Repo        : sawajstudio-system/Admin"
+          echo "🌿 Branch      : main"
+          echo "🔑 Current HEAD: $(git rev-parse --short HEAD)"
+          echo "════════════════════════════════════════"
+
+      # ═════════════════════════════════════════
+      # STEP 3: Find Target Commit
+      # ═════════════════════════════════════════
       - name: 🎯 Find Comment #${{ inputs.comment_number }}
         working-directory: Admin
         id: find
         run: |
           POS="${{ inputs.comment_number }}"
+          echo "════════════════════════════════════════"
+          echo "🎯 COMMIT SEARCH"
+          echo "════════════════════════════════════════"
 
+          # ── Validation ──
           if [ "$POS" -lt 1 ]; then
-            echo "❌ Number 1 ya usse bada hona chahiye!"
+            echo "❌ FATAL: Number 1 ya usse bada hona chahiye!"
             exit 1
           fi
 
-          TARGET=$(git log --format="%H" --skip=$((POS - 1)) -1)
+          TOTAL=$(git rev-list --count HEAD)
+          echo "📊 Total commits in repo: $TOTAL"
 
-          if [ -z "$TARGET" ]; then
-            echo "❌ Comment #$POS exist nahi karta!"
-            echo "📋 Available commits:"
+          if [ "$POS" -gt "$TOTAL" ]; then
+            echo "❌ FATAL: Comment #$POS exist nahi karta! (Total: $TOTAL)"
+            echo ""
+            echo "📋 Available commits (latest 20):"
             git log --oneline | head -20
             exit 1
           fi
 
-          echo "✅ Comment #$POS mila:"
-          git log -1 --format="  Hash    : %H%n  Author  : %an%n  Date    : %ad%n  Message : %s" "$TARGET"
+          # ── Find commit ──
+          TARGET=$(git log --format="%H" --skip=$((POS - 1)) -1)
+          TARGET_SHORT=$(git log --format="%h" --skip=$((POS - 1)) -1)
+          TARGET_MSG=$(git log -1 --format="%s" "$TARGET")
+          TARGET_AUTHOR=$(git log -1 --format="%an" "$TARGET")
+          TARGET_DATE=$(git log -1 --format="%ad" --date=short "$TARGET")
 
+          echo ""
+          echo "✅ TARGET COMMIT MILA:"
+          echo "────────────────────────────────────"
+          echo "  🔢 Position  : #$POS"
+          echo "  🔑 Hash      : $TARGET_SHORT ($TARGET)"
+          echo "  👤 Author    : $TARGET_AUTHOR"
+          echo "  📅 Date      : $TARGET_DATE"
+          echo "  📝 Message   : $TARGET_MSG"
+          echo "────────────────────────────────────"
+          echo ""
+
+          # ── Save outputs ──
           echo "target=$TARGET" >> $GITHUB_OUTPUT
-          echo "message=$(git log -1 --format='%s' $TARGET)" >> $GITHUB_OUTPUT
+          echo "target_short=$TARGET_SHORT" >> $GITHUB_OUTPUT
+          echo "message=$TARGET_MSG" >> $GITHUB_OUTPUT
+          echo "author=$TARGET_AUTHOR" >> $GITHUB_OUTPUT
+          echo "date=$TARGET_DATE" >> $GITHUB_OUTPUT
 
-      # ─────────────────────────────────────────
-      # STEP 3: Preview
-      # ─────────────────────────────────────────
+      # ═════════════════════════════════════════
+      # STEP 4: Preview Changes
+      # ═════════════════════════════════════════
       - name: 👁️ Preview Changes
         working-directory: Admin
+        id: preview
         run: |
           TARGET="${{ steps.find.outputs.target }}"
-          echo "════════════════════════════════════════"
-          echo "📊 RESTORE PREVIEW"
-          echo "════════════════════════════════════════"
-          echo "🔢 Comment #  : ${{ inputs.comment_number }}"
-          echo "📝 Message    : ${{ steps.find.outputs.message }}"
-          echo "📂 Destination: Admin repo root"
-          echo "────────────────────────────────────"
-          echo "📋 Files jo change hongi:"
-          git diff --name-status $TARGET HEAD || true
-          echo "────────────────────────────────────"
-          echo "Total: $(git diff --name-only $TARGET HEAD | wc -l) files"
-          echo "════════════════════════════════════════"
 
-      # ─────────────────────────────────────────
-      # STEP 4: Restore to Root
-      # ─────────────────────────────────────────
+          echo "════════════════════════════════════════"
+          echo "👁️ CHANGES PREVIEW"
+          echo "════════════════════════════════════════"
+          echo "From : ${{ steps.find.outputs.target_short }} — ${{ steps.find.outputs.message }}"
+          echo "To   : HEAD — $(git log -1 --format='%h %s')"
+          echo "════════════════════════════════════════"
+          echo ""
+
+          # ── File stats ──
+          ADDED=$(git diff --name-status $TARGET HEAD | grep -c '^A' || true)
+          MODIFIED=$(git diff --name-status $TARGET HEAD | grep -c '^M' || true)
+          DELETED=$(git diff --name-status $TARGET HEAD | grep -c '^D' || true)
+          TOTAL_CHANGED=$(git diff --name-only $TARGET HEAD | wc -l)
+
+          echo "📊 STATS:"
+          echo "  ✅ Added    : $ADDED"
+          echo "  ✏️ Modified : $MODIFIED"
+          echo "  ❌ Deleted  : $DELETED"
+          echo "  📦 Total    : $TOTAL_CHANGED"
+          echo ""
+
+          if [ "$TOTAL_CHANGED" -gt 0 ]; then
+            echo "📋 FILES JO CHANGE HONGI:"
+            echo "────────────────────────────────────"
+            git diff --name-status $TARGET HEAD | head -50
+            if [ "$TOTAL_CHANGED" -gt 50 ]; then
+              echo "... aur $((TOTAL_CHANGED - 50)) files"
+            fi
+          else
+            echo "ℹ️ Koi file change nahi hai — already same version."
+            echo "💡 Force run = true karo agar marker commit chahiye."
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "total_changed=$TOTAL_CHANGED" >> $GITHUB_OUTPUT
+
+      # ═════════════════════════════════════════
+      # STEP 5: Restore
+      # ═════════════════════════════════════════
       - name: 🔄 Restore Comment #${{ inputs.comment_number }}
         working-directory: Admin
+        id: restore
         run: |
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
 
           TARGET="${{ steps.find.outputs.target }}"
           TARGET_MSG="${{ steps.find.outputs.message }}"
+          TARGET_SHORT="${{ steps.find.outputs.target_short }}"
+          FORCE="${{ inputs.force_run }}"
+          TOTAL_CHANGED="${{ steps.preview.outputs.total_changed }}"
 
-          echo "🔄 Restoring Comment #${{ inputs.comment_number }} to root..."
+          echo "════════════════════════════════════════"
+          echo "🔄 RESTORE PROCESS"
+          echo "════════════════════════════════════════"
 
-          # Root folder mein sab restore
+          # ── Restore all files from target commit to root ──
+          echo "📦 Checking out files from $TARGET_SHORT to root..."
           git checkout $TARGET -- .
 
           git add -A
 
+          # ── Check if there are changes ──
           if git diff --cached --quiet; then
-            echo "ℹ️ Koi change nahi — already same version hai."
+            echo ""
+            echo "ℹ️ NO CHANGES DETECTED"
+            echo "────────────────────────────────────"
+            echo "Comment #${{ inputs.comment_number }} wala version already current hai."
+            echo ""
+
+            if [ "$FORCE" = "true" ]; then
+              echo "⚡ Force run ON — marker commit bana rahe hain..."
+              MARKER_FILE=".restore-log"
+              echo "Restore run: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $MARKER_FILE
+              echo "Comment #: ${{ inputs.comment_number }}" >> $MARKER_FILE
+              echo "Target: $TARGET_SHORT ($TARGET_MSG)" >> $MARKER_FILE
+              echo "Status: No file changes (already same)" >> $MARKER_FILE
+              echo "---" >> $MARKER_FILE
+              git add $MARKER_FILE
+              git commit -m "⚡ Force Restore: Comment #${{ inputs.comment_number }} — '$TARGET_MSG' (no changes)"
+              git push origin main
+              echo "✅ Marker commit pushed."
+              echo "committed=true" >> $GITHUB_OUTPUT
+              echo "commit_msg=Force Restore (no changes)" >> $GITHUB_OUTPUT
+            else
+              echo "💡 Kuch nahi kiya. Force run = true karo agar marker chahiye."
+              echo "committed=false" >> $GITHUB_OUTPUT
+              echo "commit_msg=No changes" >> $GITHUB_OUTPUT
+            fi
             exit 0
           fi
 
-          git commit -m "🔄 Restore: Comment #${{ inputs.comment_number }} — '$TARGET_MSG'"
-          git push origin main
-          echo "✅ Restore complete!"
+          # ── Real changes — commit them ──
+          echo ""
+          echo "📝 Files changed:"
+          git diff --cached --name-status | head -30
 
-      # ─────────────────────────────────────────
-      # STEP 5: Summary
-      # ─────────────────────────────────────────
-      - name: 📊 Summary
+          COMMIT_MSG="🔄 Restore: Comment #${{ inputs.comment_number }} — '$TARGET_MSG'
+
+Target: $TARGET_SHORT
+Comment #: ${{ inputs.comment_number }}
+Files changed: $TOTAL_CHANGED
+Run by: GitHub Actions
+Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+
+          git commit -m "$COMMIT_MSG"
+
+          echo ""
+          echo "📤 Pushing to main..."
+          git push origin main
+
+          NEW_HEAD=$(git rev-parse --short HEAD)
+          echo ""
+          echo "✅ RESTORE SUCCESSFUL!"
+          echo "────────────────────────────────────"
+          echo "  🔑 New commit : $NEW_HEAD"
+          echo "  📦 Files      : $TOTAL_CHANGED"
+          echo "  🎯 Source     : $TARGET_SHORT"
+          echo "────────────────────────────────────"
+
+          echo "committed=true" >> $GITHUB_OUTPUT
+          echo "commit_msg=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "new_head=$NEW_HEAD" >> $GITHUB_OUTPUT
+
+      # ═════════════════════════════════════════
+      # STEP 6: Final Summary
+      # ═════════════════════════════════════════
+      - name: 📊 Final Summary
+        if: always()
         working-directory: Admin
         run: |
           echo "════════════════════════════════════════"
-          echo "✅ DONE"
+          echo "📊 FINAL SUMMARY"
           echo "════════════════════════════════════════"
-          echo "Comment #  : ${{ inputs.comment_number }}"
-          echo "Message    : ${{ steps.find.outputs.message }}"
-          echo "Location   : Admin repo root"
+          echo "🔢 Comment #      : ${{ inputs.comment_number }}"
+          echo "📝 Message        : ${{ steps.find.outputs.message }}"
+          echo "🔑 Source hash    : ${{ steps.find.outputs.target_short }}"
+          echo "📦 Files changed  : ${{ steps.preview.outputs.total_changed }}"
+          echo "⚡ Force run      : ${{ inputs.force_run }}"
+          echo "✅ Committed      : ${{ steps.restore.outputs.committed }}"
+          echo "🔑 New HEAD       : ${{ steps.restore.outputs.new_head }}"
           echo ""
-          echo "📜 Last 3 commits:"
-          git log --oneline -3
+          echo "📜 Last 5 commits in Admin repo:"
+          echo "────────────────────────────────────"
+          git log --oneline -5
+          echo "────────────────────────────────────"
           echo "════════════════════════════════════════"
+          echo "✅ WORKFLOW COMPLETE"
+          echo "════════════════════════════════════════"
+
+      # ═════════════════════════════════════════
+      # STEP 7: Job Status
+      # ═════════════════════════════════════════
+      - name: ✅ Success Message
+        if: steps.restore.outputs.committed == 'true'
+        run: |
+          echo "🎉 Comment #${{ inputs.comment_number }} successfully restored!"
+          echo "📂 Admin repo updated."
+          echo "🔗 Check: https://github.com/sawajstudio-system/Admin/commits/main"
+
+      - name: ℹ️ No Changes Message
+        if: steps.restore.outputs.committed == 'false'
+        run: |
+          echo "ℹ️ Comment #${{ inputs.comment_number }} wala version already current hai."
+          echo "💡 Force run = true karo agar marker commit chahiye."
