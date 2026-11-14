@@ -1,30 +1,12 @@
-name: 🔄 Emergency Restore Development
+name: 🔄 Emergency Restore Factory
 
 on:
   workflow_dispatch:
     inputs:
       commit_hash:
-        description: 'Commit hash (cleanup se PEHLE wala commit)'
+        description: 'Commit hash (Factory delete hone se PEHLE wala)'
         type: string
         required: true
-        default: ''
-      folder:
-        description: 'Kya restore karna hai?'
-        type: choice
-        default: 'Factory/Management/ (saara software)'
-        options:
-          - 'Factory/Management/ (saara software)'
-          - 'Factory/Management/1_Git_Tools/'
-          - 'Factory/Management/2_AI_Models/'
-          - 'Factory/Management/3_Media/'
-          - 'Factory/Management/4_Islamic/'
-          - 'Factory/Management/5_Audio_Text/'
-          - 'Factory/Management/Uploader/'
-          - 'Factory/Management/story/'
-          - 'Factory/Management/assets/'
-          - 'Factory/branch/'
-          - 'Pura Factory/'
-          - 'Pura Repo'
 
 permissions:
   contents: write
@@ -40,92 +22,71 @@ jobs:
       TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
 
     steps:
-      # 1. Development repo clone
-      - name: 1. 📥 Checkout Development
+      - name: 1. 📥 Checkout Development (Full History)
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Development'
           token: ${{ secrets.TOKEN_GITHUB }}
           path: 'Development'
-          fetch-depth: 50    # Last 50 commits fetch karo (history ke liye)
+          fetch-depth: 100    # Pura history fetch karo
 
-      # 2. Commit history dikhao
-      - name: 2. 📜 Show Recent Commits
+      - name: 2. 📜 Show Commit History
         run: |
           cd Development
           echo "═══════════════════════════════════════════════════"
-          echo "📜 Last 10 commits (hash + message):"
+          echo "📜 Last 20 commits:"
           echo "═══════════════════════════════════════════════════"
-          git log --oneline -10
+          git log --oneline -20
 
-      # 3. User ke bataye commit se restore karo
-      - name: 3. 🔄 Restore Files
+      - name: 3. 🔄 Restore Factory Folder
         run: |
           cd Development
           COMMIT="${{ inputs.commit_hash }}"
           
           if [ -z "$COMMIT" ]; then
-            echo "❌ Commit hash nahi diya!"
+            echo "❌ Commit hash required!"
             exit 1
           fi
           
-          echo "🔄 Restoring from commit: $COMMIT"
+          echo "🔄 Restoring Factory/ from commit: $COMMIT"
+          git checkout "$COMMIT" -- Factory/
           
-          FOLDER="${{ inputs.folder }}"
-          
-          case "$FOLDER" in
-            "Factory/Management/ (saara software)")
-              git checkout "$COMMIT" -- Factory/Management/
-              ;;
-            "Pura Factory/")
-              git checkout "$COMMIT" -- Factory/
-              ;;
-            "Pura Repo")
-              git checkout "$COMMIT" -- .
-              ;;
-            *)
-              git checkout "$COMMIT" -- "$FOLDER"
-              ;;
-          esac
-          
-          echo ""
-          echo "✅ Restore complete!"
-          echo "📁 Restored folder: $FOLDER"
-          echo "📊 Total files now: $(find . -type f -not -path '*/.git/*' | wc -l)"
-          
-          # Show restored structure
-          echo ""
-          echo "📁 New Factory structure:"
-          find Factory -maxdepth 2 -type d 2>/dev/null | sort
+          if [ -d "Factory" ]; then
+            echo "✅ Factory folder restored!"
+            echo "📊 Total files: $(find Factory -type f | wc -l)"
+            echo ""
+            echo "📁 Factory structure:"
+            find Factory -maxdepth 2 -type d | sort
+          else
+            echo "❌ Restore failed - Factory folder not found in commit $COMMIT"
+            exit 1
+          fi
 
-      # 4. Commit & Push
       - name: 4. 💾 Commit & Push
         run: |
           cd Development
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
           
-          git add -A
+          git add Factory/
           
           if git diff-index --quiet HEAD; then
             echo "STATUS=No changes (already restored)" >> $GITHUB_ENV
           else
-            git commit -m "🔄 Emergency Restore: Files wapas from commit ${{ inputs.commit_hash }}"
+            git commit -m "🔄 Restore: Factory folder wapas (from ${{ inputs.commit_hash }})"
             git push origin main
-            echo "STATUS=✅ Success! Files restored" >> $GITHUB_ENV
+            echo "STATUS=✅ Factory restored successfully!" >> $GITHUB_ENV
           fi
 
-      # 5. Telegram Report
-      - name: 5. 📤 Send Telegram Report
+      - name: 5. 📤 Telegram Report
         if: always()
         run: |
-          MSG="🔄 <b>Development Restore</b>
+          MSG="🔄 <b>Factory Restore Report</b>
           
           📜 <b>Commit:</b> ${{ inputs.commit_hash }}
-          📁 <b>Restored:</b> ${{ inputs.folder }}
           📊 <b>Status:</b> ${STATUS:-Unknown}
           
-          ✅ <i>Check karo repo ab sahi hai</i>"
+          $( [ -n "$STATUS" ] && echo "✅ <i>Factory folder wapas aa gaya!</i>" || echo "⚠️ <i>Check karo repo</i>" )"
           
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
