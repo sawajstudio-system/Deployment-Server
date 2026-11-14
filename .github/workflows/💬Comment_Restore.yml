@@ -1,4 +1,4 @@
-name: 💬 Comment Restore
+name: 💬 Comment Restore (Full Upgrade)
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ on:
         default: 2
 
       force_run:
-        description: '⚡ Force run? (true = agar kuch change nahi bhi hai toh marker commit karega)'
+        description: '⚡ Force run? (true = agar kuch change nahi bhi hai toh marker file/commit banayega)'
         required: true
         type: boolean
         default: false
@@ -42,7 +42,6 @@ jobs:
           echo "════════════════════════════════════════"
           echo "🖥️ ENVIRONMENT INFO"
           echo "════════════════════════════════════════"
-          echo "📅 Date        : $(date)"
           echo "👤 Runner      : ${{ runner.os }}"
           echo "🔢 Comment #   : ${{ inputs.comment_number }}"
           echo "⚡ Force run   : ${{ inputs.force_run }}"
@@ -63,7 +62,6 @@ jobs:
           echo "🎯 COMMIT SEARCH"
           echo "════════════════════════════════════════"
 
-          # ── Validation ──
           if [ "$POS" -lt 1 ]; then
             echo "❌ FATAL: Number 1 ya usse bada hona chahiye!"
             exit 1
@@ -80,7 +78,6 @@ jobs:
             exit 1
           fi
 
-          # ── Find commit ──
           TARGET=$(git log --format="%H" --skip=$((POS - 1)) -1)
           TARGET_SHORT=$(git log --format="%h" --skip=$((POS - 1)) -1)
           TARGET_MSG=$(git log -1 --format="%s" "$TARGET")
@@ -91,14 +88,13 @@ jobs:
           echo "✅ TARGET COMMIT MILA:"
           echo "────────────────────────────────────"
           echo "  🔢 Position  : #$POS"
-          echo "  🔑 Hash      : $TARGET_SHORT ($TARGET)"
+          echo "  🔑 Hash      : $TARGET_SHORT"
           echo "  👤 Author    : $TARGET_AUTHOR"
           echo "  📅 Date      : $TARGET_DATE"
           echo "  📝 Message   : $TARGET_MSG"
           echo "────────────────────────────────────"
           echo ""
 
-          # ── Save outputs ──
           echo "target=$TARGET" >> $GITHUB_OUTPUT
           echo "target_short=$TARGET_SHORT" >> $GITHUB_OUTPUT
           echo "message=$TARGET_MSG" >> $GITHUB_OUTPUT
@@ -122,7 +118,6 @@ jobs:
           echo "════════════════════════════════════════"
           echo ""
 
-          # ── File stats ──
           ADDED=$(git diff --name-status $TARGET HEAD | grep -c '^A' || true)
           MODIFIED=$(git diff --name-status $TARGET HEAD | grep -c '^M' || true)
           DELETED=$(git diff --name-status $TARGET HEAD | grep -c '^D' || true)
@@ -152,7 +147,7 @@ jobs:
           echo "total_changed=$TOTAL_CHANGED" >> $GITHUB_OUTPUT
 
       # ═════════════════════════════════════════
-      # STEP 5: Restore
+      # STEP 5: Restore Process (YAML Error FIXED)
       # ═════════════════════════════════════════
       - name: 🔄 Restore Comment #${{ inputs.comment_number }}
         working-directory: Admin
@@ -174,7 +169,6 @@ jobs:
           # ── Restore all files from target commit to root ──
           echo "📦 Checking out files from $TARGET_SHORT to root..."
           git checkout $TARGET -- .
-
           git add -A
 
           # ── Check if there are changes ──
@@ -193,9 +187,11 @@ jobs:
               echo "Target: $TARGET_SHORT ($TARGET_MSG)" >> $MARKER_FILE
               echo "Status: No file changes (already same)" >> $MARKER_FILE
               echo "---" >> $MARKER_FILE
+              
               git add $MARKER_FILE
-              git commit -m "⚡ Force Restore: Comment #${{ inputs.comment_number }} — '$TARGET_MSG' (no changes)"
+              git commit -m "⚡ Force Restore: Comment #${{ inputs.comment_number }} (no changes)"
               git push origin main
+              
               echo "✅ Marker commit pushed."
               echo "committed=true" >> $GITHUB_OUTPUT
               echo "commit_msg=Force Restore (no changes)" >> $GITHUB_OUTPUT
@@ -212,18 +208,12 @@ jobs:
           echo "📝 Files changed:"
           git diff --cached --name-status | head -30
 
-          COMMIT_MSG="🔄 Restore: Comment #${{ inputs.comment_number }} — '$TARGET_MSG'
-
-Target: $TARGET_SHORT
-Comment #: ${{ inputs.comment_number }}
-Files changed: $TOTAL_CHANGED
-Run by: GitHub Actions
-Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-
-          git commit -m "$COMMIT_MSG"
+          # Yahan YAML error fix kiya gaya hai (alag alag -m use karke)
+          echo "📤 Committing changes..."
+          git commit -m "🔄 Restore: Comment #${{ inputs.comment_number }} — '$TARGET_MSG'" -m "Target: $TARGET_SHORT | Files: $TOTAL_CHANGED | Run by: GitHub Actions"
 
           echo ""
-          echo "📤 Pushing to main..."
+          echo "🚀 Pushing to main..."
           git push origin main
 
           NEW_HEAD=$(git rev-parse --short HEAD)
@@ -236,7 +226,7 @@ Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
           echo "────────────────────────────────────"
 
           echo "committed=true" >> $GITHUB_OUTPUT
-          echo "commit_msg=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "commit_msg=Success" >> $GITHUB_OUTPUT
           echo "new_head=$NEW_HEAD" >> $GITHUB_OUTPUT
 
       # ═════════════════════════════════════════
