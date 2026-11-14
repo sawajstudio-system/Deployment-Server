@@ -147,7 +147,7 @@ jobs:
           echo "total_changed=$TOTAL_CHANGED" >> $GITHUB_OUTPUT
 
       # ═════════════════════════════════════════
-      # STEP 5: Restore Process (YAML Error FIXED)
+      # STEP 5: Restore Process (Clean & Checkout)
       # ═════════════════════════════════════════
       - name: 🔄 Restore Comment #${{ inputs.comment_number }}
         working-directory: Admin
@@ -166,8 +166,9 @@ jobs:
           echo "🔄 RESTORE PROCESS"
           echo "════════════════════════════════════════"
 
-          # ── Restore all files from target commit to root ──
-          echo "📦 Checking out files from $TARGET_SHORT to root..."
+          # ── Clear current workspace and check out exact files from target commit ──
+          echo "📦 Resetting working directory and checking out files from $TARGET_SHORT..."
+          git rm -rf . || true
           git checkout $TARGET -- .
           git add -A
 
@@ -208,7 +209,6 @@ jobs:
           echo "📝 Files changed:"
           git diff --cached --name-status | head -30
 
-          # Yahan YAML error fix kiya gaya hai (alag alag -m use karke)
           echo "📤 Committing changes..."
           git commit -m "🔄 Restore: Comment #${{ inputs.comment_number }} — '$TARGET_MSG'" -m "Target: $TARGET_SHORT | Files: $TOTAL_CHANGED | Run by: GitHub Actions"
 
