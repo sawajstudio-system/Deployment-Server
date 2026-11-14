@@ -1,46 +1,71 @@
-name: 🚑 Direct Target Restore
+name: 🚀 Auto-Fetch Folders to Root
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch: # Manual run karne ke liye button
 
 permissions:
-  contents: write 
+  contents: write # Repo me file save karne ki permission
 
 jobs:
-  direct-restore:
+  fetch-folders:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-      - name: 1. 📥 Checkout Full History
+      # 1. Admin Repo Checkout
+      - name: 1. 📥 Checkout Admin Repo
+        uses: actions/checkout@v4
+
+      # 2. Hosting Server Repo se download karna
+      - name: 2. 📦 Fetch from hosting_sarvar
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          repository: sawajstudio-system/hosting_sarvar
           token: ${{ secrets.TOKEN_GITHUB }}
+          path: temp_hosting
+          sparse-checkout: |
+            API service
+            Video_Generator
 
-      - name: 2. 🔍 Restore from Exact Safe Commit
+      # 3. Folders ko Root me move karna (API service ke andar se bahar nikalna)
+      - name: 3. 🚚 Move Folders to Admin Repo Root
         run: |
-          echo "🎯 Targeting the safe commit: 0bbeb86"
+          echo "🚚 Moving folders to admin repo root..."
           
-          # Direct us safe commit se saari files nikaal lo
-          git checkout 0bbeb86 -- .
+          # Purane folders delete karo agar hain toh
+          rm -rf "API service" "Video_Generator" "A_API_room" "Git_room" "URL_room" || true
           
-          echo "✅ Files restored from 0bbeb86!"
-          
-          # Check karo ki folder aa gaya ya nahi
-          ls -la | grep "API"
+          # 1. Video_Generator ko bahar nikalo
+          if [ -d "temp_hosting/Video_Generator" ]; then
+            mv "temp_hosting/Video_Generator" "./Video_Generator"
+            echo "✅ Video_Generator moved to root."
+          fi
 
-      - name: 3. 🚀 Force Push to Save
+          # 2. API service ke andar ki cheezein root me nikalo
+          if [ -d "temp_hosting/API service" ]; then
+            # A_API_room, Git_room, URL_room ko root me move karo
+            mv "temp_hosting/API service/A_API_room" ./
+            mv "temp_hosting/API service/Git_room" ./
+            mv "temp_hosting/API service/URL_room" ./
+            echo "✅ A_API_room, Git_room, URL_room moved to root."
+          fi
+          
+          # Temp folder saaf karo
+          rm -rf temp_hosting
+          echo "✅ Cleanup done!"
+
+      # 4. Admin Repo me save (Commit) karna
+      - name: 4. 💾 Save to Admin Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
           
-          # Force add aur commit
-          git add . -f
+          git add . 
           
           if git diff --cached --quiet; then
-            echo "ℹ️ No changes."
+            echo "ℹ️ Koi change nahi mila, folders pehle se root me hain."
           else
-            git commit -m "🚑 Restored files from safe commit 0bbeb86"
-            git push origin HEAD:${{ github.ref_name }} --force
-            echo "✅ Successfully pushed back to GitHub!"
+            git commit -m "🤖 Auto-Fetched: Moved API folders (A_API_room, Git_room, URL_room) to Root"
+            git push origin HEAD:${{ github.ref_name }}
+            echo "✅ Folders successfully admin repo root me save ho gaye!"
           fi
