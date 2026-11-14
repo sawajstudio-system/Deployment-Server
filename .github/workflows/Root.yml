@@ -1,4 +1,4 @@
-name: 🚑 100% Full Repo Recovery
+name: 🚑 Force Restore Folders
 
 on:
   workflow_dispatch: 
@@ -7,46 +7,62 @@ permissions:
   contents: write 
 
 jobs:
-  restore-everything:
+  force-restore:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Pura History checkout karein
-      - name: 1. 📥 Checkout Full History
+      # 1. Admin Repo Checkout
+      - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           token: ${{ secrets.TOKEN_GITHUB }}
+          fetch-depth: 0
 
-      # 2. History se sabse purani files wapas laayein
-      - name: 2. 🚑 Force Restore First Commit
+      # 2. Hosting Repo se Files Lao
+      - name: 2. 📦 Fetch from hosting_sarvar
+        uses: actions/checkout@v4
+        with:
+          repository: sawajstudio-system/hosting_sarvar
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: temp_hosting
+
+      # 3. Folders Copy karo aur Git_room bahar nikalo
+      - name: 3. 🚚 Move Folders & Setup
         run: |
-          echo "🔍 Finding the VERY FIRST commit of this repo..."
+          echo "📂 Copying folders..."
           
-          # Sabse pehla commit dhundho (jahan saari files safe thi)
-          FIRST_COMMIT=$(git log --all --format="%H" | tail -n 1)
+          # API service folder ko lao (with quotes for space)
+          if [ -d "temp_hosting/API service" ]; then
+            cp -rf "temp_hosting/API service" "./API service"
+            echo "✅ API service copied."
+          fi
           
-          echo "✅ Found First Commit: $FIRST_COMMIT"
-          echo "📂 Forcefully restoring ALL files from the first commit..."
+          # Video_Generator lao
+          if [ -d "temp_hosting/Video_Generator" ]; then
+            cp -rf "temp_hosting/Video_Generator" "./Video_Generator"
+            echo "✅ Video_Generator copied."
+          fi
           
-          # Us commit se saari files wapas laao
-          git checkout $FIRST_COMMIT -- .
+          # Git_room ko bahar nikalo
+          if [ -d "API service/Git_room" ]; then
+            cp -rf "API service/Git_room" "./Git_room"
+            echo "✅ Git_room moved to root."
+          fi
           
-          echo "✅ All files successfully restored to workspace!"
+          rm -rf temp_hosting
+          echo "✅ Folders ready!"
 
-      # 3. Wapas GitHub par save karein
-      - name: 3. 💾 Save Restored Files
+      # 4. Commit aur Force Push
+      - name: 4. 🚀 Force Push to Admin Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
           
-          # Sab kuch add karein
-          git add .
+          # Sab kuch force add karo
+          git add -A -f
           
-          if git diff --cached --quiet; then
-            echo "ℹ️ Files pehle se hi sahi hain."
-          else
-            git commit -m "🚑 FULL EMERGENCY RESTORE: Recovered all files from the very first commit"
-            git push origin HEAD:${{ github.ref_name }} --force
-            echo "✅ Successfully recovered ALL files to Admin Repo!"
-          fi
+          git commit -m "🚑 Force Restored: Brought API service & Git_room from hosting_sarvar" || echo "No changes"
+          
+          # 🟢 Force push taaki purani khaali history override ho jaye
+          git push origin HEAD:${{ github.ref_name }} --force
+          echo "✅ Successfully force-pushed to Admin Repo!"
