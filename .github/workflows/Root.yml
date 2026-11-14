@@ -1,4 +1,4 @@
-name: 🚑 Force Restore Folders
+name: 🚑 Force Restore Folders 
 
 on:
   workflow_dispatch: 
