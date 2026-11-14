@@ -1,94 +1,26 @@
-name: 🔄 Emergency Restore Factory
-
+name: 🔄 Emergency Restore Project
 on:
   workflow_dispatch:
-    inputs:
-      commit_hash:
-        description: 'Commit hash (Factory delete hone se PEHLE wala)'
-        type: string
-        required: true
-
 permissions:
   contents: write
-
 jobs:
   restore:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    env:
-      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
-      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
-      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
-
     steps:
-      - name: 1. 📥 Checkout Development (Full History)
+      - name: Checkout Development
         uses: actions/checkout@v4
         with:
           repository: 'sawajstudio-system/Development'
           token: ${{ secrets.TOKEN_GITHUB }}
           path: 'Development'
-          fetch-depth: 100    # Pura history fetch karo
-
-      - name: 2. 📜 Show Commit History
-        run: |
-          cd Development
-          echo "═══════════════════════════════════════════════════"
-          echo "📜 Last 20 commits:"
-          echo "═══════════════════════════════════════════════════"
-          git log --oneline -20
-
-      - name: 3. 🔄 Restore Factory Folder
-        run: |
-          cd Development
-          COMMIT="${{ inputs.commit_hash }}"
-          
-          if [ -z "$COMMIT" ]; then
-            echo "❌ Commit hash required!"
-            exit 1
-          fi
-          
-          echo "🔄 Restoring Factory/ from commit: $COMMIT"
-          git checkout "$COMMIT" -- Factory/
-          
-          if [ -d "Factory" ]; then
-            echo "✅ Factory folder restored!"
-            echo "📊 Total files: $(find Factory -type f | wc -l)"
-            echo ""
-            echo "📁 Factory structure:"
-            find Factory -maxdepth 2 -type d | sort
-          else
-            echo "❌ Restore failed - Factory folder not found in commit $COMMIT"
-            exit 1
-          fi
-
-      - name: 4. 💾 Commit & Push
+          fetch-depth: 10
+      - name: Restore Factory
         run: |
           cd Development
           git config user.name "Sawaj Studio Bot"
           git config user.email "bot@sawajstudio.com"
-          
-          git add Factory/
-          
-          if git diff-index --quiet HEAD; then
-            echo "STATUS=No changes (already restored)" >> $GITHUB_ENV
-          else
-            git commit -m "🔄 Restore: Factory folder wapas (from ${{ inputs.commit_hash }})"
-            git push origin main
-            echo "STATUS=✅ Factory restored successfully!" >> $GITHUB_ENV
-          fi
-
-      - name: 5. 📤 Telegram Report
-        if: always()
-        run: |
-          MSG="🔄 <b>Factory Restore Report</b>
-          
-          📜 <b>Commit:</b> ${{ inputs.commit_hash }}
-          📊 <b>Status:</b> ${STATUS:-Unknown}
-          
-          $( [ -n "$STATUS" ] && echo "✅ <i>Factory folder wapas aa gaya!</i>" || echo "⚠️ <i>Check karo repo</i>" )"
-          
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
-            --data-urlencode "text=${MSG}" \
-            -d "parse_mode=HTML" || true
+          # Yeh pichle commit (jisme project tha) se sari files wapas le aayega
+          git checkout HEAD~1 -- .
+          git add .
+          git commit -m "🔄 Restore: Pura project wapas laaya gaya"
+          git push origin main
