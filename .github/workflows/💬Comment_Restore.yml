@@ -1,0 +1,122 @@
+name: 💬Comment_Restore
+
+on:
+  workflow_dispatch:
+    inputs:
+      comment_number:
+        description: '🔢 Kaunsa comment number restore karna hai? (1 = latest, 2 = second, 3 = third...)'
+        required: true
+        type: number
+        default: 1
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      # ─────────────────────────────────────────
+      # STEP 1: Checkout Admin Repo (root folder mein)
+      # ─────────────────────────────────────────
+      - name: 📥 Checkout Admin Repo
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Admin'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Admin'
+          fetch-depth: 0
+
+      # ─────────────────────────────────────────
+      # STEP 2: Find the commit by number
+      # ─────────────────────────────────────────
+      - name: 🎯 Find Comment #${{ inputs.comment_number }}
+        working-directory: Admin
+        id: find
+        run: |
+          POS="${{ inputs.comment_number }}"
+
+          if [ "$POS" -lt 1 ]; then
+            echo "❌ Number 1 ya usse bada hona chahiye!"
+            exit 1
+          fi
+
+          TARGET=$(git log --format="%H" --skip=$((POS - 1)) -1)
+
+          if [ -z "$TARGET" ]; then
+            echo "❌ Comment #$POS exist nahi karta!"
+            echo "📋 Available commits:"
+            git log --oneline | head -20
+            exit 1
+          fi
+
+          echo "✅ Comment #$POS mila:"
+          git log -1 --format="  Hash    : %H%n  Author  : %an%n  Date    : %ad%n  Message : %s" "$TARGET"
+
+          echo "target=$TARGET" >> $GITHUB_OUTPUT
+          echo "message=$(git log -1 --format='%s' $TARGET)" >> $GITHUB_OUTPUT
+
+      # ─────────────────────────────────────────
+      # STEP 3: Preview
+      # ─────────────────────────────────────────
+      - name: 👁️ Preview Changes
+        working-directory: Admin
+        run: |
+          TARGET="${{ steps.find.outputs.target }}"
+          echo "════════════════════════════════════════"
+          echo "📊 RESTORE PREVIEW"
+          echo "════════════════════════════════════════"
+          echo "🔢 Comment #  : ${{ inputs.comment_number }}"
+          echo "📝 Message    : ${{ steps.find.outputs.message }}"
+          echo "📂 Destination: Admin repo root"
+          echo "────────────────────────────────────"
+          echo "📋 Files jo change hongi:"
+          git diff --name-status $TARGET HEAD || true
+          echo "────────────────────────────────────"
+          echo "Total: $(git diff --name-only $TARGET HEAD | wc -l) files"
+          echo "════════════════════════════════════════"
+
+      # ─────────────────────────────────────────
+      # STEP 4: Restore to Root
+      # ─────────────────────────────────────────
+      - name: 🔄 Restore Comment #${{ inputs.comment_number }}
+        working-directory: Admin
+        run: |
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+
+          TARGET="${{ steps.find.outputs.target }}"
+          TARGET_MSG="${{ steps.find.outputs.message }}"
+
+          echo "🔄 Restoring Comment #${{ inputs.comment_number }} to root..."
+
+          # Root folder mein sab restore
+          git checkout $TARGET -- .
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "ℹ️ Koi change nahi — already same version hai."
+            exit 0
+          fi
+
+          git commit -m "🔄 Restore: Comment #${{ inputs.comment_number }} — '$TARGET_MSG'"
+          git push origin main
+          echo "✅ Restore complete!"
+
+      # ─────────────────────────────────────────
+      # STEP 5: Summary
+      # ─────────────────────────────────────────
+      - name: 📊 Summary
+        working-directory: Admin
+        run: |
+          echo "════════════════════════════════════════"
+          echo "✅ DONE"
+          echo "════════════════════════════════════════"
+          echo "Comment #  : ${{ inputs.comment_number }}"
+          echo "Message    : ${{ steps.find.outputs.message }}"
+          echo "Location   : Admin repo root"
+          echo ""
+          echo "📜 Last 3 commits:"
+          git log --oneline -3
+          echo "════════════════════════════════════════"
