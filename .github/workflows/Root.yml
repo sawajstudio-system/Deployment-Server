@@ -1,59 +1,71 @@
-name: 🚑 Emergency Restore Repo
+name: 🚀 Auto-Fetch Folders to Root
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch: # Manual run karne ke liye button
 
 permissions:
-  contents: write 
+  contents: write # Repo me file save karne ki permission
 
 jobs:
-  restore-repo:
+  fetch-folders:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-      # 1. Pura History checkout karein (Fetch Depth 0 matlab saari purani history)
-      - name: 1. 📥 Checkout Full History
+      # 1. Admin Repo Checkout
+      - name: 1. 📥 Checkout Admin Repo
+        uses: actions/checkout@v4
+
+      # 2. Hosting Server Repo se download karna
+      - name: 2. 📦 Fetch from hosting_sarvar
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          repository: sawajstudio-system/hosting_sarvar
           token: ${{ secrets.TOKEN_GITHUB }}
+          path: temp_hosting
+          sparse-checkout: |
+            API service
+            Video_Generator
 
-      # 2. History se purani files wapas laayein
-      - name: 2. 🚑 Restore Deleted Files
+      # 3. Folders ko Root me move karna (API service ke andar se bahar nikalna)
+      - name: 3. 🚚 Move Folders to Admin Repo Root
         run: |
-          echo "🔍 Finding the last commit where files existed..."
+          echo "🚚 Moving folders to admin repo root..."
           
-          # Pichle 10 commits mein se dhundho jahan API service ya System_room folder tha
-          # (Aapke screenshot ke anusar files pichle kisi commit me thi)
-          GOOD_COMMIT=$(git log --all --format="%H" -- "API service" "System_room" "Video_Generator" | head -n 1)
+          # Purane folders delete karo agar hain toh
+          rm -rf "API service" "Video_Generator" "A_API_room" "Git_room" "URL_room" || true
           
-          if [ -z "$GOOD_COMMIT" ]; then
-            echo "⚠️ Direct folder nahi mila, thoda aur peeche check kar rahe hain..."
-            # Agar naam alag tha, toh sabse purana commit utha lo
-            GOOD_COMMIT=$(git log --all --format="%H" | head -n 10 | tail -n 1)
+          # 1. Video_Generator ko bahar nikalo
+          if [ -d "temp_hosting/Video_Generator" ]; then
+            mv "temp_hosting/Video_Generator" "./Video_Generator"
+            echo "✅ Video_Generator moved to root."
+          fi
+
+          # 2. API service ke andar ki cheezein root me nikalo
+          if [ -d "temp_hosting/API service" ]; then
+            # A_API_room, Git_room, URL_room ko root me move karo
+            mv "temp_hosting/API service/A_API_room" ./
+            mv "temp_hosting/API service/Git_room" ./
+            mv "temp_hosting/API service/URL_room" ./
+            echo "✅ A_API_room, Git_room, URL_room moved to root."
           fi
           
-          echo "✅ Found commit: $GOOD_COMMIT"
-          echo "📂 Restoring all files from this commit..."
-          
-          # Us commit se saari files wapas laao (delete kiye bina)
-          git checkout $GOOD_COMMIT -- .
-          
-          echo "✅ Files successfully restored from history!"
+          # Temp folder saaf karo
+          rm -rf temp_hosting
+          echo "✅ Cleanup done!"
 
-      # 3. Wapas GitHub par save karein
-      - name: 3. 💾 Save Restored Files
+      # 4. Admin Repo me save (Commit) karna
+      - name: 4. 💾 Save to Admin Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
           
-          # Changes add karein
-          git add .
+          git add . 
           
           if git diff --cached --quiet; then
-            echo "ℹ️ Files pehle se hi sahi hain."
+            echo "ℹ️ Koi change nahi mila, folders pehle se root me hain."
           else
-            git commit -m "🚑 EMERGENCY RESTORE: Recovered all files from git history"
+            git commit -m "🤖 Auto-Fetched: Moved API folders (A_API_room, Git_room, URL_room) to Root"
             git push origin HEAD:${{ github.ref_name }}
-            echo "✅ Successfully recovered to Admin Repo!"
+            echo "✅ Folders successfully admin repo root me save ho gaye!"
           fi
