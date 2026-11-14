@@ -1,0 +1,304 @@
+name: 🧹 Cleanup Duplicates (Diploment)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Mode (Dry Run = sirf list, Delete = actual delete)'
+        type: choice
+        default: 'Dry Run'
+        options:
+          - 'Dry Run'          # 🔍 Sirf dikhaayega kya delete hoga
+          - 'Delete'           # 🗑️ Actual delete karega
+      
+      backup_first:
+        description: 'Backup banana hai? (GDrive pe ZIP upload)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_F_RECYCLE_ID: ${{ secrets.GDRIVE_F_RECYCLE_ID }}
+
+    steps:
+      # ─────────────────────────────────────────────────────────────
+      # STEP 1: Checkout Diploment Repo
+      # ─────────────────────────────────────────────────────────────
+      - name: 1. 📥 Checkout Diploment
+        uses: actions/checkout@v4
+        with:
+          repository: 'sawajstudio-system/Diploment'
+          token: ${{ secrets.TOKEN_GITHUB }}
+          path: 'Diploment'
+          fetch-depth: 1
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 2: Safety Info — Kya kya milega
+      # ─────────────────────────────────────────────────────────────
+      - name: 2. 🔍 Analyze Current Structure
+        run: |
+          echo "═══════════════════════════════════════════════════"
+          echo "📁 Current Diploment Structure:"
+          echo "═══════════════════════════════════════════════════"
+          cd Diploment
+          ls -la
+          echo ""
+          echo "📂 Full tree (2 levels deep):"
+          find . -maxdepth 2 -type d | sort
+          echo ""
+          echo "📊 Total files: $(find . -type f -not -path '*/.git/*' | wc -l)"
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 3: Define Delete Patterns
+      # ─────────────────────────────────────────────────────────────
+      - name: 3. 📋 Define Delete Patterns
+        run: |
+          # 🟢 YEH SAARE PATTERNS DELETE HONGE (Diploment se)
+          # Agar koi pattern galat hai toh yahan edit karo
+          
+          cat > /tmp/delete_patterns.txt <<'EOF'
+          Git/
+          API service/
+          1_Git_Tools/
+          2_AI_Models/
+          3_Media/
+          4_Islamic/
+          5_Audio_Text/
+          Factory/
+          Management/
+          EOF
+          
+          echo "📋 Delete patterns defined:"
+          cat /tmp/delete_patterns.txt
+          echo ""
+          echo "✅ KEEP (rakhne wali files):"
+          echo "   - .github/ (workflows)"
+          echo "   - Video_Generator/ (main folder)"
+          echo "   - README.md"
+          echo "   - .gitignore"
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 4: Find Matching Files/Directories
+      # ─────────────────────────────────────────────────────────────
+      - name: 4. 🎯 Find Duplicates (Dry List)
+        run: |
+          cd Diploment
+          echo "═══════════════════════════════════════════════════"
+          echo "🎯 Files/Folders that will be DELETED:"
+          echo "═══════════════════════════════════════════════════"
+          
+          TO_DELETE=0
+          > /tmp/delete_list.txt
+          
+          while IFS= read -r pattern; do
+            [ -z "$pattern" ] && continue
+            
+            # Har pattern ke liye check karo
+            if [ -e "$pattern" ]; then
+              echo "❌ FOUND: $pattern"
+              find "$pattern" -type f -not -path '*/.git/*' 2>/dev/null | while read f; do
+                echo "   - $f"
+              done
+              echo "$pattern" >> /tmp/delete_list.txt
+              TO_DELETE=$((TO_DELETE + 1))
+            fi
+          done < /tmp/delete_patterns.txt
+          
+          if [ ! -s /tmp/delete_list.txt ]; then
+            echo "✅ Koi duplicate nahi mila! Repo already clean hai."
+          else
+            echo ""
+            echo "═══════════════════════════════════════════════════"
+            echo "📊 Total patterns to delete: $(wc -l < /tmp/delete_list.txt)"
+            echo "📊 Total files to delete: $(find . -type f -not -path '*/.git/*' | wc -l)"
+            echo "═══════════════════════════════════════════════════"
+          fi
+          
+          # List ko env var mein save karo
+          cp /tmp/delete_list.txt $GITHUB_WORKSPACE/delete_list.txt
+          cp /tmp/delete_patterns.txt $GITHUB_WORKSPACE/delete_patterns.txt
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 5: Backup (ZIP + GDrive Upload)
+      # ─────────────────────────────────────────────────────────────
+      - name: 5. 💾 Backup (if requested)
+        if: ${{ inputs.backup_first == true }}
+        run: |
+          echo "💾 Creating backup ZIP..."
+          
+          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+          BACKUP_NAME="Diploment_backup_${TIMESTAMP}.zip"
+          
+          cd Diploment
+          zip -r "../${BACKUP_NAME}" . \
+            -x "*.git/*" \
+            -x "*/__pycache__/*" \
+            -x "*.pyc" \
+            > /dev/null
+          cd ..
+          
+          BACKUP_SIZE=$(du -h "${BACKUP_NAME}" | cut -f1)
+          echo "✅ Backup created: ${BACKUP_NAME} (${BACKUP_SIZE})"
+          
+          echo "BACKUP_NAME=${BACKUP_NAME}" >> $GITHUB_ENV
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 5.1: Upload Backup to GDrive
+      # ─────────────────────────────────────────────────────────────
+      - name: 5.1 ☁️ Upload Backup to GDrive
+        if: ${{ inputs.backup_first == true && env.BACKUP_NAME != '' }}
+        run: |
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib > /dev/null
+          
+          python << 'PYEOF'
+          import os
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          cid = os.getenv("GDRIVE_CLIENT_ID")
+          csec = os.getenv("GDRIVE_CLIENT_SECRET")
+          rtok = os.getenv("GDRIVE_REFRESH_TOKEN")
+          folder_id = os.getenv("GDRIVE_F_RECYCLE_ID")
+          zip_file = os.getenv("BACKUP_NAME")
+
+          if not all([cid, csec, rtok, folder_id]):
+              print("⚠️ GDrive credentials missing. Skipping upload.")
+              exit(0)
+
+          if not os.path.exists(zip_file):
+              print(f"❌ Backup file not found: {zip_file}")
+              exit(0)
+
+          print(f"☁️ Uploading {zip_file} to GDrive...")
+          creds = Credentials(None, refresh_token=rtok, client_id=cid, 
+                              client_secret=csec, 
+                              token_uri="https://oauth2.googleapis.com/token")
+          service = build('drive', 'v3', credentials=creds, cache_discovery=False)
+
+          file_metadata = {'name': zip_file, 'parents': [folder_id]}
+          media = MediaFileUpload(zip_file, mimetype='application/zip', resumable=True)
+          
+          try:
+              file = service.files().create(body=file_metadata, media_body=media, 
+                                            fields='id, webViewLink').execute()
+              print(f"✅ Uploaded: {file.get('webViewLink')}")
+          except Exception as e:
+              print(f"❌ Upload failed: {e}")
+          PYEOF
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 6: ACTUAL DELETE (only if mode = Delete)
+      # ─────────────────────────────────────────────────────────────
+      - name: 6. 🗑️ Delete Duplicates
+        if: ${{ inputs.mode == 'Delete' }}
+        run: |
+          echo "🗑️ Starting actual deletion..."
+          cd Diploment
+          
+          DELETED_COUNT=0
+          
+          while IFS= read -r pattern; do
+            [ -z "$pattern" ] && continue
+            
+            if [ -e "$pattern" ]; then
+              echo "🗑️ Deleting: $pattern"
+              
+              # File count before delete
+              COUNT=$(find "$pattern" -type f 2>/dev/null | wc -l)
+              DELETED_COUNT=$((DELETED_COUNT + COUNT))
+              
+              rm -rf "$pattern"
+              echo "   ✓ Deleted ($COUNT files)"
+            fi
+          done < /tmp/delete_patterns.txt
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════"
+          echo "✅ Total deleted files: $DELETED_COUNT"
+          echo "═══════════════════════════════════════════════════"
+          
+          echo "DELETED_COUNT=$DELETED_COUNT" >> $GITHUB_ENV
+          
+          # Verify what remains
+          echo "📁 Remaining structure:"
+          find . -maxdepth 2 -not -path '*/.git/*' | sort
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 7: Commit & Push
+      # ─────────────────────────────────────────────────────────────
+      - name: 7. 💾 Commit & Push
+        if: ${{ inputs.mode == 'Delete' }}
+        run: |
+          cd Diploment
+          git config user.name "Sawaj Studio Bot"
+          git config user.email "bot@sawajstudio.com"
+          
+          git add -A
+          
+          if git diff-index --quiet HEAD; then
+            echo "STATUS=No changes (nothing to delete)" >> $GITHUB_ENV
+          else
+            DELETED=${DELETED_COUNT:-0}
+            git commit -m "🧹 Cleanup: Removed duplicate files/folders (${DELETED} files deleted)"
+            git push origin main
+            echo "STATUS=✅ Success! Deleted ${DELETED} duplicate files" >> $GITHUB_ENV
+          fi
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 8: Telegram Report
+      # ─────────────────────────────────────────────────────────────
+      - name: 8. 📤 Send Telegram Report
+        if: always()
+        run: |
+          MODE="${{ inputs.mode }}"
+          
+          if [ "$MODE" = "Dry Run" ]; then
+            MSG="🔍 <b>Diploment Cleanup — DRY RUN</b>
+            
+            📋 <b>Mode:</b> Sirf analysis (kuch delete nahi hua)
+            📁 <b>Delete patterns:</b> $(wc -l < /tmp/delete_list.txt 2>/dev/null || echo 0)
+            💾 <b>Backup:</b> ${{ inputs.backup_first == true && 'Bana liya (GDrive pe upload)' || 'Nahi banaya' }}
+            
+            ℹ️ <i>Confirm karne ke liye workflow dobara chalao</i>
+            ℹ️ <i>Aur mode = "Delete" select karo</i>"
+          
+          elif [ "$MODE" = "Delete" ]; then
+            MSG="🧹 <b>Diploment Cleanup — COMPLETED</b>
+            
+            🗑️ <b>Deleted files:</b> ${DELETED_COUNT:-0}
+            💾 <b>Backup:</b> ${{ inputs.backup_first == true && 'GDrive pe safe' || 'Nahi liya' }}
+            📊 <b>Status:</b> ${STATUS:-Completed}
+            
+            ✅ <i>Repo ab clean hai!</i>"
+          
+          else
+            MSG="ℹ️ <b>Cleanup cancelled</b>"
+          fi
+          
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_API_REPORT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_API_REPORT_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" \
+            -d "parse_mode=HTML" || true
+
+      # ─────────────────────────────────────────────────────────────
+      # STEP 9: Cleanup artifacts
+      # ─────────────────────────────────────────────────────────────
+      - name: 9. 🧹 Cleanup Temp Files
+        if: always()
+        run: |
+          rm -f *.zip 2>/dev/null || true
+          rm -f delete_list.txt delete_patterns.txt 2>/dev/null || true
