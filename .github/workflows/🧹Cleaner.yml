@@ -1,0 +1,48 @@
+name: 🧹 Cleaner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+
+    env:
+      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+      TELEGRAM_API_REPORT_TOKEN: ${{ secrets.TELEGRAM_API_REPORT_TOKEN }}
+      TELEGRAM_API_REPORT_CHAT_ID: ${{ secrets.TELEGRAM_API_REPORT_CHAT_ID }}
+
+    steps:
+      - name: 1. 📥 Checkout Public Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 2. 🔒 Clone Private Backend in Air
+        run: |
+          git clone https://${{ secrets.TOKEN_GITHUB }}@github.com/sawajstudio-system/Backend.git ${{ runner.temp }}/private_repo
+
+      - name: 3. 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 4. 📦 Install Deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: 5. 🧹 Run Safe Cleaner
+        run: |
+          cp ${{ runner.temp }}/private_repo/System_room/cleaner.py ${{ runner.temp }}/cleaner.py
+          python ${{ runner.temp }}/cleaner.py
+
+      - name: 6. 💨 Vanish from Air
+        if: always()
+        run: |
+          rm -rf ${{ runner.temp }}/private_repo
+          rm -f ${{ runner.temp }}/cleaner.py
+          echo "✅ Hawa mein hi gayab ho gaya!"
