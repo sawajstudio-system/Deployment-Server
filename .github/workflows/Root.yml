@@ -1,10 +1,10 @@
-name: 🚀 Auto-Fetch Folders to Root
+name: 🚀 Recover & Setup Folders
 
 on:
-  workflow_dispatch: # Manual run karne ke liye button
+  workflow_dispatch: 
 
 permissions:
-  contents: write # Repo me file save karne ki permission
+  contents: write 
 
 jobs:
   fetch-folders:
@@ -16,7 +16,7 @@ jobs:
       - name: 1. 📥 Checkout Admin Repo
         uses: actions/checkout@v4
 
-      # 2. Hosting Server Repo se download karna (Bina sparse-checkout ke)
+      # 2. Hosting Server Repo Download
       - name: 2. 📦 Fetch from hosting_sarvar
         uses: actions/checkout@v4
         with:
@@ -24,48 +24,45 @@ jobs:
           token: ${{ secrets.TOKEN_GITHUB }}
           path: temp_hosting
 
-      # 3. Folders ko Root me move karna
-      - name: 3. 🚚 Move Folders to Admin Repo Root
+      # 3. Copy Folders (No Delete)
+      - name: 3. 🚚 Recover & Setup Folders
         run: |
-          echo "🚚 Moving folders to admin repo root..."
+          echo "📂 1. Copying fresh folders from hosting_sarvar..."
           
-          # Purane folders delete karo agar hain toh
-          rm -rf "API service" "Video_Generator" "A_API_room" "Git_room" "URL_room" || true
-          
-          # 1. Video_Generator ko bahar nikalo
-          if [ -d "temp_hosting/Video_Generator" ]; then
-            mv "temp_hosting/Video_Generator" "./Video_Generator"
-            echo "✅ Video_Generator moved to root."
-          fi
-
-          # 2. API service folder ko root me move karo
+          # Forcefully copy folders
           if [ -d "temp_hosting/API service" ]; then
-            mv "temp_hosting/API service" "./API service"
-            echo "✅ API service folder moved to root."
-            
-            # 3. Ab API service ke andar se Git_room ko bahar nikalo
-            if [ -d "API service/Git_room" ]; then
-              mv "API service/Git_room" "./Git_room"
-              echo "✅ Git_room extracted to root."
-            fi
+            cp -rf "temp_hosting/API service" "./API service"
+            echo "✅ API service recovered to root."
           fi
           
-          # Temp folder saaf karo
+          if [ -d "temp_hosting/Video_Generator" ]; then
+            cp -rf "temp_hosting/Video_Generator" "./Video_Generator"
+            echo "✅ Video_Generator recovered to root."
+          fi
+          
+          echo "🚚 2. Extracting Git_room to root..."
+          # Copy Git_room out of API service instead of moving
+          if [ -d "API service/Git_room" ]; then
+            cp -rf "API service/Git_room" "./Git_room"
+            echo "✅ Git_room successfully copied to root!"
+          fi
+          
           rm -rf temp_hosting
-          echo "✅ Cleanup done!"
+          echo "✅ Recovery complete!"
 
-      # 4. Admin Repo me save (Commit) karna
+      # 4. Commit and Push
       - name: 4. 💾 Save to Admin Repo
         run: |
           git config --global user.name "Sawaj Studio Bot"
           git config --global user.email "bot@sawajstudio.com"
           
-          git add . 
+          # Sirf new/modified files add karo (deletes ignore karo)
+          git add .
           
           if git diff --cached --quiet; then
-            echo "ℹ️ Koi change nahi mila, folders pehle se root me hain."
+            echo "ℹ️ Koi change nahi mila."
           else
-            git commit -m "🤖 Auto-Fetched: Moved folders to Root (API service, Video_Generator, Git_room)"
+            git commit -m "🔄 Recovered folders: API service, Video_Generator, Git_room"
             git push origin HEAD:${{ github.ref_name }}
-            echo "✅ Folders successfully admin repo root me save ho gaye!"
+            echo "✅ Successfully recovered to Admin Repo!"
           fi
